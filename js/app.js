@@ -101,7 +101,8 @@ function esc(str) { return (str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;
 function minutesToLabel(mins) {
   let h = Math.floor(mins / 60) % 24;
   let m = mins % 60;
-  return `${String(h).padStart(2, '0')}h${String(m).padStart(2, '0')}`;
+  const sep = (typeof state !== 'undefined' && state.lang === 'en') ? ':' : 'h';
+  return `${String(h).padStart(2, '0')}${sep}${String(m).padStart(2, '0')}`;
 }
 function timeToMinutes(hhmm) {
   const [h, m] = hhmm.split(':').map(Number);
@@ -118,12 +119,17 @@ const TIME_OPTIONS = (() => {
 })();
 
 const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+// L'ordre jour/mois s'inverse d'une langue à l'autre (« 3 septembre » vs
+// « September 3 ») : pas qu'une question de vocabulaire, la structure change.
 function formatDateLong(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
+  if (state.lang === 'en') return `${MONTHS_EN[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
   return `${d.getDate()} ${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`;
 }
 function formatDateGroup(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
+  if (state.lang === 'en') return `${MONTHS_EN[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
   return `${d.getDate()} ${MONTHS_FR[d.getMonth()][0].toUpperCase()}${MONTHS_FR[d.getMonth()].slice(1)} ${d.getFullYear()}`;
 }
 // Date locale, pas UTC : `toISOString` bascule au jour suivant dès 20 h à
@@ -246,22 +252,39 @@ const MLS_POOL = [
 const AVAIL_HOUR_START = 7;
 const AVAIL_HOUR_END = 22;
 
+// `labelFr`/`labelEn`, pas `label` : ces entrées sont des const de module,
+// évaluées avant que `state` existe — `tr()` ne peut être appelé qu'au
+// rendu, via `availTypeLabel()`, jamais ici.
 const AVAIL_TYPES = [
-  { id: 'visite-libre', label: 'Visite libre', color: '#1F9D55', bg: '#E8F5E9' },
-  { id: 'pre-approuve', label: 'Pré-approuvé', color: '#0066DC', bg: '#EAF3FB' },
-  { id: 'impossible', label: 'Impossible', color: '#C8102E', bg: '#FAE8EB' },
+  { id: 'visite-libre', labelFr: 'Visite libre', labelEn: 'Open showing', color: '#1F9D55', bg: '#E8F5E9' },
+  { id: 'pre-approuve', labelFr: 'Pré-approuvé', labelEn: 'Pre-approved', color: '#0066DC', bg: '#EAF3FB' },
+  { id: 'impossible', labelFr: 'Impossible', labelEn: 'Unavailable', color: '#C8102E', bg: '#FAE8EB' },
 ];
-function availTypeMeta(id) { return AVAIL_TYPES.find(t => t.id === id) || AVAIL_TYPES[0]; }
+function availTypeMeta(id) { return AVAIL_TYPES.find(a => a.id === id) || AVAIL_TYPES[0]; }
+function availTypeLabel(id) { const m = availTypeMeta(id); return tr(m.labelFr, m.labelEn); }
 
 // Lun→Dim pour les puces à cocher du modal (comme la maquette) ; Dim→Sam pour
 // l'en-tête de semaine, qui commence un dimanche. Les deux pointent vers le
-// même index `Date#getDay()`.
-const MODAL_DAY_ORDER = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-const DAY_LABEL_TO_DOW = { Lun: 1, Mar: 2, Mer: 3, Jeu: 4, Ven: 5, Sam: 6, Dim: 0 };
-const WEEKDAY_SHORT_SUN_FIRST = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+// même index `Date#getDay()`, quelle que soit la langue — seule l'étiquette
+// affichée change, la position (et donc le jour visé) reste stable.
+const DAY_ORDER_ABBR = {
+  fr: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+  en: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+};
+const DAY_DOW_BY_INDEX = [1, 2, 3, 4, 5, 6, 0];
+const WEEKDAY_SHORT_SUN_FIRST_BY_LANG = {
+  fr: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+};
+function modalDayOrder() { return DAY_ORDER_ABBR[state.lang]; }
+function dayLabelToDow(label) {
+  const idx = modalDayOrder().indexOf(label);
+  return idx === -1 ? null : DAY_DOW_BY_INDEX[idx];
+}
+function weekdayShortSunFirst() { return WEEKDAY_SHORT_SUN_FIRST_BY_LANG[state.lang]; }
 
 function dowLabelFor(dateIso) {
-  return MODAL_DAY_ORDER.find(l => DAY_LABEL_TO_DOW[l] === new Date(dateIso + 'T00:00:00').getDay());
+  return modalDayOrder().find(l => dayLabelToDow(l) === new Date(dateIso + 'T00:00:00').getDay());
 }
 
 function rangesOverlap(a, b) { return a.startMinutes < b.endMinutes && b.startMinutes < a.endMinutes; }
@@ -273,7 +296,7 @@ function generateAvailDates(weekStartIso, dayLabels, recurrence) {
   const cycles = recurrence ? AVAIL_RECURRENCE_CYCLES[recurrence] : 1;
   const out = new Set();
   dayLabels.forEach(label => {
-    const occurrence0 = addDaysISO(weekStartIso, DAY_LABEL_TO_DOW[label]);
+    const occurrence0 = addDaysISO(weekStartIso, dayLabelToDow(label));
     for (let c = 0; c < cycles; c++) {
       let d = occurrence0;
       if (recurrence === 'semaine') d = addDaysISO(occurrence0, c * 7);
@@ -326,11 +349,12 @@ function propertyAvailability(mls) {
 // rien à consulter, donc rien d'autre à répondre que « ça passe par le
 // courtier ».
 const AVAILABILITY_TAGS = {
-  'visite-libre': { label: 'Visite libre', tone: 'ok' },
-  'pre-approuve': { label: 'Pré-approuvée', tone: 'info' },
-  impossible:     { label: 'Impossible dans cette plage horaire', tone: 'danger' },
-  none:           { label: 'Besoin d\'approbation du courtier', tone: 'warn' },
+  'visite-libre': { labelFr: 'Visite libre', labelEn: 'Open showing', tone: 'ok' },
+  'pre-approuve': { labelFr: 'Pré-approuvée', labelEn: 'Pre-approved', tone: 'info' },
+  impossible:     { labelFr: 'Impossible dans cette plage horaire', labelEn: 'Not available at this time', tone: 'danger' },
+  none:           { labelFr: 'Besoin d\'approbation du courtier', labelEn: 'Needs broker approval', tone: 'warn' },
 };
+function availabilityTagLabel(tag) { return tag ? tr(tag.labelFr, tag.labelEn) : ''; }
 function availabilityTagFor(stop, start) {
   if (stop.external || !stop.mls) return AVAILABILITY_TAGS.none;
   const end = start + stop.duration;
@@ -386,12 +410,19 @@ function addressSuggestions(q) {
     .slice(0, 4);
 }
 
-const PROVINCES = [
+const PROVINCES_FR = [
   ['QC', 'Québec'], ['ON', 'Ontario'], ['NB', 'Nouveau-Brunswick'], ['NS', 'Nouvelle-Écosse'],
   ['PE', 'Île-du-Prince-Édouard'], ['NL', 'Terre-Neuve-et-Labrador'], ['MB', 'Manitoba'],
   ['SK', 'Saskatchewan'], ['AB', 'Alberta'], ['BC', 'Colombie-Britannique'],
   ['YT', 'Yukon'], ['NT', 'Territoires du Nord-Ouest'], ['NU', 'Nunavut'],
 ];
+const PROVINCES_EN = [
+  ['QC', 'Quebec'], ['ON', 'Ontario'], ['NB', 'New Brunswick'], ['NS', 'Nova Scotia'],
+  ['PE', 'Prince Edward Island'], ['NL', 'Newfoundland and Labrador'], ['MB', 'Manitoba'],
+  ['SK', 'Saskatchewan'], ['AB', 'Alberta'], ['BC', 'British Columbia'],
+  ['YT', 'Yukon'], ['NT', 'Northwest Territories'], ['NU', 'Nunavut'],
+];
+function provinces() { return state.lang === 'en' ? PROVINCES_EN : PROVINCES_FR; }
 
 // Découpe « 567 rue des Développeurs, Boucherville » en numéro, rue et ville :
 // ce que le courtier vient de taper n'a pas à être retapé.
@@ -420,14 +451,14 @@ function newPropertyDraft(typed) {
 }
 
 const NEW_PROPERTY_REQUIRED = [
-  ['num', 'le numéro civique'],
-  ['street', 'le nom de la rue'],
-  ['city', 'la ville'],
-  ['province', 'la province'],
+  ['num', 'le numéro civique', 'the street number'],
+  ['street', 'le nom de la rue', 'the street name'],
+  ['city', 'la ville', 'the city'],
+  ['province', 'la province', 'the province'],
 ];
 function newPropertyMissing() {
   const f = state.newProperty || {};
-  return NEW_PROPERTY_REQUIRED.filter(([k]) => !String(f[k] || '').trim()).map(([, label]) => label);
+  return NEW_PROPERTY_REQUIRED.filter(([k]) => !String(f[k] || '').trim()).map(([, labelFr, labelEn]) => tr(labelFr, labelEn));
 }
 
 // Greater Montréal bounds, used to place custom stops that have no MLS listing.
@@ -576,12 +607,16 @@ function courtierPhoneFor(courtier) {
   return `(${514 + (h % 3) * 100}) ${100 + (h % 900)}-${1000 + ((h >>> 3) % 9000)}`;
 }
 
-// Virgule décimale : l'interface est en français, « 0.4 km » se lit comme une
-// coquille.
-function formatKm(km) { return km < 10 ? `${km.toFixed(1).replace('.', ',')} km` : `${Math.round(km)} km`; }
+// Virgule décimale en français (point en anglais) : « 0.4 km » se lit comme
+// une coquille pour un lectorat FR.
+function formatKm(km) {
+  if (km >= 10) return `${Math.round(km)} km`;
+  return state.lang === 'en' ? `${km.toFixed(1)} km` : `${km.toFixed(1).replace('.', ',')} km`;
+}
 function formatMinutes(min) {
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60), m = min % 60;
+  if (state.lang === 'en') return m ? `${h}h ${m}min` : `${h}h`;
   return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`;
 }
 
@@ -628,17 +663,19 @@ function makeStop(address, mls, opts = {}) {
 const STOP_STATUSES = {
   // Bac à sable : la propriété est retenue, rien n'est parti. Pas de libellé —
   // il n'y a rien à dire d'un état qui n'engage personne.
-  sandbox:   { label: '', short: 'Bac à sable', tone: 'none', action: false },
-  pending:   { label: 'En attente de confirmation du courtier inscripteur', short: 'En attente', tone: 'pending', action: true },
-  confirmed: { label: 'Confirmée', short: 'Confirmée', tone: 'ok', action: false },
-  proposed:  { label: 'Autre créneau proposé', short: 'Contre-proposition', tone: 'warn', action: true },
-  refused:   { label: 'Visite refusée', short: 'Refusée', tone: 'danger', action: true },
-  noreply:   { label: 'Sans réponse du courtier', short: 'Sans réponse', tone: 'muted', action: true },
+  sandbox:   { labelFr: '', labelEn: '', shortFr: 'Bac à sable', shortEn: 'Sandbox', tone: 'none', action: false },
+  pending:   { labelFr: 'En attente de confirmation du courtier inscripteur', labelEn: 'Awaiting confirmation from listing broker', shortFr: 'En attente', shortEn: 'Pending', tone: 'pending', action: true },
+  confirmed: { labelFr: 'Confirmée', labelEn: 'Confirmed', shortFr: 'Confirmée', shortEn: 'Confirmed', tone: 'ok', action: false },
+  proposed:  { labelFr: 'Autre créneau proposé', labelEn: 'Alternate time proposed', shortFr: 'Contre-proposition', shortEn: 'Counter-offer', tone: 'warn', action: true },
+  refused:   { labelFr: 'Visite refusée', labelEn: 'Visit declined', shortFr: 'Refusée', shortEn: 'Declined', tone: 'danger', action: true },
+  noreply:   { labelFr: 'Sans réponse du courtier', labelEn: 'No response from broker', shortFr: 'Sans réponse', shortEn: 'No response', tone: 'muted', action: true },
   // Distinct du refus : un refus répond à une demande jamais accordée, une
   // annulation retire une confirmation qui existait. L'heure était promise,
   // parfois déjà transmise à l'acheteur — le tour recule d'une case.
-  cancelled: { label: 'Visite annulée par le courtier inscripteur', short: 'Annulée', tone: 'danger', action: true },
+  cancelled: { labelFr: 'Visite annulée par le courtier inscripteur', labelEn: 'Visit cancelled by listing broker', shortFr: 'Annulée', shortEn: 'Cancelled', tone: 'danger', action: true },
 };
+function stopStatusLabel(status) { const m = STOP_STATUSES[status]; return m ? tr(m.labelFr, m.labelEn) : ''; }
+function stopStatusShort(status) { const m = STOP_STATUSES[status]; return m ? tr(m.shortFr, m.shortEn) : ''; }
 // Ordre du simulateur de démo : le cycle suit le parcours réel d'une demande.
 // L'annulation suit la confirmation, seul état d'où elle a un sens — et le
 // seul d'où l'heure promise existe encore pour être nommée.
@@ -648,12 +685,13 @@ const STOP_STATUS_CYCLE = ['pending', 'confirmed', 'cancelled', 'proposed', 'ref
 // demandes sont parties, l'acheteur a reçu le tour) et de l'état des arrêts.
 // Deux champs stockés au lieu de quatre états à maintenir en cohérence.
 const TOUR_STATUSES = {
-  brouillon:     { label: 'Brouillon', tone: 'draft', help: 'Aucune demande envoyée. Le tour n\'est visible que par vous.' },
-  en_cours:      { label: 'Tour créé et en cours', tone: 'pending', help: 'Des demandes sont parties. Le tour est engagé : les arrêts envoyés ne se déplacent plus qu\'en passant par « Éditer ».' },
-  confirme:      { label: 'Confirmé', tone: 'ok', help: 'Toutes les visites sont confirmées. Le tour peut être partagé avec un acheteur.' },
-  non_envoye:    { label: 'Non envoyé', tone: 'todo', help: 'L\'acheteur est choisi et les visites sont confirmées, mais le tour ne lui a pas encore été envoyé.' },
-  partage:       { label: 'Partagé', tone: 'shared', help: 'Le tour a été partagé avec l\'acheteur.' },
+  brouillon:     { labelFr: 'Brouillon', labelEn: 'Draft', tone: 'draft', help: 'Aucune demande envoyée. Le tour n\'est visible que par vous.' },
+  en_cours:      { labelFr: 'Tour créé et en cours', labelEn: 'Tour created, in progress', tone: 'pending', help: 'Des demandes sont parties. Le tour est engagé : les arrêts envoyés ne se déplacent plus qu\'en passant par « Éditer ».' },
+  confirme:      { labelFr: 'Confirmé', labelEn: 'Confirmed', tone: 'ok', help: 'Toutes les visites sont confirmées. Le tour peut être partagé avec un acheteur.' },
+  non_envoye:    { labelFr: 'Non envoyé', labelEn: 'Not sent', tone: 'todo', help: 'L\'acheteur est choisi et les visites sont confirmées, mais le tour ne lui a pas encore été envoyé.' },
+  partage:       { labelFr: 'Partagé', labelEn: 'Shared', tone: 'shared', help: 'Le tour a été partagé avec l\'acheteur.' },
 };
+function tourStatusLabel(status) { const m = TOUR_STATUSES[status]; return m ? tr(m.labelFr, m.labelEn) : ''; }
 
 // Sans réponse au bout du délai, l'arrêt bascule visuellement en « sans
 // réponse » sans qu'on ait à écrire dans la donnée : c'est le temps qui a
@@ -815,12 +853,12 @@ function seedTours() {
 // behind a flag. `wired: false` means the feature is specced but not built yet;
 // the panel lists it as "à venir" rather than offering a toggle that does nothing.
 const FEATURE_FLAGS = [
-  { group: 'Sources de propriétés', id: 'mlsCart', label: 'Panier et recherche MLS', help: 'Onglets Panier et MLS dans « Ajouter une destination ». Désactivé, on obtient le comportement ImmoContact, sans catalogue MLS.', default: false, wired: true },
-  { group: 'Sources de propriétés', id: 'customAddress', label: 'Adresse personnalisée', help: 'La recherche par adresse propose aussi les adresses hors catalogue, ajoutables directement. Désactivé, seules les fiches existantes remontent.', default: true, wired: true },
-  { group: 'Sources de propriétés', id: 'propertyViaBrokerOnly', label: 'Propriété via courtier uniquement (TB)', help: 'Sur TB, une propriété ne peut être ajoutée qu\'après avoir sélectionné un courtier.', default: false, wired: false },
+  { group: 'Sources de propriétés', groupEn: 'Listing sources', id: 'mlsCart', labelFr: 'Panier et recherche MLS', labelEn: 'MLS search and cart', helpFr: 'Onglets Panier et MLS dans « Ajouter une destination ». Désactivé, on obtient le comportement ImmoContact, sans catalogue MLS.', helpEn: 'Cart and MLS tabs in "Add a destination". Disabled, you get the ImmoContact behavior, with no MLS catalogue.', default: false, wired: true },
+  { group: 'Sources de propriétés', groupEn: 'Listing sources', id: 'customAddress', labelFr: 'Adresse personnalisée', labelEn: 'Custom address', helpFr: 'La recherche par adresse propose aussi les adresses hors catalogue, ajoutables directement. Désactivé, seules les fiches existantes remontent.', helpEn: 'Address search also suggests off-catalogue addresses, addable directly. Disabled, only existing listings come up.', default: true, wired: true },
+  { group: 'Sources de propriétés', groupEn: 'Listing sources', id: 'propertyViaBrokerOnly', labelFr: 'Propriété via courtier uniquement (TB)', labelEn: 'Listing via broker only (TB)', helpFr: 'Sur TB, une propriété ne peut être ajoutée qu\'après avoir sélectionné un courtier.', helpEn: 'On TB, a listing can only be added after a broker has been selected.', default: false, wired: false },
 
-  { group: 'Démo', id: 'simulateConfirmation', label: 'Simuler la réponse des courtiers', help: 'Rend le statut de chaque visite cliquable pour basculer entre « À confirmer » et « Confirmée ». Outil de démo : en production, seul le courtier inscripteur confirme.', default: true, wired: true },
-  { group: 'Démo', id: 'tourOptimize', label: 'Optimiser le tour', help: 'Affiche le bouton « Optimiser le tour » dans le constructeur, qui réordonne les arrêts par proximité géographique. Désactivé, le tour ne se compose que par glisser-déposer manuel.', default: true, wired: true },
+  { group: 'Démo', groupEn: 'Demo', id: 'simulateConfirmation', labelFr: 'Simuler la réponse des courtiers', labelEn: 'Simulate broker responses', helpFr: 'Rend le statut de chaque visite cliquable pour basculer entre « À confirmer » et « Confirmée ». Outil de démo : en production, seul le courtier inscripteur confirme.', helpEn: 'Makes each visit\'s status clickable to toggle between "To confirm" and "Confirmed". A demo tool: in production, only the listing broker confirms.', default: true, wired: true },
+  { group: 'Démo', groupEn: 'Demo', id: 'tourOptimize', labelFr: 'Optimiser le tour', labelEn: 'Optimize the tour', helpFr: 'Affiche le bouton « Optimiser le tour » dans le constructeur, qui réordonne les arrêts par proximité géographique. Désactivé, le tour ne se compose que par glisser-déposer manuel.', helpEn: 'Shows the "Optimize the tour" button in the builder, which reorders stops by geographic proximity. Disabled, the tour can only be arranged by manual drag-and-drop.', default: false, wired: true },
 ];
 
 // Une seule API Buyer's Tour sert les deux plateformes : ce qui les distingue
@@ -833,16 +871,16 @@ const FEATURE_FLAGS = [
 // largeur : elle est portée ici pour que le bandeau réserve la bonne place
 // avant que le SVG soit chargé.
 const PLATFORMS = [
-  { id: 'immocontact', label: 'ImmoContact', brand: 'Immocontact', logo: 'assets/logo-immocontact.svg', logoWidth: 184, help: 'Adresse libre, sans catalogue MLS ni Panier.' },
-  { id: 'touchbase', label: 'Touchbase', brand: 'Touchbase', logo: 'assets/logo-touchbase.svg', logoWidth: 160, help: 'Catalogue MLS et Panier ; la propriété passe par un courtier.' },
+  { id: 'immocontact', label: 'ImmoContact', brand: 'Immocontact', logo: 'assets/logo-immocontact.svg', logoWidth: 184, helpFr: 'Adresse libre, sans catalogue MLS ni Panier.', helpEn: 'Free-form address, no MLS catalogue or cart.' },
+  { id: 'touchbase', label: 'Touchbase', brand: 'Touchbase', logo: 'assets/logo-touchbase.svg', logoWidth: 160, helpFr: 'Catalogue MLS et Panier ; la propriété passe par un courtier.', helpEn: 'MLS catalogue and cart; the listing goes through a broker.' },
 ];
 
 // Chaque preset décrit la plateforme en entier, y compris les comportements pas
 // encore construits : il documente la cible et s'appliquera tout seul au fur et
 // à mesure que les flags passent en `wired`.
 const PLATFORM_PRESETS = {
-  immocontact: { mlsCart: false, customAddress: true, propertyViaBrokerOnly: false, simulateConfirmation: true, tourOptimize: true },
-  touchbase: { mlsCart: true, customAddress: false, propertyViaBrokerOnly: true, simulateConfirmation: true, tourOptimize: true },
+  immocontact: { mlsCart: false, customAddress: true, propertyViaBrokerOnly: false, simulateConfirmation: true, tourOptimize: false },
+  touchbase: { mlsCart: true, customAddress: false, propertyViaBrokerOnly: true, simulateConfirmation: true, tourOptimize: false },
 };
 
 // Appliquer ne touche qu'aux flags branchés : les autres n'ont aucun
@@ -868,7 +906,7 @@ function currentPlatform() {
 // Saved values win over the defaults above, so bump the suffix whenever a
 // `default` changes — otherwise anyone who already toggled a flag keeps the old
 // default for the new one and never sees the feature.
-const FLAG_STORAGE_KEY = 'ic-buyers-tour-flags-v5';
+const FLAG_STORAGE_KEY = 'ic-buyers-tour-flags-v6';
 
 function loadFlags() {
   const flags = {};
@@ -901,11 +939,37 @@ function saveBrandPlatform() {
   try { localStorage.setItem(BRAND_PLATFORM_KEY, state.brandPlatform); } catch (e) { /* ignore */ }
 }
 
+/* ---------------- Langue ---------------- */
+// Indépendante de la plateforme/des flags : un cabinet bilingue peut vouloir
+// montrer la démo en anglais sous ImmoContact comme sous Touchbase. Le
+// français reste la clé de référence — `t(fr, en)` évite un dictionnaire
+// séparé à tenir à jour, au prix de répéter le texte anglais à chaque appel.
+const LANGUAGES = [
+  { id: 'fr', label: 'FR' },
+  { id: 'en', label: 'EN' },
+];
+const LANG_STORAGE_KEY = 'ic-buyers-tour-lang-v1';
+function loadLang() {
+  try {
+    const saved = localStorage.getItem(LANG_STORAGE_KEY);
+    if (saved && LANGUAGES.some(l => l.id === saved)) return saved;
+  } catch (e) { /* storage unavailable (private mode) — default is fine */ }
+  return LANGUAGES[0].id;
+}
+function saveLang() {
+  try { localStorage.setItem(LANG_STORAGE_KEY, state.lang); } catch (e) { /* ignore */ }
+}
+// Nommé `tr`, pas `t` : ce dernier sert déjà partout comme nom de variable
+// locale (tour, type…) — un helper global `t()` serait masqué par ces
+// variables dans la plupart des fonctions où on en a justement besoin.
+function tr(fr, en) { return state.lang === 'en' ? en : fr; }
+
 /* ---------------- State ---------------- */
 
 const state = {
   flags: loadFlags(),
   brandPlatform: loadBrandPlatform(), // marque affichée — ne suit que le dernier preset cliqué, voir renderBrand()
+  lang: loadLang(),
   screen: 'list',           // list | contact | buyerForm | builder | properties
   listTab: 'upcoming',      // upcoming | past
   listSearch: '',
@@ -1048,23 +1112,29 @@ function groupSameSlot(stop) {
   if (wasConfirmed) setStopStatus(stop, 'pending');
   markDirtyIfSent();
   render();
-  showToast(wasConfirmed
-    ? `Visite déplacée à ${slotStart ? slotStart.replace(':', 'h') : 'ce créneau'} : la confirmation du courtier est à redemander.`
-    : `Les deux visites sont demandées à ${slotStart ? slotStart.replace(':', 'h') : 'la même heure'}.`,
-    wasConfirmed ? 'default' : 'success');
+  const slotStartFr = slotStart ? slotStart.replace(':', 'h') : 'ce créneau';
+  const slotStartEn = slotStart || 'this time slot';
+  showToast(tr(
+    wasConfirmed
+      ? `Visite déplacée à ${slotStartFr} : la confirmation du courtier est à redemander.`
+      : `Les deux visites sont demandées à ${slotStart ? slotStartFr : 'la même heure'}.`,
+    wasConfirmed
+      ? `Visit moved to ${slotStartEn}: the broker's confirmation needs to be requested again.`
+      : `Both visits are requested at ${slotStart ? slotStartEn : 'the same time'}.`
+  ), wasConfirmed ? 'default' : 'success');
 }
 function splitSameSlot(stop) {
   stop.parallel = false;
   stop.slotAck = false;
   markDirtyIfSent();
   render();
-  showToast('Les deux visites sont de nouveau demandées l\'une après l\'autre.');
+  showToast(tr('Les deux visites sont de nouveau demandées l\'une après l\'autre.', 'Both visits are requested one after the other again.'));
 }
 function ackSameSlot(stop) {
   stop.slotAck = true;
   markDirtyIfSent();
   render();
-  showToast('Créneau simultané confirmé.', 'success');
+  showToast(tr('Créneau simultané confirmé.', 'Overlapping time slot confirmed.'), 'success');
 }
 
 /* ----- Optimisation ----- */
@@ -1077,12 +1147,12 @@ function optimizeDraftStops() {
   const props = state.draft.stops.filter(s => s.type === 'property');
   const reordered = optimizeByGeography(props);
   const unchanged = reordered.map(s => s.id).join(',') === state.draft.stops.map(s => s.id).join(',');
-  if (unchanged) { showToast('Le tour suit déjà cet ordre.'); return; }
+  if (unchanged) { showToast(tr('Le tour suit déjà cet ordre.', 'The tour already follows this order.')); return; }
   state.draft.stops = reordered;
   normalizeParallel(state.draft);
   markDirtyIfSent();
   render();
-  showToast('Tour réordonné par proximité géographique.', 'success');
+  showToast(tr('Tour réordonné par proximité géographique.', 'Tour reordered by geographic proximity.'), 'success');
 }
 
 // Relancer remet le compteur du délai à zéro : les arrêts « sans réponse »
@@ -1132,10 +1202,10 @@ function sendStopRequest(stop) {
   markStopsSent([stop]);
   commitDraft();
   render();
-  showToast(
+  showToast(tr(
     `Demande de visite envoyée à ${stop.courtier || 'son courtier inscripteur'}${stop.lockedStart ? ` pour ${stop.lockedStart.replace(':', 'h')}` : ''}.`,
-    'success'
-  );
+    `Visit request sent to ${stop.courtier || 'the listing broker'}${stop.lockedStart ? ` for ${stop.lockedStart}` : ''}.`
+  ), 'success');
 }
 
 // Envoi groupé : un raccourci pour ne pas cliquer huit fois. L'état obtenu est
@@ -1150,12 +1220,14 @@ function sendTourToBrokers(notifyBuyer, selectedIds = null) {
   });
   state.modal = null;
   render();
-  showToast(
+  showToast(tr(
     notifyBuyer
       ? `${targets.length} demande${targets.length > 1 ? 's' : ''} de visite envoyée${targets.length > 1 ? 's' : ''} aux courtiers inscripteurs et à l'acheteur.`
       : `${targets.length} demande${targets.length > 1 ? 's' : ''} de visite envoyée${targets.length > 1 ? 's' : ''} aux courtiers inscripteurs.`,
-    'success'
-  );
+    notifyBuyer
+      ? `${targets.length} visit request${targets.length > 1 ? 's' : ''} sent to the listing brokers and to the buyer.`
+      : `${targets.length} visit request${targets.length > 1 ? 's' : ''} sent to the listing brokers.`
+  ), 'success');
 }
 
 // Le tour est déjà parti et vient d'être modifié : on enregistre, et `notify`
@@ -1166,10 +1238,10 @@ function saveDraftToTour(notify, notifyBuyer = false) {
   render();
   showToast(
     !notify
-      ? 'Modifications enregistrées.'
+      ? tr('Modifications enregistrées.', 'Changes saved.')
       : notifyBuyer
-        ? 'Modifications enregistrées et mise à jour envoyée aux courtiers concernés et à l\'acheteur.'
-        : 'Modifications enregistrées et mise à jour envoyée aux courtiers concernés.',
+        ? tr('Modifications enregistrées et mise à jour envoyée aux courtiers concernés et à l\'acheteur.', 'Changes saved and an update sent to the brokers involved and to the buyer.')
+        : tr('Modifications enregistrées et mise à jour envoyée aux courtiers concernés.', 'Changes saved and an update sent to the brokers involved.'),
     'success'
   );
 }
@@ -1273,18 +1345,22 @@ function tourStartIsFixed(draft) {
 
 /* ---------------- Rendering ---------------- */
 
+// `labelEn` reprend le vocabulaire exact de la maquette Touchbase fournie
+// (Active inbox, Buyer's tours, My listings…) — les autres écrans du
+// prototype, absents de cette maquette, suivent ce même registre.
 const NAV_ITEMS = [
-  { id: 'inbox', label: 'Boîte de réception', img: 'assets/menu/inbox.svg', badge: 7 },
-  { id: 'sendmsg', label: 'Envoi de message', img: 'assets/menu/send.svg' },
-  { id: 'waiting', label: 'Attente de réponse', img: 'assets/menu/wait.svg', badge: 3 },
-  { id: 'tours', label: 'Tour de visites', img: 'assets/menu/tour.svg' },
-  { id: 'properties', label: 'Mes propriétés', img: 'assets/menu/properties.svg' },
-  { id: 'reports', label: 'Rapports', img: 'assets/menu/reports.svg' },
-  { id: 'calendar', label: 'Calendrier', img: 'assets/menu/calendar.svg' },
-  { id: 'map', label: 'Carte', img: 'assets/menu/map.svg' },
-  { id: 'settings', label: 'Paramètres', img: 'assets/menu/settings.svg' },
-  { id: 'help', label: 'Aide', img: 'assets/menu/help.svg' },
+  { id: 'inbox', labelFr: 'Boîte de réception', labelEn: 'Active inbox', img: 'assets/menu/inbox.svg', badge: 7 },
+  { id: 'sendmsg', labelFr: 'Envoi de message', labelEn: 'Send message', img: 'assets/menu/send.svg' },
+  { id: 'waiting', labelFr: 'Attente de réponse', labelEn: 'Pending responses', img: 'assets/menu/wait.svg', badge: 3 },
+  { id: 'tours', labelFr: 'Tour de visites', labelEn: 'Buyer\'s tours', img: 'assets/menu/tour.svg' },
+  { id: 'properties', labelFr: 'Mes propriétés', labelEn: 'My listings', img: 'assets/menu/properties.svg' },
+  { id: 'reports', labelFr: 'Rapports', labelEn: 'Reports', img: 'assets/menu/reports.svg' },
+  { id: 'calendar', labelFr: 'Calendrier', labelEn: 'Calendar', img: 'assets/menu/calendar.svg' },
+  { id: 'map', labelFr: 'Carte', labelEn: 'Map', img: 'assets/menu/map.svg' },
+  { id: 'settings', labelFr: 'Paramètres', labelEn: 'Settings', img: 'assets/menu/settings.svg' },
+  { id: 'help', labelFr: 'Aide', labelEn: 'Help', img: 'assets/menu/help.svg' },
 ];
+function navItemLabel(item) { return tr(item.labelFr, item.labelEn); }
 
 // Sections câblées dans ce prototype, au-delà du tour de visites. Une section
 // câblée n'affiche plus la réserve « absente de ce prototype », qu'elle soit
@@ -1308,16 +1384,17 @@ function renderSidebarNav() {
   el.innerHTML = NAV_ITEMS.map(item => {
     const active = item.id === activeId;
     const iconSrc = active ? (NAV_ACTIVE_ICONS[item.id] || item.img) : item.img;
+    const label = navItemLabel(item);
     // Le décor de la plateforme reste, badges compris : c'est ce qui rend la
     // démo crédible. Mais un badge promet du contenu, et ces sections n'en ont
     // pas. La réserve se dit avant le clic, pas seulement dans le toast après.
-    const hors = WIRED_NAV.has(item.id) ? '' : ' — section absente de ce prototype';
+    const hors = WIRED_NAV.has(item.id) ? '' : tr(' — section absente de ce prototype', ' — not wired up in this prototype');
     return `
     <a href="#" class="nav-item ${active ? 'active' : ''}" data-nav="${item.id}"
-      ${active ? 'aria-current="page"' : `title="${esc(item.label)}${hors}"`}
-      aria-label="${esc(item.label)}${item.badge ? `, ${item.badge} en attente` : ''}${hors}">
+      ${active ? 'aria-current="page"' : `title="${esc(label)}${hors}"`}
+      aria-label="${esc(label)}${item.badge ? `, ${item.badge} ${tr('en attente', 'pending')}` : ''}${hors}">
       <span class="nav-icon"><img src="${iconSrc}" alt=""></span>
-      ${esc(item.label)}
+      ${esc(label)}
       ${item.badge ? `<span class="nav-badge" aria-hidden="true">${item.badge}</span>` : ''}
     </a>`;
   }).join('');
@@ -1330,12 +1407,12 @@ function renderSidebarNav() {
 // tour sur lequel on a cliqué, ce qu'un libellé identique pour tous ne fait pas.
 function builderTitle() {
   const d = state.draft;
-  if (!d) return 'Créer un tour de visites';
-  if (d.buyer) return `Tour de ${d.buyer.prenom} ${d.buyer.nom}`;
+  if (!d) return tr('Créer un tour de visites', 'Create a buyer\'s tour');
+  if (d.buyer) return state.lang === 'en' ? `${d.buyer.prenom} ${d.buyer.nom}’s tour` : `Tour de ${d.buyer.prenom} ${d.buyer.nom}`;
   const saved = currentTour();
-  if (!saved || !tourSentAt(saved)) return 'Créer un tour de visites';
+  if (!saved || !tourSentAt(saved)) return tr('Créer un tour de visites', 'Create a buyer\'s tour');
   // Tour parti sans acheteur : la date est le seul nom qu'il ait.
-  return `Tour du ${formatDateLong(d.date)}`;
+  return state.lang === 'en' ? `Tour – ${formatDateLong(d.date)}` : `Tour du ${formatDateLong(d.date)}`;
 }
 
 // Le logotype suit la plateforme choisie dans les réglages : la démo doit
@@ -1351,7 +1428,40 @@ function renderBrand() {
     img.setAttribute('alt', p.brand);
     img.setAttribute('width', p.logoWidth);
   });
-  document.title = `${p.brand} — Tour de visites`;
+  document.title = `${p.brand} — ${tr('Tour de visites', 'Buyer\'s tours')}`;
+}
+
+// Chrome statique de index.html (sidebar, en-têtes mobiles, pied de page) :
+// jamais régénéré par `render()`, donc jamais retraduit par un simple
+// changement de `state.lang` sans ce passage dédié. Mêmes attributs que
+// `data-brand-logo` : on cible par attribut plutôt que par id un par un.
+const STATIC_CHROME_STRINGS = {
+  logout: ['Déconnexion', 'Disconnect'],
+  back: ['Retour', 'Back'],
+  menu: ['Menu', 'Menu'],
+  openMenu: ['Ouvrir le menu', 'Open menu'],
+  poweredByTouchbase: ['Propulsé par Touchbase Real Estate', 'Powered by Touchbase Real Estate'],
+};
+function staticStr(key) {
+  const pair = STATIC_CHROME_STRINGS[key];
+  return pair ? tr(pair[0], pair[1]) : '';
+}
+function syncStaticChrome() {
+  document.documentElement.lang = state.lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = staticStr(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.setAttribute('title', staticStr(el.getAttribute('data-i18n-title'))); });
+  document.querySelectorAll('[data-i18n-aria-label]').forEach(el => { el.setAttribute('aria-label', staticStr(el.getAttribute('data-i18n-aria-label'))); });
+  const logoutLabel = document.getElementById('sidebar-logout-label');
+  if (logoutLabel) logoutLabel.textContent = tr('Déconnexion', 'Disconnect');
+  const flagLabel = document.getElementById('sidebar-flag-label');
+  if (flagLabel) flagLabel.innerHTML = tr('Fièrement<br>canadien', 'Proudly<br>Canadian');
+  const mobileFlagLabel = document.getElementById('mobile-footer-flag-label');
+  if (mobileFlagLabel) mobileFlagLabel.textContent = tr('Fièrement Canadien', 'Proudly Canadian');
+  document.querySelectorAll('[data-lang]').forEach(btn => {
+    const active = btn.getAttribute('data-lang') === state.lang;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
 }
 
 function setTopbarTitle(title) {
@@ -1363,18 +1473,19 @@ function setTopbarTitle(title) {
 function render() {
   const main = document.getElementById('main-content');
   renderBrand();
+  syncStaticChrome();
   renderSidebarNav();
   // Un créneau partagé dépend de l'ordre de la liste : on le revalide ici, seul
   // point par lequel passe toute modification du tour.
   normalizeParallel(state.draft);
-  if (state.screen === 'list') { setTopbarTitle('Tour de visites'); main.innerHTML = renderListScreen(); }
+  if (state.screen === 'list') { setTopbarTitle(tr('Tour de visites', 'Buyer\'s tours')); main.innerHTML = renderListScreen(); }
   // L'écran nomme son objet — l'acheteur — et non l'envoi : on peut en repartir
   // sans avoir rien envoyé.
-  else if (state.screen === 'contact') { setTopbarTitle(state.contactPurpose === 'create' ? 'Créer un tour de visites' : 'Choisir l\'acheteur'); main.innerHTML = renderContactScreen(); }
+  else if (state.screen === 'contact') { setTopbarTitle(state.contactPurpose === 'create' ? tr('Créer un tour de visites', 'Create a buyer\'s tour') : tr('Choisir l\'acheteur', 'Choose the buyer')); main.innerHTML = renderContactScreen(); }
   else if (state.screen === 'builder') { setTopbarTitle(builderTitle()); main.innerHTML = renderBuilderScreen(); }
-  else if (state.screen === 'report') { setTopbarTitle('Compte rendu de visite'); main.innerHTML = renderReportScreen(); }
-  else if (state.screen === 'menu') { setTopbarTitle('Menu'); main.innerHTML = renderMenuScreen(); }
-  else if (state.screen === 'properties') { setTopbarTitle('Mes propriétés'); main.innerHTML = renderPropertiesScreen(); }
+  else if (state.screen === 'report') { setTopbarTitle(tr('Compte rendu de visite', 'Visit report')); main.innerHTML = renderReportScreen(); }
+  else if (state.screen === 'menu') { setTopbarTitle(tr('Menu', 'Menu')); main.innerHTML = renderMenuScreen(); }
+  else if (state.screen === 'properties') { setTopbarTitle(tr('Mes propriétés', 'My listings')); main.innerHTML = renderPropertiesScreen(); }
   else if (state.screen === 'propertyDetail') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderPropertyDetailScreen(); }
   else if (state.screen === 'propertyAvailability') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderAvailabilityScreen(); }
   document.body.dataset.screen = state.screen;
@@ -1393,15 +1504,16 @@ function renderMenuScreen() {
     <div class="menu-grid">
       ${NAV_ITEMS.map(item => {
         const active = item.id === activeId;
-        const hors = WIRED_NAV.has(item.id) ? '' : ' — section absente de ce prototype';
+        const label = navItemLabel(item);
+        const hors = WIRED_NAV.has(item.id) ? '' : tr(' — section absente de ce prototype', ' — not wired up in this prototype');
         return `
         <a href="#" class="menu-card ${active ? 'is-current' : ''}" data-nav="${item.id}"
-          ${active ? 'aria-current="page"' : (WIRED_NAV.has(item.id) ? '' : 'title="Section absente de ce prototype"')}
-          aria-label="${esc(item.label)}${item.badge ? `, ${item.badge} en attente` : ''}${hors}">
-          ${item.id === 'tours' ? '<span class="menu-card-clip"><span class="menu-ribbon">Nouveau</span></span>' : ''}
+          ${active ? 'aria-current="page"' : (WIRED_NAV.has(item.id) ? '' : `title="${tr('Section absente de ce prototype', 'Not wired up in this prototype')}"`)}
+          aria-label="${esc(label)}${item.badge ? `, ${item.badge} ${tr('en attente', 'pending')}` : ''}${hors}">
+          ${item.id === 'tours' ? `<span class="menu-card-clip"><span class="menu-ribbon">${tr('Nouveau', 'New')}</span></span>` : ''}
           ${item.badge ? `<span class="nav-badge menu-card-badge" aria-hidden="true">${item.badge}</span>` : ''}
           <span class="menu-card-icon"><img src="${item.img}" alt=""></span>
-          <span class="menu-card-label">${esc(item.label)}</span>
+          <span class="menu-card-label">${esc(label)}</span>
         </a>`;
       }).join('')}
     </div>
@@ -1419,7 +1531,7 @@ function renderPropertiesScreen() {
   const list = MLS_POOL.filter(p => (tab === 'inactive' ? p.inactive : !p.inactive));
 
   const rows = list.length === 0
-    ? `<div class="empty-state"><p>${tab === 'inactive' ? 'Aucune propriété inactive.' : 'Aucune propriété active.'}</p></div>`
+    ? `<div class="empty-state"><p>${tab === 'inactive' ? tr('Aucune propriété inactive.', 'No inactive listings.') : tr('Aucune propriété active.', 'No active listings.')}</p></div>`
     : `<div class="property-list">${list.map(p => `
         <div class="property-row" data-open-property="${esc(p.mls)}">
           <img class="property-row-thumb" src="${thumbFor(p.mls, p.address)}" alt="">
@@ -1428,12 +1540,12 @@ function renderPropertiesScreen() {
         </div>`).join('')}</div>`;
 
   return `
-    <div class="property-tabs" role="tablist" aria-label="Filtrer mes propriétés">
-      <button class="${tab === 'active' ? 'active' : ''}" data-property-tab="active" role="tab" aria-selected="${tab === 'active'}">Actives</button>
-      <button class="${tab === 'inactive' ? 'active' : ''}" data-property-tab="inactive" role="tab" aria-selected="${tab === 'inactive'}">Inactives</button>
+    <div class="property-tabs" role="tablist" aria-label="${tr('Filtrer mes propriétés', 'Filter my listings')}">
+      <button class="${tab === 'active' ? 'active' : ''}" data-property-tab="active" role="tab" aria-selected="${tab === 'active'}">${tr('Actives', 'Active')}</button>
+      <button class="${tab === 'inactive' ? 'active' : ''}" data-property-tab="inactive" role="tab" aria-selected="${tab === 'inactive'}">${tr('Inactives', 'Inactive')}</button>
     </div>
     ${rows}
-    <button class="btn btn-primary btn-block page-create-btn" id="btn-add-property">${icon('plus')} Ajouter une nouvelle propriété</button>
+    <button class="btn btn-primary btn-block page-create-btn" id="btn-add-property">${icon('plus')} ${tr('Ajouter une nouvelle propriété', 'Add a new listing')}</button>
   `;
 }
 
@@ -1442,7 +1554,7 @@ function bindPropertiesEvents() {
     btn.onclick = () => { state.propertiesTab = btn.getAttribute('data-property-tab'); render(); };
   });
   const addBtn = document.getElementById('btn-add-property');
-  if (addBtn) addBtn.onclick = () => showToast('L\'ajout d\'une propriété n\'est pas encore disponible dans ce prototype.');
+  if (addBtn) addBtn.onclick = () => showToast(tr('L\'ajout d\'une propriété n\'est pas encore disponible dans ce prototype.', 'Adding a listing isn\'t wired up in this prototype yet.'));
   document.querySelectorAll('[data-open-property]').forEach(row => {
     row.onclick = () => {
       state.propertyDetailMls = row.getAttribute('data-open-property');
@@ -1458,14 +1570,14 @@ function bindPropertiesEvents() {
 // prototype : la réserve se dit au clic, comme partout ailleurs, plutôt que
 // de laisser croire que la fiche est complète.
 const PROPERTY_DETAIL_ROWS = [
-  { id: 'visitParams', label: 'Paramètres pour les visites' },
-  { id: 'messageSplit', label: 'Répartition des messages' },
-  { id: 'notes', label: 'Notes de propriété' },
-  { id: 'reviews', label: 'Envoi d\'avis' },
-  { id: 'seller', label: 'Détails du vendeur' },
-  { id: 'availability', label: 'Disponibilités pour visites' },
-  { id: 'activities', label: 'Activités' },
-  { id: 'reports', label: 'Comptes rendus' },
+  { id: 'visitParams', labelFr: 'Paramètres pour les visites', labelEn: 'Showing settings' },
+  { id: 'messageSplit', labelFr: 'Répartition des messages', labelEn: 'Message routing' },
+  { id: 'notes', labelFr: 'Notes de propriété', labelEn: 'Listing notes' },
+  { id: 'reviews', labelFr: 'Envoi d\'avis', labelEn: 'Send reviews' },
+  { id: 'seller', labelFr: 'Détails du vendeur', labelEn: 'Seller details' },
+  { id: 'availability', labelFr: 'Disponibilités pour visites', labelEn: 'Showing availability' },
+  { id: 'activities', labelFr: 'Activités', labelEn: 'Activity' },
+  { id: 'reports', labelFr: 'Comptes rendus', labelEn: 'Reports' },
 ];
 
 function currentPropertyDetail() {
@@ -1474,31 +1586,31 @@ function currentPropertyDetail() {
 
 function propertyDetailTitle() {
   const p = currentPropertyDetail();
-  return p ? p.address : 'Propriété';
+  return p ? p.address : tr('Propriété', 'Listing');
 }
 
 function renderPropertyDetailScreen() {
   const p = currentPropertyDetail();
-  if (!p) return `<div class="empty-state"><p>Cette fiche n'existe plus.</p></div>`;
+  if (!p) return `<div class="empty-state"><p>${tr('Cette fiche n\'existe plus.', 'This listing no longer exists.')}</p></div>`;
   const active = !p.inactive;
 
   return `
     <img class="property-detail-photo" src="${thumbFor(p.mls, p.address)}" alt="">
     <p class="property-detail-address">${esc(p.address)}</p>
     <div class="property-detail-toggle-row">
-      <span>Active</span>
-      <button class="property-switch ${active ? 'on' : ''}" id="btn-toggle-property-active" role="switch" aria-checked="${active}" aria-label="Propriété active">
+      <span>${tr('Active', 'Active')}</span>
+      <button class="property-switch ${active ? 'on' : ''}" id="btn-toggle-property-active" role="switch" aria-checked="${active}" aria-label="${tr('Propriété active', 'Active listing')}">
         <span class="property-switch-thumb">${active ? icon('check') : ''}</span>
       </button>
     </div>
     <div class="property-detail-menu">
       ${PROPERTY_DETAIL_ROWS.map(row => `
         <button class="property-detail-row" data-property-menu-item="${row.id}">
-          <span>${esc(row.label)}</span>
+          <span>${esc(tr(row.labelFr, row.labelEn))}</span>
           <img src="assets/badge-chevron.svg" alt="" width="9" height="15">
         </button>`).join('')}
     </div>
-    <button class="btn btn-danger-outline btn-block" id="btn-delete-property">Supprimer</button>
+    <button class="btn btn-danger-outline btn-block" id="btn-delete-property">${tr('Supprimer', 'Delete')}</button>
   `;
 }
 
@@ -1520,11 +1632,11 @@ function bindPropertyDetailEvents() {
         render();
         return;
       }
-      showToast('Cette section n\'est pas encore disponible dans ce prototype.');
+      showToast(tr('Cette section n\'est pas encore disponible dans ce prototype.', 'This section isn\'t wired up in this prototype yet.'));
     };
   });
   const delBtn = document.getElementById('btn-delete-property');
-  if (delBtn) delBtn.onclick = () => showToast('La suppression d\'une propriété n\'est pas encore disponible dans ce prototype.');
+  if (delBtn) delBtn.onclick = () => showToast(tr('La suppression d\'une propriété n\'est pas encore disponible dans ce prototype.', 'Deleting a listing isn\'t wired up in this prototype yet.'));
 }
 
 /* ----- Screen: property availability (Property-Management-Showingavailability, reskinné) ----- */
@@ -1534,16 +1646,22 @@ function bindPropertyDetailEvents() {
 const AVAIL_ROW_HEIGHT = 60;
 const AVAIL_GRID_HEIGHT = (AVAIL_HOUR_END - AVAIL_HOUR_START) * AVAIL_ROW_HEIGHT;
 
+function monthsArr() { return state.lang === 'en' ? MONTHS_EN : MONTHS_FR; }
 function formatAvailRangeLabel(days) {
+  const months = monthsArr();
+  const en = state.lang === 'en';
   if (days.length === 1) {
     const d = new Date(days[0] + 'T00:00:00');
-    return `${d.getDate()} ${capFirst(MONTHS_FR[d.getMonth()])} ${d.getFullYear()}`;
+    return en ? `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : `${d.getDate()} ${capFirst(months[d.getMonth()])} ${d.getFullYear()}`;
   }
   const first = new Date(days[0] + 'T00:00:00');
   const last = new Date(days[days.length - 1] + 'T00:00:00');
   const sameMonth = first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear();
-  const firstPart = sameMonth ? `${first.getDate()}` : `${first.getDate()} ${capFirst(MONTHS_FR[first.getMonth()])}`;
-  return `${firstPart} – ${last.getDate()} ${capFirst(MONTHS_FR[last.getMonth()])} ${last.getFullYear()}`;
+  if (en) {
+    return `${months[first.getMonth()]} ${first.getDate()} – ${months[last.getMonth()]} ${last.getDate()}, ${last.getFullYear()}`;
+  }
+  const firstPart = sameMonth ? `${first.getDate()}` : `${first.getDate()} ${capFirst(months[first.getMonth()])}`;
+  return `${firstPart} – ${last.getDate()} ${capFirst(months[last.getMonth()])} ${last.getFullYear()}`;
 }
 
 function renderAvailEventCard(ev) {
@@ -1554,7 +1672,7 @@ function renderAvailEventCard(ev) {
   return `
     <div class="avail-event" data-avail-event="${esc(ev.id)}"
       style="top:${top}px;height:${height}px;--avail-color:${meta.color};--avail-bg:${meta.bg}">
-      <span class="avail-event-type">${esc(meta.label)}</span>
+      <span class="avail-event-type">${esc(availTypeLabel(ev.type))}</span>
       ${showTime ? `<span class="avail-event-time">${minutesToHHMM(ev.startMinutes)} – ${minutesToHHMM(ev.endMinutes)}</span>` : ''}
       <span class="avail-event-handle" data-avail-resize="${esc(ev.id)}" aria-hidden="true"></span>
     </div>`;
@@ -1574,20 +1692,20 @@ function renderAvailMiniCal() {
       data-avail-pick-date="${iso}">${d}</button>`);
   }
   return `
-    <div class="avail-minical" role="dialog" aria-label="Choisir une date">
+    <div class="avail-minical" role="dialog" aria-label="${tr('Choisir une date', 'Choose a date')}">
       <div class="avail-minical-head">
-        <button class="avail-minical-nav" data-avail-minical-month="-1" aria-label="Mois précédent">${icon('chevronRight', 'icon-flip')}</button>
-        <span>${capFirst(MONTHS_FR[m - 1])} ${y}</span>
-        <button class="avail-minical-nav" data-avail-minical-month="1" aria-label="Mois suivant">${icon('chevronRight')}</button>
+        <button class="avail-minical-nav" data-avail-minical-month="-1" aria-label="${tr('Mois précédent', 'Previous month')}">${icon('chevronRight', 'icon-flip')}</button>
+        <span>${capFirst(monthsArr()[m - 1])} ${y}</span>
+        <button class="avail-minical-nav" data-avail-minical-month="1" aria-label="${tr('Mois suivant', 'Next month')}">${icon('chevronRight')}</button>
       </div>
-      <div class="avail-minical-dow">${WEEKDAY_SHORT_SUN_FIRST.map(d => `<span>${d}</span>`).join('')}</div>
+      <div class="avail-minical-dow">${weekdayShortSunFirst().map(d => `<span>${d}</span>`).join('')}</div>
       <div class="avail-minical-grid">${cells.join('')}</div>
     </div>`;
 }
 
 function renderAvailabilityScreen() {
   const p = currentPropertyDetail();
-  if (!p) return `<div class="empty-state"><p>Cette fiche n'existe plus.</p></div>`;
+  if (!p) return `<div class="empty-state"><p>${tr('Cette fiche n\'existe plus.', 'This listing no longer exists.')}</p></div>`;
   if (!state.availAnchor) state.availAnchor = todayPlus(0);
 
   const days = state.availView === 'day'
@@ -1604,13 +1722,16 @@ function renderAvailabilityScreen() {
     const d = new Date(date + 'T00:00:00');
     return `
       <div class="avail-day-header${date === today ? ' is-today' : ''}">
-        <span class="avail-day-name">${WEEKDAY_SHORT_SUN_FIRST[d.getDay()]}</span>
+        <span class="avail-day-name">${weekdayShortSunFirst()[d.getDay()]}</span>
         <span class="avail-day-num">${d.getDate()}</span>
       </div>`;
   }).join('');
 
-  const hourLabels = Array.from({ length: AVAIL_HOUR_END - AVAIL_HOUR_START }, (_, i) =>
-    `<span class="avail-hour-label" style="top:${i * AVAIL_ROW_HEIGHT}px">${AVAIL_HOUR_START + i}h</span>`).join('');
+  const hourLabels = Array.from({ length: AVAIL_HOUR_END - AVAIL_HOUR_START }, (_, i) => {
+    const h = AVAIL_HOUR_START + i;
+    const label = state.lang === 'en' ? `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}` : `${h}h`;
+    return `<span class="avail-hour-label" style="top:${i * AVAIL_ROW_HEIGHT}px">${label}</span>`;
+  }).join('');
 
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -1627,9 +1748,9 @@ function renderAvailabilityScreen() {
   return `
     <div class="avail-toolbar">
       <div class="avail-nav">
-        <button class="avail-nav-btn" id="avail-prev" aria-label="Période précédente">${icon('chevronRight', 'icon-flip')}</button>
-        <button class="btn avail-today-btn" id="avail-today">Aujourd'hui</button>
-        <button class="avail-nav-btn" id="avail-next" aria-label="Période suivante">${icon('chevronRight')}</button>
+        <button class="avail-nav-btn" id="avail-prev" aria-label="${tr('Période précédente', 'Previous period')}">${icon('chevronRight', 'icon-flip')}</button>
+        <button class="btn avail-today-btn" id="avail-today">${tr('Aujourd\'hui', 'Today')}</button>
+        <button class="avail-nav-btn" id="avail-next" aria-label="${tr('Période suivante', 'Next period')}">${icon('chevronRight')}</button>
       </div>
       <div class="avail-date-picker">
         <button class="avail-date-btn" id="avail-minical-btn" aria-haspopup="dialog" aria-expanded="${state.availMiniCalOpen}">
@@ -1637,9 +1758,9 @@ function renderAvailabilityScreen() {
         </button>
         ${state.availMiniCalOpen ? renderAvailMiniCal() : ''}
       </div>
-      <div class="avail-view-toggle" role="tablist" aria-label="Vue du calendrier">
-        <button class="${state.availView === 'day' ? 'active' : ''}" data-avail-view="day" role="tab" aria-selected="${state.availView === 'day'}">Jour</button>
-        <button class="${state.availView === 'week' ? 'active' : ''}" data-avail-view="week" role="tab" aria-selected="${state.availView === 'week'}">Semaine</button>
+      <div class="avail-view-toggle" role="tablist" aria-label="${tr('Vue du calendrier', 'Calendar view')}">
+        <button class="${state.availView === 'day' ? 'active' : ''}" data-avail-view="day" role="tab" aria-selected="${state.availView === 'day'}">${tr('Jour', 'Day')}</button>
+        <button class="${state.availView === 'week' ? 'active' : ''}" data-avail-view="week" role="tab" aria-selected="${state.availView === 'week'}">${tr('Semaine', 'Week')}</button>
       </div>
     </div>
     <div class="avail-grid-scroll">
@@ -1652,7 +1773,7 @@ function renderAvailabilityScreen() {
         ${dayCols}
       </div>
     </div>
-    <p class="avail-hint">Cliquez un créneau vide pour l'ajouter, ou glissez pour choisir sa durée. Glissez une carte pour la déplacer, sa base pour la raccourcir ou l'allonger.</p>
+    <p class="avail-hint">${tr('Cliquez un créneau vide pour l\'ajouter, ou glissez pour choisir sa durée. Glissez une carte pour la déplacer, sa base pour la raccourcir ou l\'allonger.', 'Click an empty slot to add it, or drag to set its length. Drag a card to move it, or its base to shorten or lengthen it.')}</p>
   `;
 }
 
@@ -1871,16 +1992,18 @@ function renderListScreen() {
   if (tours.length === 0) {
     listHtml = `
       <div class="empty-state">
-        <p>${q ? 'Aucun tour ne correspond à votre recherche.' : (state.listTab === 'upcoming' ? 'Aucun tour de visites à venir.' : 'Aucun tour de visites passé.')}</p>
+        <p>${q ? tr('Aucun tour ne correspond à votre recherche.', 'No tour matches your search.') : (state.listTab === 'upcoming' ? tr('Aucun tour de visites à venir.', 'No upcoming buyer\'s tours.') : tr('Aucun tour de visites passé.', 'No past buyer\'s tours.'))}</p>
         ${''/* Le bouton existe déjà plus bas sur l'écran : on le nomme ici,
                comme le fait déjà l'état vide du constructeur, plutôt que de le
                répéter, ce qui mettrait deux fois la même action primaire à
                l'écran. */}
         <p class="empty-sub">${!q
-          ? 'Utilisez « Créer un tour de visites » pour commencer.'
+          ? tr('Utilisez « Créer un tour de visites » pour commencer.', 'Use "Create a buyer\'s tour" to get started.')
           : anonymes
-            ? `La recherche porte sur le nom de l'acheteur. ${anonymes} tour${anonymes > 1 ? 's n\'en ont' : ' n\'en a'} pas encore : effacez la recherche pour ${anonymes > 1 ? 'les' : 'le'} retrouver.`
-            : 'Essayez un autre nom.'}</p>
+            ? (state.lang === 'en'
+              ? `The search matches by buyer name. ${anonymes} tour${anonymes > 1 ? 's don\'t' : ' doesn\'t'} have one yet: clear the search to find ${anonymes > 1 ? 'them' : 'it'}.`
+              : `La recherche porte sur le nom de l'acheteur. ${anonymes} tour${anonymes > 1 ? 's n\'en ont' : ' n\'en a'} pas encore : effacez la recherche pour ${anonymes > 1 ? 'les' : 'le'} retrouver.`)
+            : tr('Essayez un autre nom.', 'Try a different name.')}</p>
       </div>`;
   } else {
     listHtml = Object.keys(groups).sort().map(date => {
@@ -1893,11 +2016,11 @@ function renderListScreen() {
         // Le badge dit où en est le tour ; la ligne du dessous dit ce qu'il
         // reste à faire, qui est l'information que le courtier cherche.
         const detail = status === 'en_cours' && tally.toHandle
-          ? `${tally.toHandle} réponse${tally.toHandle > 1 ? 's' : ''} à traiter`
+          ? tr(`${tally.toHandle} réponse${tally.toHandle > 1 ? 's' : ''} à traiter`, `${tally.toHandle} response${tally.toHandle > 1 ? 's' : ''} to handle`)
           : status === 'en_cours'
-            ? `${tally.confirmed}/${tally.total} confirmée${tally.confirmed > 1 ? 's' : ''}`
+            ? tr(`${tally.confirmed}/${tally.total} confirmée${tally.confirmed > 1 ? 's' : ''}`, `${tally.confirmed}/${tally.total} confirmed`)
             : status === 'non_envoye'
-              ? 'À envoyer à l\'acheteur'
+              ? tr('À envoyer à l\'acheteur', 'To send to the buyer')
               : '';
         return `
           <div class="tour-card" data-open-tour="${t.id}">
@@ -1905,8 +2028,8 @@ function renderListScreen() {
               ${tourIconSvg(status === 'en_cours' || status === 'brouillon' ? 'pending' : 'confirmed')}
             </div>
             <div class="tour-card-body">
-              <p class="tour-card-name">${esc(b ? `${b.prenom} ${b.nom}` : 'Sans acheteur')} <span class="status-chip ${meta.tone}">${esc(meta.label)}</span></p>
-              <p class="tour-card-meta">Le tour commence à <strong>${t.time.replace(':', 'h')}</strong>${detail ? ` <span class="dot">•</span> ${detail}` : ''}</p>
+              <p class="tour-card-name">${esc(b ? `${b.prenom} ${b.nom}` : tr('Sans acheteur', 'No buyer'))} <span class="status-chip ${meta.tone}">${esc(tourStatusLabel(status))}</span></p>
+              <p class="tour-card-meta">${tr(`Le tour commence à <strong>${t.time.replace(':', 'h')}</strong>`, `The tour starts at <strong>${t.time}</strong>`)}${detail ? ` <span class="dot">•</span> ${detail}` : ''}</p>
             </div>
             <div class="tour-card-count">${propCount}</div>
             <div class="tour-card-chevron"><img src="assets/badge-chevron.svg" alt="" width="9" height="15"></div>
@@ -1923,21 +2046,21 @@ function renderListScreen() {
          tablist et un tabpanel que ce balisage n'a pas. -->
     <div class="tabs-toggle">
       <button class="${state.listTab === 'upcoming' ? 'active' : ''}" data-tab="upcoming"
-        aria-pressed="${state.listTab === 'upcoming'}">À venir</button>
+        aria-pressed="${state.listTab === 'upcoming'}">${tr('À venir', 'Upcoming')}</button>
       <button class="${state.listTab === 'past' ? 'active' : ''}" data-tab="past"
-        aria-pressed="${state.listTab === 'past'}">Passé</button>
+        aria-pressed="${state.listTab === 'past'}">${tr('Passé', 'Past')}</button>
     </div>
     <div class="search-bar">
       <!-- Pas de libellé visible ici : la loupe et le texte d'invite suffisent
            à l'œil. Le nom accessible dit ce que la recherche compare — le nom
            de l'acheteur, pas une adresse — ce que le texte d'invite ne dit
            plus dès la première frappe. -->
-      <input type="search" class="input" id="list-search" placeholder="Chercher un tour..."
-        aria-label="Chercher un tour par le nom de l'acheteur" value="${esc(state.listSearch)}">
+      <input type="search" class="input" id="list-search" placeholder="${tr('Chercher un tour...', 'Search tours...')}"
+        aria-label="${tr('Chercher un tour par le nom de l\'acheteur', 'Search tours by buyer name')}" value="${esc(state.listSearch)}">
       ${icon('search')}
     </div>
     ${listHtml}
-    <button class="btn btn-primary btn-block page-create-btn" id="btn-create-tour">${icon('plus')} Créer un tour de visites</button>
+    <button class="btn btn-primary btn-block page-create-btn" id="btn-create-tour">${icon('plus')} ${tr('Créer un tour de visites', 'Create a buyer\'s tour')}</button>
   `;
 }
 
@@ -1953,21 +2076,21 @@ function renderContactScreen() {
   if (selected) {
     searchBlock = `
       <div class="field">
-        <label class="field-label" for="selected-buyer">Sélectionnez un contact :</label>
+        <label class="field-label" for="selected-buyer">${tr('Sélectionnez un contact :', 'Select a contact:')}</label>
         <div class="buyer-chip">
           <input class="input" id="selected-buyer" value="${esc(selected.prenom + ' ' + selected.nom)}" readonly>
           <div class="input-actions">
-            <button class="select-icon-btn help" data-edit-buyer title="Modifier" aria-label="Modifier ce contact">${icon('pencil')}</button>
-            <button class="select-icon-btn remove" id="btn-remove-selected-buyer" title="Retirer" aria-label="Retirer ce contact">${icon('x')}</button>
+            <button class="select-icon-btn help" data-edit-buyer title="${tr('Modifier', 'Edit')}" aria-label="${tr('Modifier ce contact', 'Edit this contact')}">${icon('pencil')}</button>
+            <button class="select-icon-btn remove" id="btn-remove-selected-buyer" title="${tr('Retirer', 'Remove')}" aria-label="${tr('Retirer ce contact', 'Remove this contact')}">${icon('x')}</button>
           </div>
         </div>
       </div>`;
   } else {
     searchBlock = `
       <div class="field">
-        <label class="field-label" for="contact-search">Sélectionnez un contact :</label>
+        <label class="field-label" for="contact-search">${tr('Sélectionnez un contact :', 'Select a contact:')}</label>
         <div class="search-bar" style="margin-bottom:10px;">
-          <input type="text" class="input" id="contact-search" placeholder="Chercher un acheteur..." value="${esc(state.contactSearch)}">
+          <input type="text" class="input" id="contact-search" placeholder="${tr('Chercher un acheteur...', 'Search buyers...')}" value="${esc(state.contactSearch)}">
           ${icon('search')}
         </div>
         ${results.length ? `<div class="panel" style="padding:6px 10px;">${results.map(b => `
@@ -1977,7 +2100,7 @@ function renderContactScreen() {
           </button>`).join('')}</div>` : ''}
       </div>
       <button type="button" class="link-row" id="btn-toggle-buyer-form">
-        <span>Créer un nouvel acheteur</span>
+        <span>${tr('Créer un nouvel acheteur', 'Create a new buyer')}</span>
         ${icon('chevronRight')}
       </button>`;
   }
@@ -1996,24 +2119,31 @@ function renderContactScreen() {
   // Deux blocages différents sur le même bouton : personne de choisi, ou
   // quelqu'un de choisi mais sans courriel. Le motif suit le cas réel — le
   // second est déjà écrit à l'écran juste dessous, on ne le répète pas.
-  const choisir = 'Sélectionnez un contact dans la liste, ou remplissez la fiche d\'un nouvel acheteur.';
+  const choisir = tr('Sélectionnez un contact dans la liste, ou remplissez la fiche d\'un nouvel acheteur.', 'Select a contact from the list, or fill in a new buyer\'s info.');
   const principalWhy = whenBlocked('btn-save-contact', sharing ? canSend : canSave,
-    noEmail ? 'Ajoutez un courriel à ce contact pour lui envoyer le tour.' : choisir);
+    noEmail ? tr('Ajoutez un courriel à ce contact pour lui envoyer le tour.', 'Add an email to this contact to send them the tour.') : choisir);
   const rattacheWhy = whenBlocked('btn-attach-contact', canSave, choisir);
 
   const emailNote = !noEmail ? '' : `
-    <p class="footer-note is-warn">${esc(selected.prenom)} n'a pas encore de courriel.
-      <button class="btn-inline" data-edit-buyer>Ajouter un courriel</button> pour lui envoyer le tour.</p>`;
+    <p class="footer-note is-warn">${tr(
+      `${esc(selected.prenom)} n'a pas encore de courriel.\n      <button class="btn-inline" data-edit-buyer>Ajouter un courriel</button> pour lui envoyer le tour.`,
+      `${esc(selected.prenom)} doesn't have an email yet.\n      <button class="btn-inline" data-edit-buyer>Add an email</button> to send them the tour.`
+    )}</p>`;
 
   // En partage, l'écran rappelle ce qui va être transmis : on choisit un
   // destinataire, pas un contact dans l'abstrait.
   const recap = !sharing || !state.draft ? '' : (() => {
     const props = state.draft.stops.filter(s => s.type === 'property');
     const end = tourEndMinutes(state.draft);
+    const title = state.lang === 'en' ? `Tour – ${formatDateLong(state.draft.date)}` : `Tour du ${formatDateLong(state.draft.date)}`;
+    const meta = tr(
+      `${props.length} visite${props.length > 1 ? 's' : ''} confirmée${props.length > 1 ? 's' : ''}, de ${state.draft.time.replace(':', 'h')} à ${minutesToLabel(end)}`,
+      `${props.length} confirmed visit${props.length > 1 ? 's' : ''}, from ${state.draft.time} to ${minutesToLabel(end)}`
+    );
     return `
       <div class="share-recap">
-        <p class="share-recap-title">Tour du ${formatDateLong(state.draft.date)}</p>
-        <p class="share-recap-meta">${props.length} visite${props.length > 1 ? 's' : ''} confirmée${props.length > 1 ? 's' : ''}, de ${state.draft.time.replace(':', 'h')} à ${minutesToLabel(end)}</p>
+        <p class="share-recap-title">${title}</p>
+        <p class="share-recap-meta">${meta}</p>
       </div>`;
   })();
 
@@ -2023,13 +2153,13 @@ function renderContactScreen() {
       ${searchBlock}
       ${formBlock}
       <div class="form-actions" style="margin-top:${state.showBuyerForm || selected ? '4px' : '0'};">
-        <button class="btn btn-primary" id="btn-save-contact"${principalWhy.a}>${sharing ? 'Envoyer à l\'acheteur' : naming ? 'Enregistrer' : 'Sauvegarder'}</button>${principalWhy.n}
-        ${sharing ? `<button class="btn btn-outline" id="btn-attach-contact"${rattacheWhy.a}>Enregistrer</button>${rattacheWhy.n}` : ''}
-        <button class="btn btn-outline" id="btn-cancel-contact">Annuler</button>
+        <button class="btn btn-primary" id="btn-save-contact"${principalWhy.a}>${sharing ? tr('Envoyer à l\'acheteur', 'Send to buyer') : naming ? tr('Enregistrer', 'Save') : tr('Sauvegarder', 'Save')}</button>${principalWhy.n}
+        ${sharing ? `<button class="btn btn-outline" id="btn-attach-contact"${rattacheWhy.a}>${tr('Enregistrer', 'Save')}</button>${rattacheWhy.n}` : ''}
+        <button class="btn btn-outline" id="btn-cancel-contact">${tr('Annuler', 'Cancel')}</button>
       </div>
       ${emailNote}
-      ${sharing ? `<p class="footer-note">« Enregistrer » rattache l'acheteur au tour sans le lui envoyer : le tour reste <strong>Non envoyé</strong>.</p>` : ''}
-      ${naming ? `<p class="footer-note">Le tour prend le nom de l'acheteur pour que vous le retrouviez. Rien ne lui est envoyé : il reste au <strong>bac à sable</strong>.</p>` : ''}
+      ${sharing ? `<p class="footer-note">${tr(`« Enregistrer » rattache l'acheteur au tour sans le lui envoyer : le tour reste <strong>Non envoyé</strong>.`, `"Save" attaches the buyer to the tour without sending it: the tour stays <strong>Not sent</strong>.`)}</p>` : ''}
+      ${naming ? `<p class="footer-note">${tr('Le tour prend le nom de l\'acheteur pour que vous le retrouviez. Rien ne lui est envoyé : il reste au <strong>bac à sable</strong>.', 'The tour takes the buyer\'s name so you can find it again. Nothing is sent to them: it stays in the <strong>sandbox</strong>.')}</p>` : ''}
     </div>
   `;
 }
@@ -2050,53 +2180,53 @@ function renderBuyerForm() {
   return `
     <div class="panel" style="padding:16px;margin:0 0 20px;">
       <div class="panel-header" id="toggle-buyer-form-panel">
-        <h3>Ajouter un acheteur</h3>
+        <h3>${tr('Ajouter un acheteur', 'Add a buyer')}</h3>
         ${saved ? `<span class="status-check">${icon('check')}</span>` : icon('chevronUp')}
       </div>
       <div style="height:14px;"></div>
       <div class="field-row">
         <div class="field">
-          <label class="field-label" for="bf-prenom">Prénom :</label>
-          <input class="input" id="bf-prenom" value="${esc(f.prenom)}" placeholder="Prénom">
+          <label class="field-label" for="bf-prenom">${tr('Prénom :', 'First name:')}</label>
+          <input class="input" id="bf-prenom" value="${esc(f.prenom)}" placeholder="${tr('Prénom', 'First name')}">
         </div>
         <div class="field">
-          <label class="field-label" for="bf-nom">Nom :</label>
-          <input class="input" id="bf-nom" value="${esc(f.nom)}" placeholder="Nom">
+          <label class="field-label" for="bf-nom">${tr('Nom :', 'Last name:')}</label>
+          <input class="input" id="bf-nom" value="${esc(f.nom)}" placeholder="${tr('Nom', 'Last name')}">
         </div>
       </div>
       <div class="field">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <label class="field-label" style="margin-bottom:0;">Courriel(s)${state.contactPurpose === 'name' ? ' <span class="field-optional">facultatif pour l\'instant</span>' : ''}</label>
+          <label class="field-label" style="margin-bottom:0;">${tr('Courriel(s)', 'Email(s)')}${state.contactPurpose === 'name' ? ` <span class="field-optional">${tr('facultatif pour l\'instant', 'optional for now')}</span>` : ''}</label>
           <div style="display:flex;gap:6px;">
-            <button class="select-icon-btn add" id="bf-add-email" title="Ajouter un courriel" aria-label="Ajouter un courriel">${icon('plus')}</button>
-            <button class="select-icon-btn help" title="Courriel principal pour l'envoi des confirmations" aria-label="Aide : à quoi sert le courriel">?</button>
+            <button class="select-icon-btn add" id="bf-add-email" title="${tr('Ajouter un courriel', 'Add an email')}" aria-label="${tr('Ajouter un courriel', 'Add an email')}">${icon('plus')}</button>
+            <button class="select-icon-btn help" title="${tr('Courriel principal pour l\'envoi des confirmations', 'Main email for sending confirmations')}" aria-label="${tr('Aide : à quoi sert le courriel', 'Help: what the email is used for')}">?</button>
           </div>
         </div>
         ${f.emails.map((val, i) => `
           <div class="input-group">
-            <input class="input" type="email" data-email-idx="${i}" value="${esc(val)}" placeholder="courriel@exemple.com"
-              aria-label="Courriel ${i + 1}${f.emails.length > 1 ? ` sur ${f.emails.length}` : ''}">
+            <input class="input" type="email" data-email-idx="${i}" value="${esc(val)}" placeholder="${tr('courriel@exemple.com', 'email@example.com')}"
+              aria-label="${tr('Courriel', 'Email')} ${i + 1}${f.emails.length > 1 ? ` ${tr('sur', 'of')} ${f.emails.length}` : ''}">
             ${f.emails.length > 1 ? `<button class="select-icon-btn remove" data-remove-email="${i}">${icon('x')}</button>` : ''}
           </div>`).join('')}
       </div>
       <div class="field" style="margin-bottom:4px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <label class="field-label" style="margin-bottom:0;">Téléphone(s)</label>
+          <label class="field-label" style="margin-bottom:0;">${tr('Téléphone(s)', 'Phone(s)')}</label>
           <div style="display:flex;gap:6px;">
-            <button class="select-icon-btn add" id="bf-add-tel" title="Ajouter un téléphone" aria-label="Ajouter un téléphone">${icon('plus')}</button>
-            <button class="select-icon-btn help" title="Format: (514) 000-0000" aria-label="Aide : format du numéro">?</button>
+            <button class="select-icon-btn add" id="bf-add-tel" title="${tr('Ajouter un téléphone', 'Add a phone')}" aria-label="${tr('Ajouter un téléphone', 'Add a phone')}">${icon('plus')}</button>
+            <button class="select-icon-btn help" title="${tr('Format: (514) 000-0000', 'Format: (514) 000-0000')}" aria-label="${tr('Aide : format du numéro', 'Help: number format')}">?</button>
           </div>
         </div>
         ${f.tels.map((val, i) => `
           <div class="input-group">
             <input class="input" type="tel" data-tel-idx="${i}" value="${esc(val)}" placeholder="(514) 000-0000"
-              aria-label="Téléphone ${i + 1}${f.tels.length > 1 ? ` sur ${f.tels.length}` : ''}">
+              aria-label="${tr('Téléphone', 'Phone')} ${i + 1}${f.tels.length > 1 ? ` ${tr('sur', 'of')} ${f.tels.length}` : ''}">
             <select class="input select" style="width:130px;flex:none;" data-tel-type-idx="${i}"
-              aria-label="Type du téléphone ${i + 1}">
-              <option ${val.type === 'Cellulaire' ? 'selected' : ''}>Non défini</option>
-              <option>Cellulaire</option>
-              <option>Maison</option>
-              <option>Travail</option>
+              aria-label="${tr('Type du téléphone', 'Phone type')} ${i + 1}">
+              <option ${val.type === 'Cellulaire' ? 'selected' : ''}>${tr('Non défini', 'Not set')}</option>
+              <option>${tr('Cellulaire', 'Mobile')}</option>
+              <option>${tr('Maison', 'Home')}</option>
+              <option>${tr('Travail', 'Work')}</option>
             </select>
             ${f.tels.length > 1 ? `<button class="select-icon-btn remove" data-remove-tel="${i}">${icon('x')}</button>` : ''}
           </div>`).join('')}
@@ -2129,9 +2259,9 @@ function renderStopCard(stop, start, { variant = 'builder', sameSlot = false, is
   const moveButtons = !actionable || arretKind || !stopIsDraggable(stop) ? '' : `
         <span class="move-stop-group">
           <button class="btn-icon move-stop-btn" data-move-stop="${stop.id}" data-direction="-1" ${isFirst ? 'disabled' : ''}
-            title="Monter dans le tour" aria-label="Monter ${esc(stopShortLabel(stop))} dans le tour">${icon('arrowUp')}</button>
+            title="${tr('Monter dans le tour', 'Move up in the tour')}" aria-label="${tr(`Monter ${esc(stopShortLabel(stop))} dans le tour`, `Move ${esc(stopShortLabel(stop))} up in the tour`)}">${icon('arrowUp')}</button>
           <button class="btn-icon move-stop-btn" data-move-stop="${stop.id}" data-direction="1" ${isLast ? 'disabled' : ''}
-            title="Descendre dans le tour" aria-label="Descendre ${esc(stopShortLabel(stop))} dans le tour">${icon('arrowDown')}</button>
+            title="${tr('Descendre dans le tour', 'Move down in the tour')}" aria-label="${tr(`Descendre ${esc(stopShortLabel(stop))} dans le tour`, `Move ${esc(stopShortLabel(stop))} down in the tour`)}">${icon('arrowDown')}</button>
         </span>`;
 
   const st = effectiveStopStatus(stop);
@@ -2147,36 +2277,36 @@ function renderStopCard(stop, start, { variant = 'builder', sameSlot = false, is
   // Rien à simuler tant que la demande n'est pas partie, ni sur un écran qui
   // ne branche pas le simulateur.
   const canSim = actionable && flag('simulateConfirmation') && st !== 'sandbox';
-  const statusChip = arretKind || !stMeta.label ? ''
+  const statusChip = arretKind || !stMeta.labelFr ? ''
     : canSim
       ? `<button class="stop-flag tone-${stMeta.tone} is-sim" data-sim-status="${stop.id}"
-          title="Simuler la réponse du courtier inscripteur — état suivant : ${esc(STOP_STATUSES[nextSt].short)}">
-          ${esc(stMeta.label)}${suffix}${icon('sync')}</button>`
-      : `<span class="stop-flag tone-${stMeta.tone}">${esc(stMeta.label)}${suffix}</span>`;
+          title="${tr('Simuler la réponse du courtier inscripteur — état suivant', 'Simulate the listing broker\'s response — next state')} : ${esc(stopStatusShort(nextSt))}">
+          ${esc(stopStatusLabel(st))}${suffix}${icon('sync')}</button>`
+      : `<span class="stop-flag tone-${stMeta.tone}">${esc(stopStatusLabel(st))}${suffix}</span>`;
   // Tant que rien n'est parti, ce que dit le calendrier de disponibilité de la
   // fiche compte plus que le statut (vide) de la demande : c'est lui qui dit
   // si l'heure choisie s'envoie sans détour ou va demander un aller-retour.
   // Une fois la demande envoyée, la réponse du courtier inscripteur prend le
   // relais — les deux ne se superposent jamais sur la même carte.
   const availTag = !arretKind && actionable && !stop.sentAt ? availabilityTagFor(stop, start) : null;
-  const availChip = !availTag ? '' : `<span class="stop-flag tone-${availTag.tone}">${esc(availTag.label)}</span>`;
+  const availChip = !availTag ? '' : `<span class="stop-flag tone-${availTag.tone}">${esc(availabilityTagLabel(availTag))}</span>`;
   // Un compte rendu mis de côté ne se retrouve que si l'arrêt le dit : sans ça,
   // « Visité » couvre autant celui qui est parti chez le vendeur que celui qui
   // attend encore, et le courtier n'a rien pour trier après coup.
   const reportChip = arretKind || !stop.visited ? ''
     : reportPending
-      ? `<span class="stop-flag tone-warn">${icon('star')} Compte rendu à envoyer</span>`
-      : `<span class="stop-flag tone-ok">${icon('star')} Visité</span>`;
+      ? `<span class="stop-flag tone-warn">${icon('star')} ${tr('Compte rendu à envoyer', 'Report to send')}</span>`
+      : `<span class="stop-flag tone-ok">${icon('star')} ${tr('Visité', 'Visited')}</span>`;
   const extChip = arretKind || !stop.external ? ''
-    : `<span class="stop-flag tone-muted" title="Hors catalogue : la demande part par courriel au courtier inscripteur, sans créer de fiche.">Hors catalogue</span>`;
+    : `<span class="stop-flag tone-muted" title="${tr('Hors catalogue : la demande part par courriel au courtier inscripteur, sans créer de fiche.', 'Off-catalogue: the request goes by email to the listing broker, without creating a listing.')}">${tr('Hors catalogue', 'Off-catalogue')}</span>`;
   // Sur la carte, seul le statut compte : on y réorganise un trajet, pas un
   // compte rendu. Mais le statut, lui, y est indispensable — c'est lui qui dit
   // quelle étape est en train de tomber.
   const flags = (actionable ? [statusChip, availChip, reportChip, extChip] : [statusChip]).filter(Boolean).join('');
 
-  const pinnedTitle = stopIsDraggable(stop) ? '' : `title="Demande envoyée : l'heure de cet arrêt se change par « Éditer »"`;
-  const reportTitle = !stop.visited ? 'Faire le compte rendu de visite'
-    : reportPending ? 'Reprendre le compte rendu et l\'envoyer' : 'Voir le compte rendu de visite';
+  const pinnedTitle = stopIsDraggable(stop) ? '' : `title="${tr('Demande envoyée : l\'heure de cet arrêt se change par « Éditer »', 'Request sent: this stop\'s time can only be changed via "Edit"')}"`;
+  const reportTitle = !stop.visited ? tr('Faire le compte rendu de visite', 'Fill out the visit report')
+    : reportPending ? tr('Reprendre le compte rendu et l\'envoyer', 'Resume the report and send it') : tr('Voir le compte rendu de visite', 'View the visit report');
 
   return `
     <div class="stop-card${sameSlot ? ' same-slot' : ''}${stopIsDraggable(stop) ? '' : ' is-pinned'}" draggable="${stopIsDraggable(stop)}" data-stop-id="${stop.id}">
@@ -2189,8 +2319,8 @@ function renderStopCard(stop, start, { variant = 'builder', sameSlot = false, is
       </div>
       ${!actionable ? '' : arretKind ? `
       <div class="stop-actions">
-        <button class="btn-icon" data-edit-arret="${stop.id}" title="Modifier l'adresse" aria-label="Modifier l'adresse ${esc(stop.address)}">${icon('pencil')}</button>
-        <button class="btn-icon danger" data-remove-stop="${stop.id}" title="Retirer du tour" aria-label="Retirer ${esc(stop.address)} du tour">${icon('trash')}</button>
+        <button class="btn-icon" data-edit-arret="${stop.id}" title="${tr('Modifier l\'adresse', 'Edit the address')}" aria-label="${tr('Modifier l\'adresse', 'Edit the address')} ${esc(stop.address)}">${icon('pencil')}</button>
+        <button class="btn-icon danger" data-remove-stop="${stop.id}" title="${tr('Retirer du tour', 'Remove from the tour')}" aria-label="${tr('Retirer', 'Remove')} ${esc(stop.address)} ${tr('du tour', 'from the tour')}">${icon('trash')}</button>
       </div>` : `
       <div class="stop-actions">
         ${moveButtons}
@@ -2200,14 +2330,14 @@ function renderStopCard(stop, start, { variant = 'builder', sameSlot = false, is
              sans lequel le bouton n'aurait aucun nom sur la moitié des écrans. -->
         <button class="pick-btn${stop.buyerPick ? ' is-on' : ''}" data-toggle-pick="${stop.id}"
           aria-pressed="${stop.buyerPick ? 'true' : 'false'}"
-          aria-label="Choix de l'acheteur — ${esc(stop.address)}"
-          title="${stop.buyerPick ? 'Choisie par l\'acheteur — cliquez pour retirer la marque' : 'Marquer comme choisie par l\'acheteur'}">${icon('check')}<span class="pick-label">Choix de l'acheteur</span></button>
-        <button class="btn-icon" data-edit-stop="${stop.id}" title="Modifier la visite" aria-label="Modifier la visite du ${esc(stop.address)}">${icon('pencil')}</button>
-        <button class="btn-icon danger" data-remove-stop="${stop.id}" title="Retirer du tour" aria-label="Retirer ${esc(stop.address)} du tour">${icon('trash')}</button>
+          aria-label="${tr('Choix de l\'acheteur', 'Buyer\'s pick')} — ${esc(stop.address)}"
+          title="${stop.buyerPick ? tr('Choisie par l\'acheteur — cliquez pour retirer la marque', 'Picked by the buyer — click to remove the mark') : tr('Marquer comme choisie par l\'acheteur', 'Mark as picked by the buyer')}">${icon('check')}<span class="pick-label">${tr('Choix de l\'acheteur', 'Buyer\'s pick')}</span></button>
+        <button class="btn-icon" data-edit-stop="${stop.id}" title="${tr('Modifier la visite', 'Edit the visit')}" aria-label="${tr('Modifier la visite du', 'Edit the visit at')} ${esc(stop.address)}">${icon('pencil')}</button>
+        <button class="btn-icon danger" data-remove-stop="${stop.id}" title="${tr('Retirer du tour', 'Remove from the tour')}" aria-label="${tr('Retirer', 'Remove')} ${esc(stop.address)} ${tr('du tour', 'from the tour')}">${icon('trash')}</button>
         ${st === 'sandbox'
           // Envoyer et rendre compte ne coexistent jamais dans le temps : la
           // troisième place revient à celui des deux qui a un sens ici.
-          ? `<button class="btn-icon send-request" data-send-stop="${stop.id}" title="Envoyer la demande de visite à ${esc(stop.courtier || 'ce courtier inscripteur')}" aria-label="Envoyer la demande de visite du ${esc(stop.address)} à ${esc(stop.courtier || 'ce courtier inscripteur')}">${icon('send')}</button>`
+          ? `<button class="btn-icon send-request" data-send-stop="${stop.id}" title="${tr('Envoyer la demande de visite à', 'Send the visit request to')} ${esc(stop.courtier || tr('ce courtier inscripteur', 'this listing broker'))}" aria-label="${tr('Envoyer la demande de visite du', 'Send the visit request for')} ${esc(stop.address)} ${tr('à', 'to')} ${esc(stop.courtier || tr('ce courtier inscripteur', 'this listing broker'))}">${icon('send')}</button>`
           : `<button class="btn-icon toggle-visited ${!stop.visited ? '' : reportPending ? 'todo' : 'active'}" data-toggle-visited="${stop.id}" title="${reportTitle}" aria-label="${reportTitle} — ${esc(stop.address)}">${icon('star')}</button>`}
       </div>`}
     </div>`;
@@ -2231,7 +2361,7 @@ function renderBuilderScreen() {
   };
   const status = tourStatus(liveTour);
   const tally = validationTally(liveTour);
-  const bannerEditTitle = 'Insérer un arrêt ou une propriété à cet endroit du tour';
+  const bannerEditTitle = tr('Insérer un arrêt ou une propriété à cet endroit du tour', 'Insert a stop or a listing at this point in the tour');
 
   /* ----- Panneau de synthèse du trajet — maquettes Figma 5551:2871 / 5551:2174 -----
      « Afficher sur la carte » cesse d'être un écran à part pour devenir le
@@ -2246,7 +2376,7 @@ function renderBuilderScreen() {
   const summaryHtml = !firstProp ? '' : (() => {
     const stat = (n, l) => `<span class="stat-item"><strong>${n}</strong> ${l}</span>`;
     const stats = [
-      stat(propertyCount, `arrêt${propertyCount > 1 ? 's' : ''}`),
+      stat(propertyCount, tr(`arrêt${propertyCount > 1 ? 's' : ''}`, `stop${propertyCount > 1 ? 's' : ''}`)),
     ];
 
     // Le routage se déclenche au dépliage seulement : tant que la carte est
@@ -2260,8 +2390,8 @@ function renderBuilderScreen() {
     // La note de tracé prend place au bout des mesures plutôt que sous la carte :
     // elle ne décrit pas la carte, elle qualifie ces chiffres-là — approximatifs
     // tant que le service de routage n'a pas répondu.
-    if (routeStatus === 'loading') stats.push('<span class="stat-note">Tracé approximatif de l\'itinéraire routier…</span>');
-    if (routeStatus === 'error') stats.push('<span class="stat-note">Tracé et distances approximatifs — service de routage indisponible.</span>');
+    if (routeStatus === 'loading') stats.push(`<span class="stat-note">${tr('Tracé approximatif de l\'itinéraire routier…', 'Approximate route trace…')}</span>`);
+    if (routeStatus === 'error') stats.push(`<span class="stat-note">${tr('Tracé et distances approximatifs — service de routage indisponible.', 'Approximate trace and distances — routing service unavailable.')}</span>`);
 
     return `
       <section class="route-summary-section${state.mapOpen ? ' is-open' : ''}">
@@ -2269,7 +2399,7 @@ function renderBuilderScreen() {
           <div class="stats-row">${stats.join('<span class="stat-sep"></span>')}</div>
           <button class="rss-toggle" id="btn-toggle-map"
             aria-expanded="${state.mapOpen}" aria-controls="rss-map">
-            Afficher sur la carte ${icon(state.mapOpen ? 'chevronUp' : 'chevronRight')}
+            ${tr('Afficher sur la carte', 'Show on map')} ${icon(state.mapOpen ? 'chevronUp' : 'chevronRight')}
           </button>
         </div>
         ${state.mapOpen ? `<div class="rss-map" id="rss-map"><div id="map-slot"></div></div>` : ''}
@@ -2278,8 +2408,8 @@ function renderBuilderScreen() {
 
   const stopsHtml = draft.stops.length === 0 ? `
     <div class="empty-state tour-empty">
-      <p>Aucune destination ajoutée</p>
-      <p>Utilisez le bouton ci-dessous pour ajouter les propriétés à visiter. Vous pourrez ensuite organiser l'ordre du tour.</p>
+      <p>${tr('Aucune destination ajoutée', 'No destinations added')}</p>
+      <p>${tr('Utilisez le bouton ci-dessous pour ajouter les propriétés à visiter. Vous pourrez ensuite organiser l\'ordre du tour.', 'Use the button below to add the listings to visit. You\'ll then be able to organize the tour order.')}</p>
     </div>
   ` : rows.map(({ stop, start, sharesSlot }, i) => {
     const prevStop = draft.stops[i - 1];
@@ -2297,8 +2427,8 @@ function renderBuilderScreen() {
     let travelHtml = '';
     if (prevStop && !sharesSlot && canShareSlot) {
       travelHtml = `
-        <div class="travel-chip">${icon('pin')} <span class="banner-text">${formatKm(slotDistanceKm(prevStop, stop))} seulement entre les deux</span>
-          <button class="btn-inline" data-share-slot="${stop.id}">Même créneau</button>
+        <div class="travel-chip">${icon('pin')} <span class="banner-text">${tr(`${formatKm(slotDistanceKm(prevStop, stop))} seulement entre les deux`, `Only ${formatKm(slotDistanceKm(prevStop, stop))} apart`)}</span>
+          <button class="btn-inline" data-share-slot="${stop.id}">${tr('Même créneau', 'Same time slot')}</button>
           <span class="banner-edit"><button class="banner-edit-btn" data-edit-stop="${stop.id}" title="${bannerEditTitle}" aria-label="${bannerEditTitle}">${icon('pencil')}</button></span>
         </div>`;
     }
@@ -2313,15 +2443,20 @@ function renderBuilderScreen() {
       const hour = minutesToLabel(start);
       slotHtml = stop.slotAck ? `
         <div class="slot-note is-ack">${icon('layers')}
-          <span class="banner-text">Créneau simultané confirmé : deux visites à ${hour}, à ${km} l'une de l'autre.</span>
-          <button class="btn-inline ghost" data-split-slot="${stop.id}">Séparer</button>
+          <span class="banner-text">${tr(`Créneau simultané confirmé : deux visites à ${hour}, à ${km} l'une de l'autre.`, `Overlapping time slot confirmed: two visits at ${hour}, ${km} apart.`)}</span>
+          <button class="btn-inline ghost" data-split-slot="${stop.id}">${tr('Séparer', 'Split')}</button>
         </div>` : `
         <div class="slot-note is-pending">${icon('layers')}
-          <span class="banner-text"><strong>Vous avez placé deux visites à ${hour}.</strong>
+          <span class="banner-text">${tr(
+            `<strong>Vous avez placé deux visites à ${hour}.</strong>
             Ces propriétés sont à ${km} l'une de l'autre. Chaque courtier inscripteur reçoit une demande pour ${hour}
-            et ne voit que la sienne — à vous de confirmer que vous tenez les deux.</span>
-          <button class="btn-inline" data-ack-slot="${stop.id}">Je confirme ce créneau</button>
-          <button class="btn-inline ghost" data-split-slot="${stop.id}">Séparer les visites</button>
+            et ne voit que la sienne — à vous de confirmer que vous tenez les deux.`,
+            `<strong>You've placed two visits at ${hour}.</strong>
+            These listings are ${km} apart. Each listing broker gets a request for ${hour}
+            and only sees their own — it's on you to confirm you can make both.`
+          )}</span>
+          <button class="btn-inline" data-ack-slot="${stop.id}">${tr('Je confirme ce créneau', 'I confirm this time slot')}</button>
+          <button class="btn-inline ghost" data-split-slot="${stop.id}">${tr('Séparer les visites', 'Split the visits')}</button>
         </div>`;
     }
     // La carte est la même partout ; seul ce qui se décide sous elle appartient
@@ -2341,16 +2476,19 @@ function renderBuilderScreen() {
       // perdue et que le reste du tour a été bâti autour.
       answerHtml = `
         <div class="stop-answer danger">${icon('warning')}
-          <span class="banner-text">Le courtier inscripteur a annulé cette visite${stop.lockedStart ? `, confirmée pour ${stop.lockedStart.replace(':', 'h')}` : ''}.</span>
-          <button class="btn-inline" data-retry-stop="${stop.id}">Proposer un autre créneau</button>
-          <button class="btn-inline ghost" data-remove-stop-inline="${stop.id}">Retirer du tour</button>
+          <span class="banner-text">${tr(
+            `Le courtier inscripteur a annulé cette visite${stop.lockedStart ? `, confirmée pour ${stop.lockedStart.replace(':', 'h')}` : ''}.`,
+            `The listing broker cancelled this visit${stop.lockedStart ? `, confirmed for ${stop.lockedStart}` : ''}.`
+          )}</span>
+          <button class="btn-inline" data-retry-stop="${stop.id}">${tr('Proposer un autre créneau', 'Propose another time')}</button>
+          <button class="btn-inline ghost" data-remove-stop-inline="${stop.id}">${tr('Retirer du tour', 'Remove from the tour')}</button>
         </div>`;
     } else if (st === 'noreply') {
       answerHtml = `
         <div class="stop-answer muted">${icon('hourglass')}
-          <span class="banner-text">Sans réponse depuis 48 h.</span>
-          <button class="btn-inline" data-relance-stop="${stop.id}">Relancer</button>
-          <button class="btn-inline ghost" data-remove-stop-inline="${stop.id}">Retirer du tour</button>
+          <span class="banner-text">${tr('Sans réponse depuis 48 h.', 'No response in 48 hours.')}</span>
+          <button class="btn-inline" data-relance-stop="${stop.id}">${tr('Relancer', 'Follow up')}</button>
+          <button class="btn-inline ghost" data-remove-stop-inline="${stop.id}">${tr('Retirer du tour', 'Remove from the tour')}</button>
         </div>`;
     }
     return travelHtml + slotHtml + card + answerHtml;
@@ -2364,16 +2502,16 @@ function renderBuilderScreen() {
   // contacts — ne les atteint pas.
   const buyerField = buyer ? `
     <div class="field">
-      <span class="field-label" id="lbl-acheteur">Nom de l'acheteur</span>
+      <span class="field-label" id="lbl-acheteur">${tr('Nom de l\'acheteur', 'Buyer\'s name')}</span>
       <button type="button" class="readonly-chip" id="btn-change-buyer" aria-describedby="lbl-acheteur">
         ${esc(buyer.prenom + ' ' + buyer.nom)}
         ${icon('chevronRight')}
       </button>
     </div>` : `
     <div class="field">
-      <span class="field-label" id="lbl-acheteur">Nom de l'acheteur</span>
+      <span class="field-label" id="lbl-acheteur">${tr('Nom de l\'acheteur', 'Buyer\'s name')}</span>
       <button class="readonly-chip is-empty" id="btn-name-buyer" aria-describedby="lbl-acheteur">
-        Pour qui est ce tour ?
+        ${tr('Pour qui est ce tour ?', 'Who is this tour for?')}
         ${icon('chevronRight')}
       </button>
     </div>`;
@@ -2384,12 +2522,12 @@ function renderBuilderScreen() {
   const isPast = saved && saved.date < todayPlus(0);
   const archivePanel = !isPast ? '' : (saved.reopened ? `
     <div class="archive-panel is-reopened">
-      <p class="archive-text">Daté du ${formatDateLong(saved.date)}, ce tour est maintenu dans les tours à venir.</p>
-      <button class="btn-inline" id="btn-archive-tour">Le reclasser dans les tours passés</button>
+      <p class="archive-text">${tr(`Daté du ${formatDateLong(saved.date)}, ce tour est maintenu dans les tours à venir.`, `Dated ${formatDateLong(saved.date)}, this tour is being kept in upcoming tours.`)}</p>
+      <button class="btn-inline" id="btn-archive-tour">${tr('Le reclasser dans les tours passés', 'Move it back to past tours')}</button>
     </div>` : `
     <div class="archive-panel">
-      <p class="archive-text">Ce tour date du ${formatDateLong(saved.date)}. Il est classé dans les tours passés.</p>
-      <button class="btn-inline" id="btn-reopen-tour">Le remettre dans les tours à venir</button>
+      <p class="archive-text">${tr(`Ce tour date du ${formatDateLong(saved.date)}. Il est classé dans les tours passés.`, `This tour is dated ${formatDateLong(saved.date)}. It's filed under past tours.`)}</p>
+      <button class="btn-inline" id="btn-reopen-tour">${tr('Le remettre dans les tours à venir', 'Move it back to upcoming tours')}</button>
     </div>`);
 
   // « Partagé » entre dans la liste : un tour peut se dégrader après son envoi
@@ -2406,7 +2544,7 @@ function renderBuilderScreen() {
   const firstStopTime = (firstStop && firstStop.type === 'property' && firstStop.lockedStart) || draft.time;
   const timeField = !tourStartIsFixed(draft)
     ? `<select class="input select" id="builder-time">
-        ${TIME_OPTIONS.map(t => `<option value="${t}" ${t === firstStopTime ? 'selected' : ''}>${t.replace(':', 'h')}</option>`).join('')}
+        ${TIME_OPTIONS.map(t => `<option value="${t}" ${t === firstStopTime ? 'selected' : ''}>${state.lang === 'en' ? t : t.replace(':', 'h')}</option>`).join('')}
       </select>`
     : (() => {
         const first = draft.stops[0];
@@ -2415,8 +2553,8 @@ function renderBuilderScreen() {
           <p class="field-static">
             <strong>${minutesToLabel(rows[0].start)}</strong>
             <span class="field-static-note">${confirmee
-              ? 'Heure confirmée par le courtier inscripteur'
-              : 'Heure demandée au courtier inscripteur'}</span>
+              ? tr('Heure confirmée par le courtier inscripteur', 'Time confirmed by the listing broker')
+              : tr('Heure demandée au courtier inscripteur', 'Time requested from the listing broker')}</span>
           </p>`;
       })();
 
@@ -2424,27 +2562,33 @@ function renderBuilderScreen() {
   const validationPanel = !panelStatuses.includes(status) ? '' : `
     <div class="validation-panel ${status}${status === 'partage' && tally.confirmed < tally.total ? ' is-stale' : ''}">
       <div class="validation-counts">
-        <span class="vcount ok">${tally.confirmed} confirmée${tally.confirmed > 1 ? 's' : ''}</span>
-        ${tally.waiting ? `<span class="vcount wait">${tally.waiting} en attente</span>` : ''}
-        ${tally.toHandle ? `<span class="vcount act">${tally.toHandle} à traiter</span>` : ''}
-        ${tally.sandbox ? `<span class="vcount todo">${tally.sandbox} à envoyer</span>` : ''}
+        <span class="vcount ok">${tr(`${tally.confirmed} confirmée${tally.confirmed > 1 ? 's' : ''}`, `${tally.confirmed} confirmed`)}</span>
+        ${tally.waiting ? `<span class="vcount wait">${tr(`${tally.waiting} en attente`, `${tally.waiting} pending`)}</span>` : ''}
+        ${tally.toHandle ? `<span class="vcount act">${tr(`${tally.toHandle} à traiter`, `${tally.toHandle} to handle`)}</span>` : ''}
+        ${tally.sandbox ? `<span class="vcount todo">${tr(`${tally.sandbox} à envoyer`, `${tally.sandbox} to send`)}</span>` : ''}
       </div>
       <p class="validation-help">${status === 'partage'
         // Un tour partagé n'est à jour que si tout y est encore confirmé. Une
         // visite qui attend une nouvelle réponse compte autant qu'une annulée :
         // dans les deux cas l'acheteur tient un horaire qui n'est plus vrai.
         ? (tally.confirmed < tally.total
-          ? `${tally.total - tally.confirmed} visite${tally.total - tally.confirmed > 1 ? 's ne sont' : ' n\'est'} plus confirmée${tally.total - tally.confirmed > 1 ? 's' : ''} depuis l'envoi${buyer ? ` à ${esc(buyer.prenom)}` : ''}. ${buyer ? `${esc(buyer.prenom)} détient` : 'L\'acheteur détient'} un tour qui n'est plus à jour : renvoyez-le-lui une fois ${tally.total - tally.confirmed > 1 ? 'les créneaux réglés' : 'le créneau réglé'}.`
-          : `Le tour a été partagé${buyer ? ` avec ${esc(buyer.prenom)}` : ''}. Toutes les visites tiennent.`)
+          ? tr(
+            `${tally.total - tally.confirmed} visite${tally.total - tally.confirmed > 1 ? 's ne sont' : ' n\'est'} plus confirmée${tally.total - tally.confirmed > 1 ? 's' : ''} depuis l'envoi${buyer ? ` à ${esc(buyer.prenom)}` : ''}. ${buyer ? `${esc(buyer.prenom)} détient` : 'L\'acheteur détient'} un tour qui n'est plus à jour : renvoyez-le-lui une fois ${tally.total - tally.confirmed > 1 ? 'les créneaux réglés' : 'le créneau réglé'}.`,
+            `${tally.total - tally.confirmed} visit${tally.total - tally.confirmed > 1 ? 's are' : ' is'} no longer confirmed since being sent${buyer ? ` to ${esc(buyer.prenom)}` : ''}. ${buyer ? `${esc(buyer.prenom)} holds` : 'The buyer holds'} a tour that's no longer up to date: resend it once ${tally.total - tally.confirmed > 1 ? 'the time slots are settled' : 'the time slot is settled'}.`
+          )
+          : tr(`Le tour a été partagé${buyer ? ` avec ${esc(buyer.prenom)}` : ''}. Toutes les visites tiennent.`, `The tour was shared${buyer ? ` with ${esc(buyer.prenom)}` : ''}. All visits still hold.`))
         : tally.sandbox
-        ? `${tally.sandbox} propriété${tally.sandbox > 1 ? 's' : ''} ${tally.sandbox > 1 ? 'restent' : 'reste'} au bac à sable : ${tally.sandbox > 1 ? 'leurs demandes ne sont' : 'sa demande n\'est'} pas encore partie${tally.sandbox > 1 ? 's' : ''}.`
+        ? tr(
+          `${tally.sandbox} propriété${tally.sandbox > 1 ? 's' : ''} ${tally.sandbox > 1 ? 'restent' : 'reste'} au bac à sable : ${tally.sandbox > 1 ? 'leurs demandes ne sont' : 'sa demande n\'est'} pas encore partie${tally.sandbox > 1 ? 's' : ''}.`,
+          `${tally.sandbox} listing${tally.sandbox > 1 ? 's' : ''} ${tally.sandbox > 1 ? 'remain' : 'remains'} in the sandbox: ${tally.sandbox > 1 ? 'their requests haven\'t' : 'its request hasn\'t'} been sent yet.`
+        )
         : status === 'non_envoye'
-          ? `Toutes les visites sont confirmées. ${esc(buyer.prenom)} n'a pas encore reçu le tour.`
+          ? tr(`Toutes les visites sont confirmées. ${esc(buyer.prenom)} n'a pas encore reçu le tour.`, `All visits are confirmed. ${esc(buyer.prenom)} hasn't received the tour yet.`)
           : status === 'confirme'
-            ? 'Toutes les visites sont confirmées. Le tour peut être partagé avec un acheteur.'
+            ? tr('Toutes les visites sont confirmées. Le tour peut être partagé avec un acheteur.', 'All visits are confirmed. The tour can be shared with a buyer.')
             : tally.toHandle
-              ? 'Des courtiers ont répondu autre chose qu\'une confirmation. Traitez ces réponses pour débloquer le partage.'
-              : 'Demandes envoyées. En attente de la réponse des courtiers inscripteurs.'}</p>
+              ? tr('Des courtiers ont répondu autre chose qu\'une confirmation. Traitez ces réponses pour débloquer le partage.', 'Some brokers replied with something other than a confirmation. Handle these responses to unlock sharing.')
+              : tr('Demandes envoyées. En attente de la réponse des courtiers inscripteurs.', 'Requests sent. Awaiting a response from the listing brokers.')}</p>
     </div>`;
 
   return `
@@ -2457,7 +2601,7 @@ function renderBuilderScreen() {
     ${buyerField}
     <div class="field-row">
       <div class="field">
-        <label class="field-label" for="builder-date">Date</label>
+        <label class="field-label" for="builder-date">${tr('Date', 'Date')}</label>
         <div class="input-with-icon">
           <!-- La borne guide le sélecteur natif sans jamais descendre sous la
                valeur en place : un tour déjà daté d'hier — rouvert, ou
@@ -2469,8 +2613,8 @@ function renderBuilderScreen() {
       </div>
       <div class="field">
         ${tourStartIsFixed(draft)
-          ? `<span class="field-label" id="lbl-heure">Heure</span>`
-          : `<label class="field-label" for="builder-time">Heure</label>`}
+          ? `<span class="field-label" id="lbl-heure">${tr('Heure', 'Time')}</span>`
+          : `<label class="field-label" for="builder-time">${tr('Heure', 'Time')}</label>`}
         ${timeField}
       </div>
     </div>
@@ -2484,11 +2628,11 @@ function renderBuilderScreen() {
     <!-- En mobile first, l'action suivante se retrouve près du pouce, juste
          au-dessus de l'envoi — pas en haut d'un écran qui peut défiler loin. -->
     <div class="action-row">
-      <button class="btn btn-outline" id="btn-add-destination">${icon('plus')} Ajouter une destination</button>
+      <button class="btn btn-outline" id="btn-add-destination">${icon('plus')} ${tr('Ajouter une destination', 'Add a destination')}</button>
       ${flag('tourOptimize') ? (() => {
         const optiWhy = whenBlocked('btn-optimize', propertyCount >= 2,
-          'Ajoutez au moins deux propriétés pour réordonner le tour.');
-        return `<button class="btn btn-outline" id="btn-optimize"${optiWhy.a}>Optimiser le tour</button>${optiWhy.n}`;
+          tr('Ajoutez au moins deux propriétés pour réordonner le tour.', 'Add at least two listings to reorder the tour.'));
+        return `<button class="btn btn-outline" id="btn-optimize"${optiWhy.a}>${tr('Optimiser le tour', 'Optimize the tour')}</button>${optiWhy.n}`;
       })() : ''}
     </div>
 
@@ -2500,26 +2644,26 @@ function renderBuilderScreen() {
 // ensuite, pas l'utilisateur qui doit le déduire de trois boutons de même poids.
 function renderFooterActions(propertyCount, status, tally) {
   const del = `<button class="btn btn-danger-outline" id="btn-delete-tour">${icon('trash')} ${status === 'brouillon'
-    ? 'Supprimer le tour' : 'Supprimer ce tour et annuler les demandes de visites'}</button>`;
+    ? tr('Supprimer le tour', 'Delete the tour') : tr('Supprimer ce tour et annuler les demandes de visites', 'Delete this tour and cancel the visit requests')}</button>`;
   // L'envoi se fait sur l'écran de choix du client : ici on ne fait que s'y
   // rendre, d'où « Choisir l'acheteur » et non « Choisir et envoyer ». Quand
   // l'acheteur est déjà retenu, cet écran sert d'écran de confirmation — on y
   // relit le tour et le destinataire avant que ça parte.
-  const shareLabel = state.draft.buyer ? 'Envoyer le tour à l\'acheteur' : 'Choisir l\'acheteur';
+  const shareLabel = state.draft.buyer ? tr('Envoyer le tour à l\'acheteur', 'Send the tour to the buyer') : tr('Choisir l\'acheteur', 'Choose the buyer');
 
   // Étape 1 : envoyer aux courtiers est l'action attendue, enregistrer met le
   // tour de côté pour l'envoyer plus tard. Le second est en secondaire pour que
   // la sortie normale reste évidente.
   if (status === 'brouillon') {
     const envoiWhy = whenBlocked('btn-send-tour', propertyCount > 0,
-      'Ajoutez au moins une propriété : une demande de visite part chez le courtier qui l\'inscrit.');
+      tr('Ajoutez au moins une propriété : une demande de visite part chez le courtier qui l\'inscrit.', 'Add at least one listing: a visit request goes to the broker who listed it.'));
     const gardeWhy = whenBlocked('btn-save-draft', propertyCount > 0,
-      'Un tour sans propriété n\'a rien à enregistrer.');
+      tr('Un tour sans propriété n\'a rien à enregistrer.', 'A tour with no listings has nothing to save.'));
     return `
       <button class="btn btn-primary" id="btn-send-tour"${envoiWhy.a}>
-        Envoyer les demandes de visites
+        ${tr('Envoyer les demandes de visites', 'Send the visit requests')}
       </button>${envoiWhy.n}
-      <button class="btn btn-outline" id="btn-save-draft"${gardeWhy.a}>Enregistrer</button>${gardeWhy.n}
+      <button class="btn btn-outline" id="btn-save-draft"${gardeWhy.a}>${tr('Enregistrer', 'Save')}</button>${gardeWhy.n}
       ${del}
     `;
   }
@@ -2527,14 +2671,14 @@ function renderFooterActions(propertyCount, status, tally) {
   // modifié depuis, et on décide si les courtiers doivent être prévenus.
   if (state.dirty) {
     return `
-      <button class="btn btn-primary" id="btn-save-update">Envoyer une mise à jour</button>
-      <button class="btn btn-outline" id="btn-save-only">Enregistrer sans prévenir</button>
+      <button class="btn btn-primary" id="btn-save-update">${tr('Envoyer une mise à jour', 'Send an update')}</button>
+      <button class="btn btn-outline" id="btn-save-only">${tr('Enregistrer sans prévenir', 'Save without notifying')}</button>
       ${del}
     `;
   }
   if (status === 'partage') {
     return `
-      <button class="btn btn-primary" id="btn-share-buyer">Renvoyer le tour à l'acheteur</button>
+      <button class="btn btn-primary" id="btn-share-buyer">${tr('Renvoyer le tour à l\'acheteur', 'Resend the tour to the buyer')}</button>
       ${del}
     `;
   }
@@ -2553,7 +2697,7 @@ function renderFooterActions(propertyCount, status, tally) {
   if (tally.sandbox) {
     return `
       <button class="btn btn-primary" id="btn-send-tour">
-        Envoyer ${tally.sandbox} demande${tally.sandbox > 1 ? 's' : ''} de visite${tally.sandbox > 1 ? 's' : ''}
+        ${tr(`Envoyer ${tally.sandbox} demande${tally.sandbox > 1 ? 's' : ''} de visite${tally.sandbox > 1 ? 's' : ''}`, `Send ${tally.sandbox} visit request${tally.sandbox > 1 ? 's' : ''}`)}
       </button>
       <button class="btn btn-outline" id="btn-share-buyer">${shareLabel}</button>
       ${del}
@@ -2567,7 +2711,7 @@ function renderFooterActions(propertyCount, status, tally) {
   const remaining = tally.waiting + tally.toHandle;
   return `
     <button class="btn btn-primary" id="btn-share-buyer">${shareLabel}</button>
-    ${remaining ? `<button class="btn btn-outline" id="btn-relance">Relancer les courtiers</button>` : ''}
+    ${remaining ? `<button class="btn btn-outline" id="btn-relance">${tr('Relancer les courtiers', 'Follow up with the brokers')}</button>` : ''}
     ${del}
   `;
 }
@@ -2588,19 +2732,24 @@ function renderModal() {
     const t = currentTour();
     const wasSent = !!(t && tourSentAt(t));
     const body = wasSent
-      ? 'Cette action supprimera définitivement ce tour et annulera les demandes de visites déjà envoyées aux courtiers inscripteurs. Cette action est irréversible.'
-      : 'Cette action supprimera définitivement ce tour de visites. Cette action est irréversible.';
-    root.innerHTML = renderConfirmModal('Supprimer le tour', body, 'btn-confirm-delete-tour');
+      ? tr('Cette action supprimera définitivement ce tour et annulera les demandes de visites déjà envoyées aux courtiers inscripteurs. Cette action est irréversible.', 'This will permanently delete this tour and cancel the visit requests already sent to the listing brokers. This action can\'t be undone.')
+      : tr('Cette action supprimera définitivement ce tour de visites. Cette action est irréversible.', 'This will permanently delete this buyer\'s tour. This action can\'t be undone.');
+    root.innerHTML = renderConfirmModal(tr('Supprimer le tour', 'Delete the tour'), body, 'btn-confirm-delete-tour');
     return;
   }
   // Nielsen #5 dit prévenir, pas interdire : réencoder un tour d'hier est un
   // besoin réel. On ne bloque donc pas la date passée — on nomme sa
   // conséquence, qui est que le tour quitte la liste où le courtier le cherche.
   if (state.modal.type === 'confirmPastDate') {
-    const body = `Ce tour sera daté du <strong>${esc(formatDateLong(state.modal.date))}</strong>.
+    const body = tr(
+      `Ce tour sera daté du <strong>${esc(formatDateLong(state.modal.date))}</strong>.
       Comme cette date est passée, il quittera « À venir » et sera rangé dans <strong>« Passé »</strong>.
-      Vous pourrez l'en sortir à tout moment depuis le tour lui-même.`;
-    root.innerHTML = renderConfirmModal('Dater ce tour dans le passé ?', body, 'btn-confirm-past-date', 'Dater dans le passé', 'primary');
+      Vous pourrez l'en sortir à tout moment depuis le tour lui-même.`,
+      `This tour will be dated <strong>${esc(formatDateLong(state.modal.date))}</strong>.
+      Since that date is in the past, it will leave "Upcoming" and be filed under <strong>"Past"</strong>.
+      You can move it back at any time from the tour itself.`
+    );
+    root.innerHTML = renderConfirmModal(tr('Dater ce tour dans le passé ?', 'Date this tour in the past?'), body, 'btn-confirm-past-date', tr('Dater dans le passé', 'Date in the past'), 'primary');
     return;
   }
   if (state.modal.type === 'confirmLeave') { root.innerHTML = renderConfirmLeaveModal(); return; }
@@ -2625,43 +2774,43 @@ function renderAvailabilityModal() {
   const typePills = AVAIL_TYPES.map(t => `
     <button class="avail-type-pill${m.selectedType === t.id ? ' selected' : ''}" data-avail-type="${t.id}"
       style="--avail-color:${t.color}" role="radio" aria-checked="${m.selectedType === t.id}">
-      <span class="option-radio"></span>${esc(t.label)}
+      <span class="option-radio"></span>${esc(tr(t.labelFr, t.labelEn))}
     </button>`).join('');
 
   const dayAndRecurrence = !isEdit ? `
     <div class="field">
-      <label class="field-label">Jours</label>
+      <label class="field-label">${tr('Jours', 'Days')}</label>
       <div class="avail-day-pills">
-        ${MODAL_DAY_ORDER.map(label => `
+        ${modalDayOrder().map(label => `
           <button class="avail-day-pill${m.selectedDays.includes(label) ? ' active' : ''}" data-avail-day="${label}"
             aria-pressed="${m.selectedDays.includes(label)}">${label}</button>`).join('')}
       </div>
-      ${m.selectedDays.length === 0 ? `<p class="field-error">Choisissez au moins un jour.</p>` : ''}
+      ${m.selectedDays.length === 0 ? `<p class="field-error">${tr('Choisissez au moins un jour.', 'Choose at least one day.')}</p>` : ''}
     </div>
     <div class="field">
-      <label class="field-label">Récurrence</label>
+      <label class="field-label">${tr('Récurrence', 'Recurrence')}</label>
       <div class="avail-recur-pills">
-        <button class="avail-recur-pill${m.recurrence === 'semaine' ? ' active' : ''}" data-avail-recur="semaine" aria-pressed="${m.recurrence === 'semaine'}">Chaque semaine</button>
-        <button class="avail-recur-pill${m.recurrence === 'mois' ? ' active' : ''}" data-avail-recur="mois" aria-pressed="${m.recurrence === 'mois'}">Chaque mois</button>
+        <button class="avail-recur-pill${m.recurrence === 'semaine' ? ' active' : ''}" data-avail-recur="semaine" aria-pressed="${m.recurrence === 'semaine'}">${tr('Chaque semaine', 'Every week')}</button>
+        <button class="avail-recur-pill${m.recurrence === 'mois' ? ' active' : ''}" data-avail-recur="mois" aria-pressed="${m.recurrence === 'mois'}">${tr('Chaque mois', 'Every month')}</button>
       </div>
     </div>` : '';
 
   return `
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
-        <div class="modal-head"><h2 id="modal-title">Disponibilité de la propriété</h2><button class="modal-close" id="modal-close" aria-label="Fermer">${icon('x')}</button></div>
+        <div class="modal-head"><h2 id="modal-title">${tr('Disponibilité de la propriété', 'Listing availability')}</h2><button class="modal-close" id="modal-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
         <div class="modal-body">
           <div class="field">
-            <label class="field-label">Type</label>
+            <label class="field-label">${tr('Type', 'Type')}</label>
             <div class="avail-type-pills">${typePills}</div>
           </div>
           <div class="field-row">
             <div class="field">
-              <label class="field-label" for="avail-start">Début</label>
+              <label class="field-label" for="avail-start">${tr('Début', 'Start')}</label>
               <input type="time" id="avail-start" class="input" value="${minutesToHHMM(m.startMinutes)}" step="900">
             </div>
             <div class="field">
-              <label class="field-label" for="avail-end">Fin</label>
+              <label class="field-label" for="avail-end">${tr('Fin', 'End')}</label>
               <input type="time" id="avail-end" class="input" value="${minutesToHHMM(m.endMinutes)}" step="900">
             </div>
           </div>
@@ -2669,9 +2818,9 @@ function renderAvailabilityModal() {
           ${m.error ? `<p class="field-error">${esc(m.error)}</p>` : ''}
         </div>
         <div class="modal-footer" style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-primary" id="btn-save-availability"${canSave ? '' : ' disabled'}>Sauvegarder</button>
-          ${isEdit ? `<button class="btn btn-danger-outline" id="btn-delete-availability">Supprimer</button>` : ''}
-          <button class="btn btn-outline" id="modal-cancel">Annuler</button>
+          <button class="btn btn-primary" id="btn-save-availability"${canSave ? '' : ' disabled'}>${tr('Sauvegarder', 'Save')}</button>
+          ${isEdit ? `<button class="btn btn-danger-outline" id="btn-delete-availability">${tr('Supprimer', 'Delete')}</button>` : ''}
+          <button class="btn btn-outline" id="modal-cancel">${tr('Annuler', 'Cancel')}</button>
         </div>
       </div>
     </div>`;
@@ -2711,35 +2860,35 @@ function bindAvailabilityModalEvents() {
     const idx = list.findIndex(e => e.id === state.modal.eventId);
     if (idx >= 0) list.splice(idx, 1);
     closeModal();
-    showToast('Créneau supprimé.', 'success');
+    showToast(tr('Créneau supprimé.', 'Time slot deleted.'), 'success');
   };
 }
 
 function saveAvailabilityModal() {
   const m = state.modal;
-  if (m.startMinutes >= m.endMinutes) { m.error = 'L\'heure de fin doit être après l\'heure de début.'; render(); return; }
+  if (m.startMinutes >= m.endMinutes) { m.error = tr('L\'heure de fin doit être après l\'heure de début.', 'The end time must be after the start time.'); render(); return; }
   const list = propertyAvailability(m.propertyMls);
 
   if (m.mode === 'edit') {
     const conflict = list.some(e => e.id !== m.eventId && e.date === m.date && rangesOverlap(e, m));
-    if (conflict) { m.error = 'Ce créneau chevauche un autre déjà enregistré ce jour-là.'; render(); return; }
+    if (conflict) { m.error = tr('Ce créneau chevauche un autre déjà enregistré ce jour-là.', 'This time slot overlaps another one already saved that day.'); render(); return; }
     const ev = list.find(e => e.id === m.eventId);
     ev.type = m.selectedType; ev.startMinutes = m.startMinutes; ev.endMinutes = m.endMinutes;
     closeModal();
-    showToast('Créneau mis à jour.', 'success');
+    showToast(tr('Créneau mis à jour.', 'Time slot updated.'), 'success');
     return;
   }
 
   const dates = generateAvailDates(weekStartISO(m.date), m.selectedDays, m.recurrence);
   const today = todayPlus(0);
   const validDates = dates.filter(d => d >= today);
-  if (validDates.length === 0) { m.error = 'Toutes les dates choisies sont déjà passées.'; render(); return; }
+  if (validDates.length === 0) { m.error = tr('Toutes les dates choisies sont déjà passées.', 'All the chosen dates are already in the past.'); render(); return; }
   const conflictDate = validDates.find(d => list.some(e => e.date === d && rangesOverlap(e, m)));
-  if (conflictDate) { m.error = `Un créneau existe déjà le ${formatDateLong(conflictDate)}.`; render(); return; }
+  if (conflictDate) { m.error = tr(`Un créneau existe déjà le ${formatDateLong(conflictDate)}.`, `A time slot already exists on ${formatDateLong(conflictDate)}.`); render(); return; }
 
   validDates.forEach(d => list.push({ id: uid(), type: m.selectedType, date: d, startMinutes: m.startMinutes, endMinutes: m.endMinutes }));
   closeModal();
-  showToast(validDates.length > 1 ? `${validDates.length} créneaux ajoutés.` : 'Créneau ajouté.', 'success');
+  showToast(validDates.length > 1 ? tr(`${validDates.length} créneaux ajoutés.`, `${validDates.length} time slots added.`) : tr('Créneau ajouté.', 'Time slot added.'), 'success');
 }
 
 function renderEditBuyerModal() {
@@ -2747,57 +2896,57 @@ function renderEditBuyerModal() {
   return `
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
-        <div class="modal-head"><h2 id="modal-title">Modifier l'acheteur</h2><button class="modal-close" id="modal-close" aria-label="Fermer">${icon('x')}</button></div>
+        <div class="modal-head"><h2 id="modal-title">${tr('Modifier l\'acheteur', 'Edit buyer')}</h2><button class="modal-close" id="modal-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
         <div class="modal-body">
           <div class="field">
-            <label class="field-label" for="eb-prenom">Prénom :</label>
-            <input class="input" id="eb-prenom" value="${esc(f.prenom)}" placeholder="Prénom">
+            <label class="field-label" for="eb-prenom">${tr('Prénom :', 'First name:')}</label>
+            <input class="input" id="eb-prenom" value="${esc(f.prenom)}" placeholder="${tr('Prénom', 'First name')}">
           </div>
           <div class="field">
-            <label class="field-label" for="eb-nom">Nom :</label>
-            <input class="input" id="eb-nom" value="${esc(f.nom)}" placeholder="Nom">
+            <label class="field-label" for="eb-nom">${tr('Nom :', 'Last name:')}</label>
+            <input class="input" id="eb-nom" value="${esc(f.nom)}" placeholder="${tr('Nom', 'Last name')}">
           </div>
           <div class="field">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <label class="field-label" style="margin-bottom:0;">Courriel(s)</label>
+              <label class="field-label" style="margin-bottom:0;">${tr('Courriel(s)', 'Email(s)')}</label>
               <div style="display:flex;gap:6px;">
-                <button class="select-icon-btn add" id="eb-add-email" title="Ajouter un courriel" aria-label="Ajouter un courriel">${icon('plus')}</button>
-                <button class="select-icon-btn help" title="Courriel principal pour l'envoi des confirmations" aria-label="Aide : à quoi sert le courriel">?</button>
+                <button class="select-icon-btn add" id="eb-add-email" title="${tr('Ajouter un courriel', 'Add an email')}" aria-label="${tr('Ajouter un courriel', 'Add an email')}">${icon('plus')}</button>
+                <button class="select-icon-btn help" title="${tr('Courriel principal pour l\'envoi des confirmations', 'Main email for sending confirmations')}" aria-label="${tr('Aide : à quoi sert le courriel', 'Help: what the email is used for')}">?</button>
               </div>
             </div>
             ${f.emails.map((val, i) => `
               <div class="input-group">
-                <input class="input" type="email" data-eb-email-idx="${i}" value="${esc(val)}" placeholder="courriel@exemple.com"
-                  aria-label="Courriel ${i + 1}${f.emails.length > 1 ? ` sur ${f.emails.length}` : ''}">
+                <input class="input" type="email" data-eb-email-idx="${i}" value="${esc(val)}" placeholder="${tr('courriel@exemple.com', 'email@example.com')}"
+                  aria-label="${tr('Courriel', 'Email')} ${i + 1}${f.emails.length > 1 ? ` ${tr('sur', 'of')} ${f.emails.length}` : ''}">
                 ${f.emails.length > 1 ? `<button class="select-icon-btn remove" data-eb-remove-email="${i}">${icon('x')}</button>` : ''}
               </div>`).join('')}
           </div>
           <div class="field" style="margin-bottom:4px;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <label class="field-label" style="margin-bottom:0;">Téléphone(s)</label>
+              <label class="field-label" style="margin-bottom:0;">${tr('Téléphone(s)', 'Phone(s)')}</label>
               <div style="display:flex;gap:6px;">
-                <button class="select-icon-btn add" id="eb-add-tel" title="Ajouter un téléphone" aria-label="Ajouter un téléphone">${icon('plus')}</button>
-                <button class="select-icon-btn help" title="Format: (514) 000-0000" aria-label="Aide : format du numéro">?</button>
+                <button class="select-icon-btn add" id="eb-add-tel" title="${tr('Ajouter un téléphone', 'Add a phone')}" aria-label="${tr('Ajouter un téléphone', 'Add a phone')}">${icon('plus')}</button>
+                <button class="select-icon-btn help" title="${tr('Format: (514) 000-0000', 'Format: (514) 000-0000')}" aria-label="${tr('Aide : format du numéro', 'Help: number format')}">?</button>
               </div>
             </div>
             ${f.tels.map((val, i) => `
               <div class="input-group">
                 <input class="input" type="tel" data-eb-tel-idx="${i}" value="${esc(val)}" placeholder="(514) 000-0000"
-                  aria-label="Téléphone ${i + 1}${f.tels.length > 1 ? ` sur ${f.tels.length}` : ''}">
+                  aria-label="${tr('Téléphone', 'Phone')} ${i + 1}${f.tels.length > 1 ? ` ${tr('sur', 'of')} ${f.tels.length}` : ''}">
                 <select class="input select" style="width:130px;flex:none;" data-eb-tel-type-idx="${i}"
-                  aria-label="Type du téléphone ${i + 1}">
-                  <option>Non défini</option>
-                  <option>Cellulaire</option>
-                  <option>Maison</option>
-                  <option>Travail</option>
+                  aria-label="${tr('Type du téléphone', 'Phone type')} ${i + 1}">
+                  <option>${tr('Non défini', 'Not set')}</option>
+                  <option>${tr('Cellulaire', 'Mobile')}</option>
+                  <option>${tr('Maison', 'Home')}</option>
+                  <option>${tr('Travail', 'Work')}</option>
                 </select>
                 ${f.tels.length > 1 ? `<button class="select-icon-btn remove" data-eb-remove-tel="${i}">${icon('x')}</button>` : ''}
               </div>`).join('')}
           </div>
         </div>
         <div class="modal-footer" style="display:flex;gap:10px;">
-          <button class="btn btn-primary" id="btn-save-edit-buyer">Sauvegarder</button>
-          <button class="btn btn-outline" id="modal-cancel">Annuler</button>
+          <button class="btn btn-primary" id="btn-save-edit-buyer">${tr('Sauvegarder', 'Save')}</button>
+          <button class="btn btn-outline" id="modal-cancel">${tr('Annuler', 'Cancel')}</button>
         </div>
       </div>
     </div>`;
@@ -2815,50 +2964,50 @@ function renderNewPropertyModal() {
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
         <div class="modal-head vr-head">
-          <button class="vr-back" id="np-back" title="Retour à la recherche" aria-label="Retour à la recherche">${icon('arrowLeft')}</button>
-          <h2 class="vr-title" id="modal-title">Ajouter une propriété inexistante</h2>
+          <button class="vr-back" id="np-back" title="${tr('Retour à la recherche', 'Back to search')}" aria-label="${tr('Retour à la recherche', 'Back to search')}">${icon('arrowLeft')}</button>
+          <h2 class="vr-title" id="modal-title">${tr('Ajouter une propriété inexistante', 'Add a listing not in the catalogue')}</h2>
           <span class="vr-head-spacer"></span>
         </div>
         <div class="modal-body">
           <div class="field-row">
             <div class="field" style="flex:0 0 130px;">
-              <label class="field-label" for="np-num">Numéro civique <span class="req">*</span></label>
+              <label class="field-label" for="np-num">${tr('Numéro civique', 'Street number')} <span class="req">*</span></label>
               <input class="input${err('num')}" id="np-num" value="${esc(f.num)}" inputmode="numeric" placeholder="567">
             </div>
             <div class="field">
-              <label class="field-label" for="np-street">Nom de la rue <span class="req">*</span></label>
-              <input class="input${err('street')}" id="np-street" value="${esc(f.street)}" placeholder="Rue des Développeurs">
+              <label class="field-label" for="np-street">${tr('Nom de la rue', 'Street name')} <span class="req">*</span></label>
+              <input class="input${err('street')}" id="np-street" value="${esc(f.street)}" placeholder="${tr('Rue des Développeurs', 'Developer Street')}">
             </div>
           </div>
           <div class="field">
-            <label class="field-label" for="np-unit">Appartement / unité <span class="opt">(optionnel)</span></label>
+            <label class="field-label" for="np-unit">${tr('Appartement / unité', 'Apartment / unit')} <span class="opt">(${tr('optionnel', 'optional')})</span></label>
             <input class="input" id="np-unit" value="${esc(f.unit)}" placeholder="204">
           </div>
           <div class="field-row">
             <div class="field">
-              <label class="field-label" for="np-city">Ville <span class="req">*</span></label>
+              <label class="field-label" for="np-city">${tr('Ville', 'City')} <span class="req">*</span></label>
               <input class="input${err('city')}" id="np-city" value="${esc(f.city)}" placeholder="Boucherville">
             </div>
             <div class="field">
-              <label class="field-label" for="np-province">Province <span class="req">*</span></label>
+              <label class="field-label" for="np-province">${tr('Province', 'Province')} <span class="req">*</span></label>
               <select class="input select${err('province')}" id="np-province">
-                ${PROVINCES.map(([code, label]) => `<option value="${code}" ${f.province === code ? 'selected' : ''}>${label}</option>`).join('')}
+                ${provinces().map(([code, label]) => `<option value="${code}" ${f.province === code ? 'selected' : ''}>${label}</option>`).join('')}
               </select>
             </div>
           </div>
           <div class="field">
-            <label class="field-label" for="np-postal">Code postal <span class="opt">(optionnel)</span></label>
+            <label class="field-label" for="np-postal">${tr('Code postal', 'Postal code')} <span class="opt">(${tr('optionnel', 'optional')})</span></label>
             <input class="input" id="np-postal" value="${esc(f.postal)}" placeholder="J4B 7K1">
           </div>
 
           <div class="info-banner">${icon('info')}
-            <span>Cette propriété n'est pas créée dans le catalogue : la demande de visite part par courriel au courtier inscripteur que vous choisirez à l'étape suivante.</span>
+            <span>${tr('Cette propriété n\'est pas créée dans le catalogue : la demande de visite part par courriel au courtier inscripteur que vous choisirez à l\'étape suivante.', 'This listing isn\'t created in the catalogue: the visit request goes by email to the listing broker you\'ll choose in the next step.')}</span>
           </div>
-          ${missing.length ? `<p class="dest-empty" id="np-error">Il manque ${missing.join(', ').replace(/, ([^,]*)$/, ' et $1')}.</p>` : ''}
+          ${missing.length ? `<p class="dest-empty" id="np-error">${tr(`Il manque ${missing.join(', ').replace(/, ([^,]*)$/, ' et $1')}.`, `Missing: ${missing.join(', ').replace(/, ([^,]*)$/, ' and $1')}.`)}</p>` : ''}
         </div>
         <div class="modal-footer" style="display:flex;flex-direction:column;gap:10px;">
-          <button class="btn btn-primary btn-block" id="np-save">Enregistrer</button>
-          <button class="btn btn-outline btn-block" id="modal-cancel">Annuler</button>
+          <button class="btn btn-primary btn-block" id="np-save">${tr('Enregistrer', 'Save')}</button>
+          <button class="btn btn-outline btn-block" id="modal-cancel">${tr('Annuler', 'Cancel')}</button>
         </div>
       </div>
     </div>`;
@@ -2876,7 +3025,7 @@ function renderVisitRequestModal() {
   // Une propriété hors catalogue n'a pas de fiche : sans courtier nommé, la
   // demande n'a personne à qui partir.
   const vrWhy = whenBlocked('vr-save', !(m.external && !courtierEntry(courtier)),
-    'Nommez le courtier inscripteur : sans lui, la demande n\'a pas de destinataire.');
+    tr('Nommez le courtier inscripteur : sans lui, la demande n\'a pas de destinataire.', 'Name the listing broker: without one, the request has no recipient.'));
   // C'est l'arrêt qui est engagé ou non, pas le tour : dans un tour déjà parti,
   // une propriété ajoutée depuis reste au bac à sable jusqu'à son propre envoi.
   const editedStop = editing ? state.draft.stops.find(s => s.id === m.editStopId) : null;
@@ -2884,10 +3033,10 @@ function renderVisitRequestModal() {
   // Après un refus ou une annulation, il n'y a plus de demande à modifier :
   // celle qu'on envoie est une nouvelle, et le bouton doit le dire.
   const rejected = !!(editedStop && ['refused', 'cancelled'].includes(effectiveStopStatus(editedStop)));
-  const saveLabel = !editing ? 'Enregistrer'
-    : rejected ? 'Envoyer une nouvelle demande'
-    : sent ? 'Envoyer la modification pour validation'
-    : 'Enregistrer la modification';
+  const saveLabel = !editing ? tr('Enregistrer', 'Save')
+    : rejected ? tr('Envoyer une nouvelle demande', 'Send a new request')
+    : sent ? tr('Envoyer la modification pour validation', 'Send the change for approval')
+    : tr('Enregistrer la modification', 'Save the change');
 
   // Hors catalogue, personne ne sait à qui la demande doit partir : le courtier
   // inscripteur se cherche ici dans l'annuaire ImmoContact. Une recherche plutôt
@@ -2899,39 +3048,39 @@ function renderVisitRequestModal() {
       <span class="vr-broker-avatar">${esc(initialsOf(courtier))}</span>
       <div>
         <p class="vr-broker-name">${esc(courtier)}</p>
-        <p class="vr-broker-agency">Courtier inscripteur, Immocontact</p>
+        <p class="vr-broker-agency">${tr('Courtier inscripteur, Immocontact', 'Listing broker, Immocontact')}</p>
       </div>
     </div>` : courtier ? `
     <div class="vr-broker">
       <span class="vr-broker-avatar">${esc(initialsOf(courtier))}</span>
       <div>
         <p class="vr-broker-name">${esc(courtier)}</p>
-        <p class="vr-broker-agency">Courtier inscripteur, Immocontact${courtierEntry(courtier) ? ' — ' + esc(courtierEntry(courtier).bureau) : ''}</p>
+        <p class="vr-broker-agency">${tr('Courtier inscripteur, Immocontact', 'Listing broker, Immocontact')}${courtierEntry(courtier) ? ' — ' + esc(courtierEntry(courtier).bureau) : ''}</p>
       </div>
-      <button class="btn-inline ghost" id="vr-courtier-clear">Changer</button>
+      <button class="btn-inline ghost" id="vr-courtier-clear">${tr('Changer', 'Change')}</button>
     </div>` : (() => {
       const q = m.courtierSearch || '';
       const found = searchCourtiers(q);
       return `
     <div class="vr-broker-pick">
-      <label class="field-label" for="vr-courtier-search">Courtier inscripteur <span class="req">*</span></label>
+      <label class="field-label" for="vr-courtier-search">${tr('Courtier inscripteur', 'Listing broker')} <span class="req">*</span></label>
       <div class="search-bar" style="margin-bottom:0;">
         <input type="text" class="input" id="vr-courtier-search" autocomplete="off"
-          placeholder="Rechercher un courtier d'Immocontact…" value="${esc(q)}">
+          placeholder="${tr('Rechercher un courtier d\'Immocontact…', 'Search an Immocontact broker…')}" value="${esc(q)}">
         ${icon('search')}
       </div>
-      ${!q ? `<p class="helper-text" style="margin:8px 0 0;">Tapez un nom ou un bureau. Seuls les courtiers inscrits à Immocontact peuvent recevoir une demande de visite.</p>` : found.length ? `
+      ${!q ? `<p class="helper-text" style="margin:8px 0 0;">${tr('Tapez un nom ou un bureau. Seuls les courtiers inscrits à Immocontact peuvent recevoir une demande de visite.', 'Type a name or an office. Only brokers registered with Immocontact can receive a visit request.')}</p>` : found.length ? `
         <div class="courtier-results">
           ${found.map(c => `
             <button type="button" class="courtier-row" data-pick-courtier="${esc(c.nom)}">
               <span class="vr-broker-avatar">${esc(initialsOf(c.nom))}</span>
               <span class="courtier-id">
                 <span class="courtier-name">${esc(c.nom)}</span>
-                <span class="courtier-office">Courtier inscripteur, Immocontact — ${esc(c.bureau)}</span>
+                <span class="courtier-office">${tr('Courtier inscripteur, Immocontact', 'Listing broker, Immocontact')} — ${esc(c.bureau)}</span>
               </span>
             </button>`).join('')}
         </div>` : `
-        <p class="dest-empty">Aucun courtier de ce nom à Immocontact. Vérifiez l'orthographe : la demande ne peut partir qu'à un courtier inscrit.</p>`}
+        <p class="dest-empty">${tr('Aucun courtier de ce nom à Immocontact. Vérifiez l\'orthographe : la demande ne peut partir qu\'à un courtier inscrit.', 'No broker by that name at Immocontact. Check the spelling: the request can only go to a registered broker.')}</p>`}
     </div>`;
     })();
 
@@ -2939,8 +3088,8 @@ function renderVisitRequestModal() {
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
         <div class="modal-head vr-head">
-          <button class="vr-back" id="vr-back" title="Retour" aria-label="Retour">${icon('arrowLeft')}</button>
-          <h2 class="vr-title" id="modal-title">Demande de visite</h2>
+          <button class="vr-back" id="vr-back" title="${tr('Retour', 'Back')}" aria-label="${tr('Retour', 'Back')}">${icon('arrowLeft')}</button>
+          <h2 class="vr-title" id="modal-title">${tr('Demande de visite', 'Visit request')}</h2>
           <span class="vr-head-spacer"></span>
         </div>
         <div class="modal-body">
@@ -2950,49 +3099,49 @@ function renderVisitRequestModal() {
               ? `<span class="result-pin">${icon('mapPinOutline')}</span>`
               : `<img class="result-thumb" src="${thumbFor(m.mls, m.address)}" alt="">`}
             <span class="vr-property-address">${esc(m.address)}</span>
-            ${m.external ? `<span class="ext-chip" title="Hors catalogue : la demande part par courriel, sans créer de fiche.">Hors catalogue</span>` : ''}
+            ${m.external ? `<span class="ext-chip" title="${tr('Hors catalogue : la demande part par courriel, sans créer de fiche.', 'Off-catalogue: the request goes by email, without creating a listing.')}">${tr('Hors catalogue', 'Off-catalogue')}</span>` : ''}
           </div>
 
           <div class="field">
-            <label class="field-label" for="vr-date">Date</label>
+            <label class="field-label" for="vr-date">${tr('Date', 'Date')}</label>
             <input type="date" class="input vr-date" id="vr-date" value="${m.date}">
           </div>
 
           <div class="field-row">
             <div class="field">
-              <label class="field-label" for="vr-from">De :</label>
+              <label class="field-label" for="vr-from">${tr('De :', 'From:')}</label>
               <select class="input select" id="vr-from">${fromOptions}</select>
             </div>
             <div class="field">
-              <label class="field-label" for="vr-duration">À :</label>
+              <label class="field-label" for="vr-duration">${tr('À :', 'To:')}</label>
               <select class="input select" id="vr-duration">
                 ${[...new Set([15, 30, m.duration])].sort((a, b) => a - b).map(d => `
-                  <option value="${d}" ${m.duration === d ? 'selected' : ''}>${minutesToLabel(m.from + d).replace('h', ':')}</option>`).join('')}
+                  <option value="${d}" ${m.duration === d ? 'selected' : ''}>${state.lang === 'en' ? minutesToLabel(m.from + d) : minutesToLabel(m.from + d).replace('h', ':')}</option>`).join('')}
               </select>
             </div>
           </div>
-          <p class="vr-note">La durée de visite est limitée à 30 minutes</p>
+          <p class="vr-note">${tr('La durée de visite est limitée à 30 minutes', 'Visit length is limited to 30 minutes')}</p>
 
-          <div class="vr-availability">Disponibilité à confirmer</div>
+          <div class="vr-availability">${tr('Disponibilité à confirmer', 'Availability to confirm')}</div>
 
           <div class="field" style="margin-bottom:4px;">
             <!-- Le texte d'invite ne tenait pas lieu d'étiquette : il disparaît
                  à la première frappe, et le champ n'a alors plus de nom. -->
-            <label class="field-label" for="vr-comment">Commentaires</label>
-            <textarea class="input vr-comment" id="vr-comment" placeholder="Précisions pour le courtier inscripteur" maxlength="750" rows="3">${esc(m.comment)}</textarea>
-            <p class="vr-charcount">Caractères : <span id="vr-charcount">${m.comment.length}</span> / 750</p>
+            <label class="field-label" for="vr-comment">${tr('Commentaires', 'Comments')}</label>
+            <textarea class="input vr-comment" id="vr-comment" placeholder="${tr('Précisions pour le courtier inscripteur', 'Details for the listing broker')}" maxlength="750" rows="3">${esc(m.comment)}</textarea>
+            <p class="vr-charcount">${tr('Caractères', 'Characters')} : <span id="vr-charcount">${m.comment.length}</span> / 750</p>
           </div>
 
           <div class="field">
-            <label class="field-label" for="vr-callback">Numéro de rappel</label>
+            <label class="field-label" for="vr-callback">${tr('Numéro de rappel', 'Callback number')}</label>
             <input type="tel" class="input" id="vr-callback" value="${esc(m.callback)}" placeholder="(514) 000-0000">
           </div>
         </div>
         <div class="modal-footer"${editing ? ' style="display:flex;flex-direction:column;gap:10px;"' : ''}>
           <button class="btn btn-primary${editing ? ' btn-block' : ''}" id="vr-save" ${editing ? '' : 'style="min-width:220px;"'}${vrWhy.a}>${saveLabel}</button>${vrWhy.n}
-          ${editing ? `<button class="btn btn-outline btn-block" id="modal-cancel">Annuler</button>` : ''}
+          ${editing ? `<button class="btn btn-outline btn-block" id="modal-cancel">${tr('Annuler', 'Cancel')}</button>` : ''}
           ${m.external && !courtierEntry(courtier)
-            ? `<p class="helper-text" style="margin:10px 0 0;">Choisissez le courtier inscripteur : c'est lui qui recevra la demande de visite.</p>`
+            ? `<p class="helper-text" style="margin:10px 0 0;">${tr('Choisissez le courtier inscripteur : c\'est lui qui recevra la demande de visite.', 'Choose the listing broker: they\'re the one who will receive the visit request.')}</p>`
             : ''}
         </div>
       </div>
@@ -3015,14 +3164,14 @@ function renderSendRequestsModal() {
   // L'autre variante de ce bouton porte déjà le motif dans son libellé — elle
   // devient « Choisissez au moins une propriété ». Ici le libellé nomme le
   // destinataire, donc le motif passe par la description.
-  const choixWhy = whenBlocked('btn-send-broker-buyer', n > 0, 'Cochez au moins une propriété à envoyer.');
-  const seulWhy = whenBlocked('btn-send-broker-only', n > 0, 'Cochez au moins une propriété à envoyer.');
+  const choixWhy = whenBlocked('btn-send-broker-buyer', n > 0, tr('Cochez au moins une propriété à envoyer.', 'Check at least one listing to send.'));
+  const seulWhy = whenBlocked('btn-send-broker-only', n > 0, tr('Cochez au moins une propriété à envoyer.', 'Check at least one listing to send.'));
   const anyConfirmed = state.draft.stops.some(s => s.type === 'property' && effectiveStopStatus(s) === 'confirmed');
   const buyer = anyConfirmed ? state.draft.buyer : null;
 
   const rows = pending.map(s => {
     const row = computeSchedule(state.draft).find(r => r.stop.id === s.id);
-    const heure = s.lockedStart ? s.lockedStart.replace(':', 'h') : (row ? minutesToLabel(row.start) : '');
+    const heure = s.lockedStart ? (state.lang === 'en' ? s.lockedStart : s.lockedStart.replace(':', 'h')) : (row ? minutesToLabel(row.start) : '');
     const on = chosen.includes(s.id);
     return `
       <label class="send-row${on ? ' is-on' : ''}">
@@ -3040,21 +3189,21 @@ function renderSendRequestsModal() {
   return `
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
-        <div class="modal-head"><h2 id="modal-title">Envoyer les demandes de visites</h2><button class="modal-close" id="modal-close" aria-label="Fermer">${icon('x')}</button></div>
+        <div class="modal-head"><h2 id="modal-title">${tr('Envoyer les demandes de visites', 'Send the visit requests')}</h2><button class="modal-close" id="modal-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
         <div class="modal-body">
-          <p class="helper-text" style="margin:0 0 14px;">Chaque courtier inscripteur reçoit la demande de sa propriété, avec le créneau que vous avez retenu. Les propriétés décochées restent au bac à sable.</p>
+          <p class="helper-text" style="margin:0 0 14px;">${tr('Chaque courtier inscripteur reçoit la demande de sa propriété, avec le créneau que vous avez retenu. Les propriétés décochées restent au bac à sable.', 'Each listing broker gets the request for their listing, with the time slot you picked. Unchecked listings stay in the sandbox.')}</p>
           <div class="send-list">${rows}</div>
         </div>
         <div class="modal-footer" style="display:flex;flex-direction:column;gap:10px;">
           ${buyer ? `
-            <button class="btn btn-primary btn-block" id="btn-send-broker-buyer"${choixWhy.a}>Envoyer aux courtiers et à ${esc(buyer.prenom)}</button>${choixWhy.n}
-            <button class="btn btn-outline btn-block" id="btn-send-broker-only"${seulWhy.a}>Envoyer aux courtiers seulement</button>${seulWhy.n}
+            <button class="btn btn-primary btn-block" id="btn-send-broker-buyer"${choixWhy.a}>${tr(`Envoyer aux courtiers et à ${esc(buyer.prenom)}`, `Send to the brokers and to ${esc(buyer.prenom)}`)}</button>${choixWhy.n}
+            <button class="btn btn-outline btn-block" id="btn-send-broker-only"${seulWhy.a}>${tr('Envoyer aux courtiers seulement', 'Send to the brokers only')}</button>${seulWhy.n}
           ` : `
             <button class="btn btn-primary btn-block" id="btn-send-broker-only" ${n ? '' : 'disabled'}>
-              ${n ? `Envoyer ${n} demande${n > 1 ? 's' : ''}` : 'Choisissez au moins une propriété'}
+              ${n ? tr(`Envoyer ${n} demande${n > 1 ? 's' : ''}`, `Send ${n} request${n > 1 ? 's' : ''}`) : tr('Choisissez au moins une propriété', 'Choose at least one listing')}
             </button>
           `}
-          <button class="btn btn-outline btn-block" id="modal-cancel">Annuler</button>
+          <button class="btn btn-outline btn-block" id="modal-cancel">${tr('Annuler', 'Cancel')}</button>
         </div>
       </div>
     </div>`;
@@ -3065,10 +3214,10 @@ function renderConfirmSendUpdateModal() {
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
         <div class="modal-body" style="padding-top:24px;">
-          <h2 id="modal-title" style="font-size:17px;text-align:center;color:var(--bleu-principal);margin:0 0 18px;">Envoyer la mise à jour à</h2>
+          <h2 id="modal-title" style="font-size:17px;text-align:center;color:var(--bleu-principal);margin:0 0 18px;">${tr('Envoyer la mise à jour à', 'Send the update to')}</h2>
           <div style="display:flex;flex-direction:column;gap:12px;">
-            <button class="btn btn-primary btn-block" id="btn-send-update-broker-buyer">Courtier et acheteur</button>
-            <button class="btn btn-primary btn-block" id="btn-send-update-broker-only">Courtier uniquement</button>
+            <button class="btn btn-primary btn-block" id="btn-send-update-broker-buyer">${tr('Courtier et acheteur', 'Broker and buyer')}</button>
+            <button class="btn btn-primary btn-block" id="btn-send-update-broker-only">${tr('Courtier uniquement', 'Broker only')}</button>
           </div>
         </div>
       </div>
@@ -3078,15 +3227,15 @@ function renderConfirmSendUpdateModal() {
 // Le bouton de confirmation nomme l'acte plutôt que d'être un « Oui » : c'est
 // le dernier endroit où l'utilisateur peut se rendre compte de ce qu'il fait.
 // Rouge pour ce qui détruit, principal pour ce qui range.
-function renderConfirmModal(title, body, confirmId, confirmLabel = 'Supprimer', tone = 'danger') {
+function renderConfirmModal(title, body, confirmId, confirmLabel = tr('Supprimer', 'Delete'), tone = 'danger') {
   return `
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
-        <div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="modal-close" id="modal-close" aria-label="Fermer">${icon('x')}</button></div>
+        <div class="modal-head"><h2 id="modal-title">${esc(title)}</h2><button class="modal-close" id="modal-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
         <div class="modal-body"><p style="font-size:14.5px;color:var(--texte-secondaire);line-height:1.5;">${body}</p></div>
         <div class="modal-footer" style="display:flex;gap:10px;">
           <button class="btn btn-${tone}" id="${confirmId}">${esc(confirmLabel)}</button>
-          <button class="btn btn-outline" id="modal-cancel">Annuler</button>
+          <button class="btn btn-outline" id="modal-cancel">${tr('Annuler', 'Cancel')}</button>
         </div>
       </div>
     </div>`;
@@ -3104,19 +3253,19 @@ function renderConfirmRemoveStopModal() {
   const courtier = stop.courtier;
 
   const consequence = !courtier
-    ? 'Cet arrêt disparaît du tour. Aucune demande n\'a été envoyée pour cette adresse.'
+    ? tr('Cet arrêt disparaît du tour. Aucune demande n\'a été envoyée pour cette adresse.', 'This stop disappears from the tour. No request was sent for this address.')
     : st === 'refused'
-      ? `${esc(courtier)} a déjà refusé cette visite. Il n'y a rien à annuler.`
+      ? tr(`${esc(courtier)} a déjà refusé cette visite. Il n'y a rien à annuler.`, `${esc(courtier)} already declined this visit. There's nothing to cancel.`)
       : st === 'noreply'
-        ? `${esc(courtier)} n'a pas répondu. La demande de visite sera annulée.`
+        ? tr(`${esc(courtier)} n'a pas répondu. La demande de visite sera annulée.`, `${esc(courtier)} hasn't responded. The visit request will be cancelled.`)
         : sent
-          ? `La demande de visite envoyée à ${esc(courtier)} sera annulée.`
-          : `La demande de visite préparée pour ${esc(courtier)} sera perdue.`;
+          ? tr(`La demande de visite envoyée à ${esc(courtier)} sera annulée.`, `The visit request sent to ${esc(courtier)} will be cancelled.`)
+          : tr(`La demande de visite préparée pour ${esc(courtier)} sera perdue.`, `The visit request prepared for ${esc(courtier)} will be lost.`);
 
   return `
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
-        <div class="modal-head"><h2 id="modal-title">Retirer cette propriété ?</h2><button class="modal-close" id="modal-close" aria-label="Fermer">${icon('x')}</button></div>
+        <div class="modal-head"><h2 id="modal-title">${tr('Retirer cette propriété ?', 'Remove this listing?')}</h2><button class="modal-close" id="modal-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
         <div class="modal-body">
           <div class="vr-property" style="padding-bottom:14px;border-bottom:1px solid var(--bordures);margin-bottom:14px;">
             <img class="result-thumb" src="${thumbFor(stop.mls, stop.address)}" alt="">
@@ -3125,8 +3274,8 @@ function renderConfirmRemoveStopModal() {
           <p style="font-size:14.5px;color:var(--texte-secondaire);line-height:1.5;margin:0;">${consequence}</p>
         </div>
         <div class="modal-footer" style="display:flex;gap:10px;">
-          <button class="btn btn-danger" id="btn-confirm-remove-stop">Retirer du tour</button>
-          <button class="btn btn-outline" id="modal-cancel">Annuler</button>
+          <button class="btn btn-danger" id="btn-confirm-remove-stop">${tr('Retirer du tour', 'Remove from the tour')}</button>
+          <button class="btn btn-outline" id="modal-cancel">${tr('Annuler', 'Cancel')}</button>
         </div>
       </div>
     </div>`;
@@ -3140,18 +3289,18 @@ function renderConfirmLeaveModal() {
   return `
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
-        <div class="modal-head"><h2 id="modal-title">Quitter sans enregistrer ?</h2><button class="modal-close" id="modal-close" aria-label="Fermer">${icon('x')}</button></div>
+        <div class="modal-head"><h2 id="modal-title">${tr('Quitter sans enregistrer ?', 'Leave without saving?')}</h2><button class="modal-close" id="modal-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
         <div class="modal-body">
           <p style="font-size:14.5px;color:var(--texte-secondaire);line-height:1.5;margin:0;">
             ${saved
-              ? 'Ce tour a été modifié depuis son dernier enregistrement. Si vous quittez maintenant, ces modifications seront perdues.'
-              : 'Ce tour de visites n\'a jamais été enregistré. Si vous quittez maintenant, il sera perdu.'}
+              ? tr('Ce tour a été modifié depuis son dernier enregistrement. Si vous quittez maintenant, ces modifications seront perdues.', 'This tour has been changed since it was last saved. If you leave now, these changes will be lost.')
+              : tr('Ce tour de visites n\'a jamais été enregistré. Si vous quittez maintenant, il sera perdu.', 'This buyer\'s tour has never been saved. If you leave now, it will be lost.')}
           </p>
         </div>
         <div class="modal-footer" style="display:flex;flex-direction:column;gap:10px;">
-          <button class="btn btn-primary" id="btn-leave-save">Enregistrer et quitter</button>
-          <button class="btn btn-danger-outline" id="btn-leave-discard">Quitter sans enregistrer</button>
-          <button class="btn btn-outline" id="modal-cancel">Rester sur le tour</button>
+          <button class="btn btn-primary" id="btn-leave-save">${tr('Enregistrer et quitter', 'Save and leave')}</button>
+          <button class="btn btn-danger-outline" id="btn-leave-discard">${tr('Quitter sans enregistrer', 'Leave without saving')}</button>
+          <button class="btn btn-outline" id="modal-cancel">${tr('Rester sur le tour', 'Stay on the tour')}</button>
         </div>
       </div>
     </div>`;
@@ -3162,57 +3311,57 @@ function renderFlagsModal() {
   const groups = [];
   FEATURE_FLAGS.forEach(f => {
     let g = groups.find(x => x.name === f.group);
-    if (!g) { g = { name: f.group, items: [] }; groups.push(g); }
+    if (!g) { g = { name: f.group, nameEn: f.groupEn, items: [] }; groups.push(g); }
     g.items.push(f);
   });
 
   return `
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
-        <div class="modal-head"><h2 id="modal-title">Feature flags</h2><button class="modal-close" id="modal-close" aria-label="Fermer">${icon('x')}</button></div>
+        <div class="modal-head"><h2 id="modal-title">Feature flags</h2><button class="modal-close" id="modal-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
         <div class="modal-body">
-          <p class="helper-text" style="margin-top:0;">Le Buyer's Tour est développé comme une API autonome. Ces interrupteurs simulent les comportements propres à chaque plateforme sans changer de build.</p>
-          <p class="section-label" style="margin-top:18px;">Plateforme</p>
+          <p class="helper-text" style="margin-top:0;">${tr('Le Buyer\'s Tour est développé comme une API autonome. Ces interrupteurs simulent les comportements propres à chaque plateforme sans changer de build.', 'The Buyer\'s Tour is built as a standalone API. These switches simulate each platform\'s own behavior without changing the build.')}</p>
+          <p class="section-label" style="margin-top:18px;">${tr('Plateforme', 'Platform')}</p>
           <div class="platform-switch">
             ${PLATFORMS.map(p => `
               <button class="platform-opt ${platform === p.id ? 'active' : ''}" data-platform="${p.id}" aria-pressed="${platform === p.id ? 'true' : 'false'}">
                 <span class="platform-opt-label">${esc(p.label)}</span>
-                <span class="platform-opt-help">${esc(p.help)}</span>
+                <span class="platform-opt-help">${esc(tr(p.helpFr, p.helpEn))}</span>
               </button>`).join('')}
           </div>
           <p class="helper-text platform-note">${platform
-            ? 'Le preset n\'agit que sur les comportements déjà branchés ; ceux marqués « à venir » sont listés pour mémoire.'
-            : 'Réglage personnalisé : les interrupteurs ne correspondent à aucune plateforme. Cliquez sur l\'une des deux pour y revenir.'}</p>
+            ? tr('Le preset n\'agit que sur les comportements déjà branchés ; ceux marqués « à venir » sont listés pour mémoire.', 'The preset only affects behaviors already wired up; those marked "coming soon" are listed for reference.')
+            : tr('Réglage personnalisé : les interrupteurs ne correspondent à aucune plateforme. Cliquez sur l\'une des deux pour y revenir.', 'Custom setup: the switches don\'t match either platform. Click one of the two to go back to it.')}</p>
           ${groups.map(g => `
-            <p class="section-label" style="margin-top:18px;">${esc(g.name)}</p>
+            <p class="section-label" style="margin-top:18px;">${esc(tr(g.name, g.nameEn))}</p>
             ${g.items.map(f => `
               <div class="flag-row">
                 <div class="flag-row-text">
-                  <p class="flag-row-label">${esc(f.label)}</p>
-                  <p class="flag-row-help">${esc(f.help)}</p>
+                  <p class="flag-row-label">${esc(tr(f.labelFr, f.labelEn))}</p>
+                  <p class="flag-row-help">${esc(tr(f.helpFr, f.helpEn))}</p>
                 </div>
                 ${f.wired ? `
-                  <button class="switch ${flag(f.id) ? 'on' : ''}" data-flag="${f.id}" role="switch" aria-checked="${flag(f.id) ? 'true' : 'false'}" aria-label="${esc(f.label)}">
+                  <button class="switch ${flag(f.id) ? 'on' : ''}" data-flag="${f.id}" role="switch" aria-checked="${flag(f.id) ? 'true' : 'false'}" aria-label="${esc(tr(f.labelFr, f.labelEn))}">
                     <span class="switch-thumb"></span>
                   </button>
-                ` : `<span class="flag-soon">À venir</span>`}
+                ` : `<span class="flag-soon">${tr('À venir', 'Coming soon')}</span>`}
               </div>
             `).join('')}
           `).join('')}
         </div>
         <div class="modal-footer">
-          <button class="btn btn-outline btn-block" id="modal-cancel">Fermer</button>
+          <button class="btn btn-outline btn-block" id="modal-cancel">${tr('Fermer', 'Close')}</button>
         </div>
       </div>
     </div>`;
 }
 
 const DEST_TABS = [
-  { id: 'nom', label: 'Nom', icon: 'search' },
-  { id: 'adresse', label: 'Adresse', icon: 'mapPinOutline' },
-  { id: 'mls', label: 'MLS', icon: 'doc', prefix: '#' },
-  { id: 'cart', label: 'Panier', icon: 'cart' },
-  { id: 'arret', label: 'Adresse personnalisée', icon: 'plus' },
+  { id: 'nom', labelFr: 'Nom', labelEn: 'Name', icon: 'search' },
+  { id: 'adresse', labelFr: 'Adresse', labelEn: 'Address', icon: 'mapPinOutline' },
+  { id: 'mls', labelFr: 'MLS', labelEn: 'MLS', icon: 'doc', prefix: '#' },
+  { id: 'cart', labelFr: 'Panier', labelEn: 'Cart', icon: 'cart' },
+  { id: 'arret', labelFr: 'Adresse personnalisée', labelEn: 'Custom address', icon: 'plus' },
 ];
 
 // Le type d'une adresse personnalisée n'est qu'une étiquette pour la
@@ -3222,10 +3371,10 @@ const DEST_TABS = [
 // « Point de départ » et « Pause » n'y sont plus qu'un nom et une icône.
 const ARRET_KIND_ORDER = ['depart', 'visite', 'pause', 'restaurant'];
 const ARRET_KINDS = {
-  depart: { label: 'Point de départ', icon: 'mapPinOutline' },
-  visite: { label: 'Visite', icon: 'home' },
-  pause: { label: 'Pause', icon: 'pauseBars' },
-  restaurant: { label: 'Restaurant', icon: 'restaurant' },
+  depart: { labelFr: 'Point de départ', labelEn: 'Starting point', icon: 'mapPinOutline' },
+  visite: { labelFr: 'Visite', labelEn: 'Visit', icon: 'home' },
+  pause: { labelFr: 'Pause', labelEn: 'Break', icon: 'pauseBars' },
+  restaurant: { labelFr: 'Restaurant', labelEn: 'Restaurant', icon: 'restaurant' },
 };
 
 // MLS search and Panier come from the platform's MLS integration; ImmoContact
@@ -3261,7 +3410,7 @@ function renderDestinationModal() {
   let body = '';
 
   if (tab === 'nom' || tab === 'adresse' || tab === 'mls') {
-    const placeholder = tab === 'mls' ? 'Entrez le numéro MLS...' : tab === 'adresse' ? 'Entrez l\'addresse...' : 'Entrez un nom de courtier...';
+    const placeholder = tab === 'mls' ? tr('Entrez le numéro MLS...', 'Enter the MLS number...') : tab === 'adresse' ? tr('Entrez l\'addresse...', 'Enter the address...') : tr('Entrez un nom de courtier...', 'Enter a broker name...');
     let results = [];
     if (q) {
       results = MLS_POOL.filter(p => {
@@ -3278,21 +3427,21 @@ function renderDestinationModal() {
     const nothingFound = !!q && !results.length && !suggestions.length;
     const listHtml = !q ? '' : grouped ? `
       ${results.length ? `
-        <p class="result-group">Propriétés Immocontact</p>
+        <p class="result-group">${tr('Propriétés Immocontact', 'Immocontact listings')}</p>
         ${results.map(p => resultRow(p, addedMls)).join('')}` : ''}
       ${suggestions.length ? `
-        <p class="result-group">Propriétés à ajouter</p>
+        <p class="result-group">${tr('Propriétés à ajouter', 'Listings to add')}</p>
         ${suggestions.map(sug => suggestionRow(sug)).join('')}` : ''}
       ${!results.length && !suggestions.length ? `
-        <p class="dest-empty">Aucun résultat, veuillez raffiner votre recherche ou ajouter une nouvelle adresse.</p>
-        <button class="btn btn-primary btn-block" data-new-property style="margin-top:14px;">${icon('plus')} Ajouter une nouvelle adresse</button>` : ''}
+        <p class="dest-empty">${tr('Aucun résultat, veuillez raffiner votre recherche ou ajouter une nouvelle adresse.', 'No results — refine your search or add a new address.')}</p>
+        <button class="btn btn-primary btn-block" data-new-property style="margin-top:14px;">${icon('plus')} ${tr('Ajouter une nouvelle adresse', 'Add a new address')}</button>` : ''}
     ` : `
       ${results.map(p => resultRow(p, addedMls)).join('') || `
-        <p class="helper-text" style="margin-top:14px;">Aucun résultat.</p>
+        <p class="helper-text" style="margin-top:14px;">${tr('Aucun résultat.', 'No results.')}</p>
         ${tab === 'adresse' ? `
-          <div class="info-banner clickable" data-goto-arret style="margin-top:10px;">${icon('plus')} <span>Adresse introuvable ? L'ajouter comme adresse personnalisée.</span></div>
+          <div class="info-banner clickable" data-goto-arret style="margin-top:10px;">${icon('plus')} <span>${tr('Adresse introuvable ? L\'ajouter comme adresse personnalisée.', 'Can\'t find the address? Add it as a custom address.')}</span></div>
         ` : tab === 'mls' ? `
-          <div class="info-banner clickable" data-goto-arret style="margin-top:10px;">${icon('plus')} <span>Numéro MLS introuvable ? Ajouter l'adresse manuellement.</span></div>
+          <div class="info-banner clickable" data-goto-arret style="margin-top:10px;">${icon('plus')} <span>${tr('Numéro MLS introuvable ? Ajouter l\'adresse manuellement.', 'Can\'t find the MLS number? Add the address manually.')}</span></div>
         ` : ''}`}
     `;
 
@@ -3301,14 +3450,14 @@ function renderDestinationModal() {
         <input type="text" class="input" id="dest-search" placeholder="${placeholder}" value="${esc(state.destModalSearch)}">
         ${icon('search')}
       </div>
-      ${nothingFound ? '' : `<div class="info-banner">${icon('info')} <span>Cliquez sur un résultat pour l'ajouter directement au tour.</span></div>`}
+      ${nothingFound ? '' : `<div class="info-banner">${icon('info')} <span>${tr('Cliquez sur un résultat pour l\'ajouter directement au tour.', 'Click a result to add it directly to the tour.')}</span></div>`}
       <div style="margin-top:10px;">${listHtml}</div>
     `;
   } else if (tab === 'cart') {
     body = `
-      <div class="info-banner">${icon('info')} <span>Ces propriétés proviennent de votre sélection MLS.</span></div>
+      <div class="info-banner">${icon('info')} <span>${tr('Ces propriétés proviennent de votre sélection MLS.', 'These listings come from your MLS selection.')}</span></div>
       <div style="margin-top:10px;">
-        ${mlsCart.map(p => resultRow(p, addedMls)).join('') || '<p class="helper-text" style="margin-top:14px;">Votre panier MLS est vide.</p>'}
+        ${mlsCart.map(p => resultRow(p, addedMls)).join('') || `<p class="helper-text" style="margin-top:14px;">${tr('Votre panier MLS est vide.', 'Your MLS cart is empty.')}</p>`}
       </div>
     `;
   } else if (tab === 'arret') {
@@ -3320,12 +3469,12 @@ function renderDestinationModal() {
     const duration = state.destModalArretDuration;
     const kind = state.destModalArretKind;
     const kindOpen = state.destModalArretKindOpen;
-    const kindLabel = "Choisir votre type d'adresse";
-    const fromOptions = `<option value="" disabled hidden ${from === null ? 'selected' : ''}>Choisir l'heure</option>` +
+    const kindLabel = tr('Choisir votre type d\'adresse', 'Choose your address type');
+    const fromOptions = `<option value="" disabled hidden ${from === null ? 'selected' : ''}>${tr('Choisir l\'heure', 'Choose the time')}</option>` +
       TIME_OPTIONS.map(t => `<option value="${timeToMinutes(t)}" ${timeToMinutes(t) === from ? 'selected' : ''}>${t}</option>`).join('');
-    const durationOptions = `<option value="" disabled hidden ${duration === null ? 'selected' : ''}>Choisir la durée</option>` +
+    const durationOptions = `<option value="" disabled hidden ${duration === null ? 'selected' : ''}>${tr('Choisir la durée', 'Choose the length')}</option>` +
       [15, 30].map(d => {
-        const label = from === null ? `${d} minutes` : minutesToLabel(from + d).replace('h', ':');
+        const label = from === null ? `${d} ${tr('minutes', 'minutes')}` : (state.lang === 'en' ? minutesToLabel(from + d) : minutesToLabel(from + d).replace('h', ':'));
         return `<option value="${d}" ${d === duration ? 'selected' : ''}>${label}</option>`;
       }).join('');
 
@@ -3333,7 +3482,7 @@ function renderDestinationModal() {
       <div class="field">
         <div class="search-bar" style="margin-bottom:0;">
           <input type="text" class="input" id="arret-address" autocomplete="off"
-            placeholder="Entrez l'adresse..." value="${esc(state.destModalPrefillAddress)}">
+            placeholder="${tr('Entrez l\'adresse...', 'Enter the address...')}" value="${esc(state.destModalPrefillAddress)}">
           ${icon('search')}
         </div>
       </div>
@@ -3342,7 +3491,7 @@ function renderDestinationModal() {
           <button type="button" class="arret-kind-trigger${kind ? '' : ' is-placeholder'}" id="arret-kind-trigger"
             aria-haspopup="listbox" aria-expanded="${kindOpen}" aria-label="${kindLabel}">
             <span class="arret-kind-current">
-              ${kind ? `<span class="arret-kind-icon">${icon(ARRET_KINDS[kind].icon)}</span> ${esc(ARRET_KINDS[kind].label)}` : kindLabel}
+              ${kind ? `<span class="arret-kind-icon">${icon(ARRET_KINDS[kind].icon)}</span> ${esc(tr(ARRET_KINDS[kind].labelFr, ARRET_KINDS[kind].labelEn))}` : kindLabel}
             </span>
             ${icon(kindOpen ? 'chevronUp' : 'chevronDown')}
           </button>
@@ -3351,22 +3500,22 @@ function renderDestinationModal() {
               ${ARRET_KIND_ORDER.map(k => `
                 <button type="button" role="option" aria-selected="${k === kind}"
                   class="arret-kind-option${k === kind ? ' active' : ''}" data-arret-kind="${k}">
-                  <span class="arret-kind-icon">${icon(ARRET_KINDS[k].icon)}</span> ${esc(ARRET_KINDS[k].label)}
+                  <span class="arret-kind-icon">${icon(ARRET_KINDS[k].icon)}</span> ${esc(tr(ARRET_KINDS[k].labelFr, ARRET_KINDS[k].labelEn))}
                 </button>`).join('')}
             </div>`}
         </div>
       </div>
       <div class="field-row">
         <div class="field">
-          <label class="field-label" for="arret-from">De :</label>
+          <label class="field-label" for="arret-from">${tr('De :', 'From:')}</label>
           <select class="input select${from === null ? ' is-placeholder' : ''}" id="arret-from">${fromOptions}</select>
         </div>
         <div class="field">
-          <label class="field-label" for="arret-duration">À :</label>
+          <label class="field-label" for="arret-duration">${tr('À :', 'To:')}</label>
           <select class="input select${duration === null ? ' is-placeholder' : ''}" id="arret-duration">${durationOptions}</select>
         </div>
       </div>
-      <button class="btn btn-secondary btn-block" id="btn-add-custom-stop">${icon(editingArret ? 'check' : 'plus')} ${editingArret ? 'Enregistrer les modifications' : "Ajouter l'adresse"}</button>
+      <button class="btn btn-secondary btn-block" id="btn-add-custom-stop">${icon(editingArret ? 'check' : 'plus')} ${editingArret ? tr('Enregistrer les modifications', 'Save the changes') : tr('Ajouter l\'adresse', 'Add the address')}</button>
     `;
   }
 
@@ -3377,24 +3526,24 @@ function renderDestinationModal() {
   const anchor = editingArret ? null : insertAnchor();
   const insertHint = !anchor ? '' : `
     <div class="insert-hint">${icon('info')}
-      <span>La nouvelle étape sera insérée <strong>avant</strong> ${esc(stopShortLabel(anchor))}.</span>
+      <span>${tr(`La nouvelle étape sera insérée <strong>avant</strong> ${esc(stopShortLabel(anchor))}.`, `The new stop will be inserted <strong>before</strong> ${esc(stopShortLabel(anchor))}.`)}</span>
     </div>
     ${anchor.type === 'property' ? `
       <div class="info-banner clickable" data-edit-anchor style="margin-bottom:12px;">${icon('pencil')}
-        <span>Modifier plutôt l'heure de cette visite.</span>
+        <span>${tr('Modifier plutôt l\'heure de cette visite.', 'Edit this visit\'s time instead.')}</span>
       </div>` : ''}
   `;
 
   return `
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
-        <div class="modal-head"><h2 id="modal-title">${editingArret ? 'Modifier l\'adresse personnalisée' : anchor ? 'Insérer une étape' : 'Recherche par :'}</h2><button class="modal-close" id="modal-close" aria-label="Fermer">${icon('x')}</button></div>
+        <div class="modal-head"><h2 id="modal-title">${editingArret ? tr('Modifier l\'adresse personnalisée', 'Edit the custom address') : anchor ? tr('Insérer une étape', 'Insert a stop') : tr('Recherche par :', 'Search by:')}</h2><button class="modal-close" id="modal-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
         <div class="modal-body">
           ${editingArret ? '' : `
           <div class="dest-tabs" role="tablist">
             ${tabs.map(t => `
               <button type="button" role="tab" aria-selected="${tab === t.id}" class="dest-tab ${tab === t.id ? 'active' : ''}" data-dest-tab="${t.id}">
-                ${icon(t.icon)} ${esc(t.label)}
+                ${icon(t.icon)} ${esc(tr(t.labelFr, t.labelEn))}
                 ${t.id === 'cart' && mlsCart.length ? `<span class="tab-badge">${mlsCart.length}</span>` : ''}
               </button>`).join('')}
           </div>`}
@@ -3402,7 +3551,7 @@ function renderDestinationModal() {
           ${body}
         </div>
         <div class="modal-footer">
-          <button class="btn btn-outline btn-block" id="modal-cancel">${state.draft.stops.length > (state.modal.initialStops ?? 0) ? 'Ajouter' : 'Fermer'}</button>
+          <button class="btn btn-outline btn-block" id="modal-cancel">${state.draft.stops.length > (state.modal.initialStops ?? 0) ? tr('Ajouter', 'Add') : tr('Fermer', 'Close')}</button>
         </div>
       </div>
     </div>`;
@@ -3414,9 +3563,9 @@ function resultRow(p, addedMls) {
   // cherche sans comprendre pourquoi elle a disparu — mais ne s'ajoute pas.
   if (p.inactive) {
     return `
-      <div class="result-row is-inactive" title="Cette inscription n'est plus active. Elle ne peut pas être ajoutée à un tour.">
+      <div class="result-row is-inactive" title="${tr('Cette inscription n\'est plus active. Elle ne peut pas être ajoutée à un tour.', 'This listing is no longer active. It can\'t be added to a tour.')}">
         <img class="result-thumb" src="${thumbFor(p.mls, p.address)}" alt="">
-        <div class="result-address">${esc(p.address)} <span class="result-inactive-tag">(inactive)</span></div>
+        <div class="result-address">${esc(p.address)} <span class="result-inactive-tag">(${tr('inactive', 'inactive')})</span></div>
       </div>`;
   }
   // The whole row is the click target and toggles the selection:
@@ -3449,7 +3598,7 @@ function ratingStarsHtml(group, value, labelId) {
   return `
     <div class="rating-stars" data-rating-group="${group}"${labelId ? ` aria-labelledby="${labelId}"` : ''}>
       ${[1, 2, 3, 4, 5].map(n => `
-        <button type="button" class="rating-star ${n <= value ? 'active' : ''}" data-rate="${group}" data-value="${n}" aria-label="${n} étoile${n > 1 ? 's' : ''}">${icon('star')}</button>
+        <button type="button" class="rating-star ${n <= value ? 'active' : ''}" data-rate="${group}" data-value="${n}" aria-label="${n} ${tr(`étoile${n > 1 ? 's' : ''}`, `star${n > 1 ? 's' : ''}`)}">${icon('star')}</button>
       `).join('')}
     </div>`;
 }
@@ -3476,7 +3625,7 @@ function renderReportScreen() {
       <span class="vr-broker-avatar">${esc(initials)}</span>
       <div>
         <p class="vr-broker-name">${esc(courtier)}</p>
-        <p class="vr-broker-agency">Courtier inscripteur, Immocontact</p>
+        <p class="vr-broker-agency">${tr('Courtier inscripteur, Immocontact', 'Listing broker, Immocontact')}</p>
       </div>
     </div>
     <div class="vr-property">
@@ -3492,55 +3641,56 @@ function renderReportScreen() {
          informations négociables. Qui les reçoit se dit avant la saisie, pas
          après (Nielsen #1). -->
     <div class="info-banner" style="margin-top:16px;">${icon('info')}
-      <span>Ce compte rendu sera transmis à <strong>${esc(courtier)}</strong> et aux vendeurs.
-      Votre acheteur ne le reçoit pas.</span>
+      <span>${tr(`Ce compte rendu sera transmis à <strong>${esc(courtier)}</strong> et aux vendeurs.
+      Votre acheteur ne le reçoit pas.`, `This report will be sent to <strong>${esc(courtier)}</strong> and the sellers.
+      Your buyer doesn't receive it.`)}</span>
     </div>
 
     <div class="field" style="margin-top:16px;">
-      <span class="field-label" id="lbl-interet" style="font-weight:700;">Intérêt global</span>
+      <span class="field-label" id="lbl-interet" style="font-weight:700;">${tr('Intérêt global', 'Overall interest')}</span>
       ${ratingStarsHtml('interet', draft.interet, 'lbl-interet')}
     </div>
 
-    <p class="section-label" style="margin-top:16px;">Prix</p>
+    <p class="section-label" style="margin-top:16px;">${tr('Prix', 'Price')}</p>
     ${optionChipsHtml('prix', [
-      ['tres_satisfaisant', 'Prix très satisfaisant'],
-      ['satisfaisant', 'Prix satisfaisant'],
-      ['trop_eleve', 'Prix trop élevé'],
+      ['tres_satisfaisant', tr('Prix très satisfaisant', 'Price very satisfactory')],
+      ['satisfaisant', tr('Prix satisfaisant', 'Price satisfactory')],
+      ['trop_eleve', tr('Prix trop élevé', 'Price too high')],
     ], draft.prix)}
 
-    <p class="section-label" style="margin-top:22px;font-weight:700;">Rapport sur la propriété</p>
+    <p class="section-label" style="margin-top:22px;font-weight:700;">${tr('Rapport sur la propriété', 'Report on the listing')}</p>
 
     <div class="field" style="margin-top:10px;">
-      <span class="field-label" id="lbl-interieur" style="font-weight:700;">Intérieur</span>
+      <span class="field-label" id="lbl-interieur" style="font-weight:700;">${tr('Intérieur', 'Interior')}</span>
       ${ratingStarsHtml('interieur', draft.interieur, 'lbl-interieur')}
     </div>
     <div class="field" style="margin-top:14px;">
-      <span class="field-label" id="lbl-exterieur" style="font-weight:700;">Extérieur</span>
+      <span class="field-label" id="lbl-exterieur" style="font-weight:700;">${tr('Extérieur', 'Exterior')}</span>
       ${ratingStarsHtml('exterieur', draft.exterieur, 'lbl-exterieur')}
     </div>
 
-    <p class="section-label" style="margin-top:16px;">L'acheteur va faire une offre</p>
+    <p class="section-label" style="margin-top:16px;">${tr('L\'acheteur va faire une offre', 'The buyer will make an offer')}</p>
     ${optionChipsHtml('offre', [
-      ['oui', 'Oui'],
-      ['peut_etre', 'Peut-être'],
-      ['non', 'Non'],
+      ['oui', tr('Oui', 'Yes')],
+      ['peut_etre', tr('Peut-être', 'Maybe')],
+      ['non', tr('Non', 'No')],
     ], draft.offre)}
 
     <div class="field" style="margin-top:16px;">
-      <label class="field-label" for="report-comment">Commentaires :</label>
-      <textarea class="input report-comment" id="report-comment" maxlength="750" rows="3" placeholder="Veuillez entrer votre message.">${esc(draft.comment)}</textarea>
+      <label class="field-label" for="report-comment">${tr('Commentaires :', 'Comments:')}</label>
+      <textarea class="input report-comment" id="report-comment" maxlength="750" rows="3" placeholder="${tr('Veuillez entrer votre message.', 'Please enter your message.')}">${esc(draft.comment)}</textarea>
       <!-- Même limite que la demande de visite, donc même compteur : une
            troncature silencieuse à 750 est d'autant plus rude ici que c'est le
            plus long des deux textes. La zone vocale l'annonce sans voler le
            focus. -->
-      <p class="vr-charcount" aria-live="polite">Caractères : <span id="report-charcount">${draft.comment.length}</span> / 750</p>
+      <p class="vr-charcount" aria-live="polite">${tr('Caractères', 'Characters')} : <span id="report-charcount">${draft.comment.length}</span> / 750</p>
     </div>
 
     <div class="field" style="margin-top:16px;">
-      <span class="field-label" id="lbl-rappel">Numéro de rappel</span>
+      <span class="field-label" id="lbl-rappel">${tr('Numéro de rappel', 'Callback number')}</span>
       <div class="callback-chips" role="group" aria-labelledby="lbl-rappel">
         ${draft.callbackNumbers.map((num, i) => `
-          <span class="callback-chip">${esc(num)} <button type="button" data-remove-callback="${i}" aria-label="Retirer ce numéro">${icon('x')}</button></span>
+          <span class="callback-chip">${esc(num)} <button type="button" data-remove-callback="${i}" aria-label="${tr('Retirer ce numéro', 'Remove this number')}">${icon('x')}</button></span>
         `).join('')}
       </div>
     </div>
@@ -3548,14 +3698,13 @@ function renderReportScreen() {
     <div style="max-width:300px;margin-top:20px;">
       <!-- Le bouton porte le nom que le toast lui donnera : une action garde
            son nom d'un bout à l'autre du geste. -->
-      <button class="btn btn-primary btn-block" id="btn-send-report">Envoyer aux vendeurs</button>
-      <button class="btn btn-outline btn-block" id="btn-send-report-later" style="margin-top:15px;">Enregistrer pour plus tard</button>
+      <button class="btn btn-primary btn-block" id="btn-send-report">${tr('Envoyer aux vendeurs', 'Send to the sellers')}</button>
+      <button class="btn btn-outline btn-block" id="btn-send-report-later" style="margin-top:15px;">${tr('Enregistrer pour plus tard', 'Save for later')}</button>
     </div>
 
     <!-- Le destinataire est annoncé en tête, avant la saisie. Il reste ici ce
          qui porte sur le bouton d'à côté, et rien d'autre. -->
-    <p class="helper-text" style="margin-top:20px;">Enregistré pour plus tard, le compte rendu reste dans le tour :
-      vous l'enverrez une fois les visites terminées.</p>`;
+    <p class="helper-text" style="margin-top:20px;">${tr('Enregistré pour plus tard, le compte rendu reste dans le tour : vous l\'enverrez une fois les visites terminées.', 'Saved for later, the report stays in the tour: you\'ll send it once the visits are done.')}</p>`;
 }
 
 // Seul point d'entrée pour modifier une propriété du tour, quel que soit le
@@ -3608,6 +3757,19 @@ function showToast(msg, type = 'default') {
 /* ---------------- Events ---------------- */
 
 function bindEvents() {
+  // Bascule FR/EN : indépendante des feature flags et de la plateforme — un
+  // cabinet bilingue doit pouvoir montrer la démo en anglais sous ImmoContact
+  // comme sous Touchbase.
+  document.querySelectorAll('[data-lang]').forEach(btn => {
+    btn.onclick = () => {
+      const lang = btn.getAttribute('data-lang');
+      if (lang === state.lang) return;
+      state.lang = lang;
+      saveLang();
+      render();
+    };
+  });
+
   // Sidebar nav + mobile menu grid (only "tours" is wired; others show a toast)
   document.querySelectorAll('[data-nav]').forEach(el => {
     el.onclick = (e) => {
@@ -3615,8 +3777,8 @@ function bindEvents() {
       const id = el.getAttribute('data-nav');
       if (id === 'tours') { leaveTour(() => { state.screen = 'list'; state.draft = null; }); return; }
       if (id === 'properties') { leaveTour(() => { state.screen = 'properties'; state.draft = null; }); return; }
-      if (id === 'logout') { showToast('Déconnexion — hors scope du prototype.'); return; }
-      showToast('Cette section n\'est pas incluse dans ce prototype.');
+      if (id === 'logout') { showToast(tr('Déconnexion — hors scope du prototype.', 'Disconnect — out of scope for this prototype.')); return; }
+      showToast(tr('Cette section n\'est pas incluse dans ce prototype.', 'This section isn\'t included in this prototype.'));
     };
   });
 
@@ -3759,7 +3921,7 @@ function bindContactEvents() {
     if (state.contactPurpose === 'share') {
       shareTourWithBuyer(buyer);
       backToBuilderFromContact();
-      showToast(`Tour envoyé à ${buyer.prenom} ${buyer.nom}.`, 'success');
+      showToast(tr(`Tour envoyé à ${buyer.prenom} ${buyer.nom}.`, `Tour sent to ${buyer.prenom} ${buyer.nom}.`), 'success');
       return;
     }
     // Nommer un tour déjà ouvert : on rattache l'acheteur au brouillon en
@@ -3767,7 +3929,7 @@ function bindContactEvents() {
     if (state.contactPurpose === 'name') {
       attachBuyerToTour(buyer);
       backToBuilderFromContact();
-      showToast(`Ce tour s'appelle maintenant « Tour de ${buyer.prenom} ${buyer.nom} ».`);
+      showToast(tr(`Ce tour s'appelle maintenant « Tour de ${buyer.prenom} ${buyer.nom} ».`, `This tour is now called "${buyer.prenom} ${buyer.nom}'s tour".`));
       return;
     }
     state.draft = newDraft(buyer);
@@ -3782,7 +3944,7 @@ function bindContactEvents() {
     if (!buyer) return;
     attachBuyerToTour(buyer);
     backToBuilderFromContact();
-    showToast(`${buyer.prenom} ${buyer.nom} enregistré. Le tour ne lui a pas encore été envoyé.`);
+    showToast(tr(`${buyer.prenom} ${buyer.nom} enregistré. Le tour ne lui a pas encore été envoyé.`, `${buyer.prenom} ${buyer.nom} saved. The tour hasn't been sent to them yet.`));
   };
   const cancelBtn = document.getElementById('btn-cancel-contact');
   if (cancelBtn) cancelBtn.onclick = () => {
@@ -3848,9 +4010,9 @@ function bindBuilderEvents() {
     showToast(message, 'success');
   };
   const reopenBtn = document.getElementById('btn-reopen-tour');
-  if (reopenBtn) reopenBtn.onclick = () => setReopened(true, 'Tour remis dans les tours à venir.');
+  if (reopenBtn) reopenBtn.onclick = () => setReopened(true, tr('Tour remis dans les tours à venir.', 'Tour moved back to upcoming tours.'));
   const archiveBtn = document.getElementById('btn-archive-tour');
-  if (archiveBtn) archiveBtn.onclick = () => setReopened(false, 'Tour reclassé dans les tours passés.');
+  if (archiveBtn) archiveBtn.onclick = () => setReopened(false, tr('Tour reclassé dans les tours passés.', 'Tour moved to past tours.'));
 
   const changeBuyer = document.getElementById('btn-change-buyer');
   if (changeBuyer) changeBuyer.onclick = () => {
@@ -4007,7 +4169,13 @@ function bindBuilderEvents() {
       // mise à jour ».
       persistAnswer();
       render();
-      const msgs = {
+      const msgs = state.lang === 'en' ? {
+        pending: `Request sent to ${stop.courtier}, awaiting response.`,
+        confirmed: `Visit confirmed by ${stop.courtier}${stop.lockedStart ? ` at ${stop.lockedStart}` : ''}.`,
+        proposed: `${stop.courtier} proposes ${stop.proposedStart || 'another time'}.`,
+        refused: `${stop.courtier} declined this visit.`,
+        noreply: `${stop.courtier} hasn't responded in 48 hours.`,
+      } : {
         pending: `Demande envoyée à ${stop.courtier}, en attente de réponse.`,
         confirmed: `Visite confirmée par ${stop.courtier}${stop.lockedStart ? ` à ${stop.lockedStart.replace(':', 'h')}` : ''}.`,
         proposed: `${stop.courtier} propose ${stop.proposedStart ? stop.proposedStart.replace(':', 'h') : 'un autre créneau'}.`,
@@ -4040,13 +4208,13 @@ function bindBuilderEvents() {
       const stop = state.draft.stops.find(s => s.id === el.getAttribute('data-relance-stop'));
       if (!stop) return;
       relanceTour();
-      showToast(`Relance envoyée à ${stop.courtier}.`, 'success');
+      showToast(tr(`Relance envoyée à ${stop.courtier}.`, `Follow-up sent to ${stop.courtier}.`), 'success');
     };
   });
   const relanceBtn = document.getElementById('btn-relance');
   if (relanceBtn) relanceBtn.onclick = () => {
     relanceTour();
-    showToast('Relance envoyée aux courtiers qui n\'ont pas encore répondu.', 'success');
+    showToast(tr('Relance envoyée aux courtiers qui n\'ont pas encore répondu.', 'Follow-up sent to the brokers who haven\'t responded yet.'), 'success');
   };
 
   const sendBtn = document.getElementById('btn-send-tour');
@@ -4115,7 +4283,7 @@ function bindBuilderEvents() {
     state.listTab = 'upcoming';
     state.draft = null;
     render();
-    showToast('Tour enregistré. Vous pourrez l\'envoyer plus tard.', 'success');
+    showToast(tr('Tour enregistré. Vous pourrez l\'envoyer plus tard.', 'Tour saved. You\'ll be able to send it later.'), 'success');
   };
 
   const saveUpdateBtn = document.getElementById('btn-save-update');
@@ -4409,8 +4577,8 @@ function bindReportEvents() {
     state.screen = 'builder';
     render();
     showToast(sent
-      ? 'Compte rendu envoyé aux vendeurs.'
-      : 'Compte rendu enregistré. Rouvrez-le depuis l\'arrêt pour l\'envoyer.', 'success');
+      ? tr('Compte rendu envoyé aux vendeurs.', 'Report sent to the sellers.')
+      : tr('Compte rendu enregistré. Rouvrez-le depuis l\'arrêt pour l\'envoyer.', 'Report saved. Reopen it from the stop to send it.'), 'success');
   };
   const sendBtn = document.getElementById('btn-send-report');
   if (sendBtn) sendBtn.onclick = () => finalizeReport(true);
@@ -4557,7 +4725,7 @@ function bindModalEvents() {
         const id = el.getAttribute('data-platform');
         applyPlatformPreset(id);
         render();
-        showToast(`Comportement ${PLATFORMS.find(p => p.id === id).label} appliqué.`, 'success');
+        showToast(tr(`Comportement ${PLATFORMS.find(p => p.id === id).label} appliqué.`, `${PLATFORMS.find(p => p.id === id).label} behavior applied.`), 'success');
       };
     });
     document.querySelectorAll('[data-flag]').forEach(el => {
@@ -4606,7 +4774,7 @@ function bindModalEvents() {
       applyTourDate(date);
       // Le tour vient de changer d'onglet : le dire ici évite qu'il paraisse
       // perdu quand le courtier reviendra à la liste.
-      showToast('Tour daté dans le passé. Il est rangé dans « Passé ».');
+      showToast(tr('Tour daté dans le passé. Il est rangé dans « Passé ».', 'Tour dated in the past. It\'s filed under "Past".'));
     };
     // Renoncer laisse le champ afficher la date saisie : le render de fermeture
     // le repeint depuis le brouillon, qui n'a pas bougé.
@@ -4619,14 +4787,14 @@ function bindModalEvents() {
       state.screen = 'list';
       state.draft = null;
       render();
-      showToast('Tour de visites supprimé.');
+      showToast(tr('Tour de visites supprimé.', 'Buyer\'s tour deleted.'));
     };
   }
   if (state.modal.type === 'confirmLeave') {
     const go = state.pendingLeave;
     const leave = () => { state.pendingLeave = null; state.modal = null; state.dirty = false; if (go) go(); render(); };
     const saveBtn = document.getElementById('btn-leave-save');
-    if (saveBtn) saveBtn.onclick = () => { saveDraftAsTour(); leave(); showToast('Tour enregistré. Vous pourrez l\'envoyer plus tard.', 'success'); };
+    if (saveBtn) saveBtn.onclick = () => { saveDraftAsTour(); leave(); showToast(tr('Tour enregistré. Vous pourrez l\'envoyer plus tard.', 'Tour saved. You\'ll be able to send it later.'), 'success'); };
     const discardBtn = document.getElementById('btn-leave-discard');
     if (discardBtn) discardBtn.onclick = leave;
   }
@@ -4641,7 +4809,7 @@ function bindModalEvents() {
       if (stop.sentAt) persistAnswer(); else markDirtyIfSent();
       state.modal = null;
       render();
-      showToast(`${stopShortLabel(stop)} retiré du tour.`);
+      showToast(tr(`${stopShortLabel(stop)} retiré du tour.`, `${stopShortLabel(stop)} removed from the tour.`));
     };
   }
   if (state.modal.type === 'availability') bindAvailabilityModalEvents();
@@ -4855,13 +5023,13 @@ function bindVisitRequestModalEvents() {
     const destinataire = m.external ? m.courtier : courtierFor(m.mls);
     showToast(m.editStopId
       ? sentStop
-        ? `Modification envoyée à ${destinataire} pour validation.${slotChanged ? ' La visite repasse en attente de sa confirmation.' : ''}`
-        : 'La demande de visite a été mise à jour.'
+        ? tr(`Modification envoyée à ${destinataire} pour validation.${slotChanged ? ' La visite repasse en attente de sa confirmation.' : ''}`, `Change sent to ${destinataire} for approval.${slotChanged ? ' The visit is back to awaiting confirmation.' : ''}`)
+        : tr('La demande de visite a été mise à jour.', 'The visit request has been updated.')
       : insertedBefore
-        ? `Propriété insérée avant ${stopShortLabel(insertedBefore)}.`
+        ? tr(`Propriété insérée avant ${stopShortLabel(insertedBefore)}.`, `Listing inserted before ${stopShortLabel(insertedBefore)}.`)
         : m.external
-          ? `Demande de visite préparée pour ${m.courtier}. Elle partira par courriel.`
-          : 'La propriété a été ajoutée avec succès.', 'success');
+          ? tr(`Demande de visite préparée pour ${m.courtier}. Elle partira par courriel.`, `Visit request prepared for ${m.courtier}. It will be sent by email.`)
+          : tr('La propriété a été ajoutée avec succès.', 'The listing was added successfully.'), 'success');
   };
 }
 
@@ -4992,7 +5160,7 @@ function bindDestinationModalEvents() {
       }
       resetArretForm();
       closeModal();
-      if (stop) showToast(`${stopShortLabel(stop)} mis à jour.`, 'success');
+      if (stop) showToast(tr(`${stopShortLabel(stop)} mis à jour.`, `${stopShortLabel(stop)} updated.`), 'success');
       return;
     }
     const inserted = addStopToDraft({
@@ -5002,7 +5170,7 @@ function bindDestinationModalEvents() {
     markDirtyIfSent();
     resetArretForm();
     closeModal();
-    if (inserted) showToast(`Arrêt inséré avant ${stopShortLabel(inserted)}.`, 'success');
+    if (inserted) showToast(tr(`Arrêt inséré avant ${stopShortLabel(inserted)}.`, `Stop inserted before ${stopShortLabel(inserted)}.`), 'success');
   };
 }
 

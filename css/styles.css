@@ -141,6 +141,28 @@ a { color: inherit; text-decoration: none; }
 
 .sidebar-bottom { display: flex; flex-direction: column; gap: 16px; }
 
+/* Bascule FR/EN, même style de pilule segmentée que .avail-view-toggle. */
+.lang-toggle {
+  display: flex;
+  align-self: flex-start;
+  margin: 0 10px;
+  border: 1px solid var(--bordures);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+.lang-toggle button {
+  padding: 5px 12px;
+  border: none;
+  background: var(--blanc);
+  color: var(--bleu-principal);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lang-toggle button + button { border-left: 1px solid var(--bordures); }
+.lang-toggle button.active { background: var(--bleu-principal); color: var(--blanc); }
+
 .sidebar-flag {
   display: flex;
   align-items: flex-start;
@@ -1513,6 +1535,8 @@ body[data-screen="propertyAvailability"] .topbar-back { display: inline-flex; }
 
   .mobile-logo { padding: 0; }
   .mobile-logo img { display: block; height: 31px; width: auto; }
+  .mobile-header-actions { display: flex; align-items: center; gap: 12px; }
+  .lang-toggle--mobile { margin: 0; align-self: center; }
   .mobile-power { background: none; border: none; padding: 4px; cursor: pointer; color: var(--bleu-principal); }
   .mobile-power svg { width: 28px; height: 28px; }
 
@@ -1562,7 +1586,8 @@ body[data-screen="propertyAvailability"] .topbar-back { display: inline-flex; }
     gap: 6px;
     padding: 24px 16px 28px;
   }
-  .mobile-footer-flag-lockup { display: block; width: 100px; height: 28px; }
+  .mobile-footer-flag-lockup { display: flex; align-items: center; gap: 6px; color: var(--rouge-principal); font-size: 14px; font-weight: 500; }
+  .mobile-footer-flag-lockup img { width: 25px; height: 28px; flex-shrink: 0; }
   .mobile-footer-brand { margin: 0; font-size: 14px; color: var(--bleu-principal); font-weight: 500; }
 
   /* List screen */

@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <!-- Bump ?v= on both tags below whenever css/js changes, so browsers don't serve a stale cached copy after deploy. -->
-<link rel="stylesheet" href="css/styles.css?v=143">
+<link rel="stylesheet" href="css/styles.css?v=145">
 </head>
 <body>
 
@@ -24,13 +24,17 @@
     <nav class="sidebar-nav" id="sidebar-nav"></nav>
 
     <div class="sidebar-bottom">
+      <div class="lang-toggle" id="lang-toggle" role="group" aria-label="Langue / Language">
+        <button type="button" data-lang="fr" id="lang-btn-fr">FR</button>
+        <button type="button" data-lang="en" id="lang-btn-en">EN</button>
+      </div>
       <a href="#" class="nav-item nav-item--muted" data-nav="logout">
         <span class="nav-icon"><img src="assets/menu/logout.svg" alt=""></span>
-        Déconnexion
+        <span id="sidebar-logout-label">Déconnexion</span>
       </a>
       <div class="sidebar-flag">
         <img src="assets/flag.svg" alt="" width="25" height="28">
-        <span>Fièrement<br>canadien</span>
+        <span id="sidebar-flag-label">Fièrement<br>canadien</span>
       </div>
     </div>
   </aside>
@@ -39,18 +43,24 @@
     <!-- Mobile header, menu screen variant: logo + logout -->
     <header class="mobile-header mobile-header--menu">
       <span class="mobile-logo"><img src="assets/logo-immocontact.svg" alt="Immocontact" width="184" height="31" data-brand-logo></span>
-      <button class="mobile-power" data-nav="logout" title="Déconnexion" aria-label="Déconnexion">
-        <img src="assets/menu/power.svg" alt="" width="32" height="31">
-      </button>
+      <div class="mobile-header-actions">
+        <div class="lang-toggle lang-toggle--mobile" id="lang-toggle-mobile" role="group" aria-label="Langue / Language">
+          <button type="button" data-lang="fr" id="lang-btn-fr-mobile">FR</button>
+          <button type="button" data-lang="en" id="lang-btn-en-mobile">EN</button>
+        </div>
+        <button class="mobile-power" data-nav="logout" title="Déconnexion" aria-label="Déconnexion" id="mobile-power-btn" data-i18n-title="logout" data-i18n-aria-label="logout">
+          <img src="assets/menu/power.svg" alt="" width="32" height="31">
+        </button>
+      </div>
     </header>
 
     <!-- Mobile header, inner pages variant: back + page title + menu grid -->
     <header class="mobile-header mobile-header--nav">
-      <button class="mobile-nav-back" id="mobile-back-btn" title="Retour" aria-label="Retour">
+      <button class="mobile-nav-back" id="mobile-back-btn" title="Retour" aria-label="Retour" data-i18n-title="back" data-i18n-aria-label="back">
         <svg viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <span class="mobile-nav-title" id="mobile-nav-title">Tour de visites</span>
-      <button class="mobile-nav-grid" id="mobile-menu-btn" title="Menu" aria-label="Ouvrir le menu">
+      <button class="mobile-nav-grid" id="mobile-menu-btn" title="Menu" aria-label="Ouvrir le menu" data-i18n-title="menu" data-i18n-aria-label="openMenu">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <rect x="3" y="3" width="5" height="5" rx="1"/><rect x="9.5" y="3" width="5" height="5" rx="1"/><rect x="16" y="3" width="5" height="5" rx="1"/>
           <rect x="3" y="9.5" width="5" height="5" rx="1"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><rect x="16" y="9.5" width="5" height="5" rx="1"/>
@@ -60,7 +70,7 @@
     </header>
     <header class="topbar">
       <div class="topbar-title-group">
-        <button class="topbar-back" id="topbar-back-btn" title="Retour" aria-label="Retour">
+        <button class="topbar-back" id="topbar-back-btn" title="Retour" aria-label="Retour" data-i18n-title="back" data-i18n-aria-label="back">
           <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M25.0114 11.4735C25.6629 12.1022 25.6629 13.1178 25.0114 13.7465L18.53 20.001L25.0114 26.2556C25.6629 26.8843 25.6629 27.8998 25.0114 28.5285C24.3599 29.1572 23.3075 29.1572 22.656 28.5285L14.9886 21.1294C14.3371 20.5007 14.3371 19.4852 14.9886 18.8565L22.656 11.4574C23.2908 10.8449 24.3599 10.8449 25.0114 11.4735Z" fill="currentColor"/></svg>
         </button>
         <h1 class="topbar-title" id="topbar-title">Tour de visites</h1>
@@ -82,8 +92,11 @@
     </main>
 
     <footer class="mobile-footer">
-      <img class="mobile-footer-flag-lockup" src="assets/menu/flag-canadien.svg" alt="Fièrement Canadien" width="100" height="28">
-      <p class="mobile-footer-brand">Propulsé par Touchbase Real Estate</p>
+      <div class="mobile-footer-flag-lockup">
+        <img src="assets/flag.svg" alt="" width="25" height="28">
+        <span id="mobile-footer-flag-label">Fièrement Canadien</span>
+      </div>
+      <p class="mobile-footer-brand" data-i18n="poweredByTouchbase">Propulsé par Touchbase Real Estate</p>
     </footer>
   </div>
 
@@ -93,6 +106,6 @@
 <div id="toast-root"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="js/app.js?v=141"></script>
+<script src="js/app.js?v=144"></script>
 </body>
 </html>
