@@ -852,7 +852,9 @@ function applyPlatformPreset(id) {
   const preset = PLATFORM_PRESETS[id];
   if (!preset) return;
   FEATURE_FLAGS.forEach(f => { if (f.wired && f.id in preset) state.flags[f.id] = preset[f.id]; });
+  state.brandPlatform = id;
   saveFlags();
+  saveBrandPlatform();
 }
 
 // Renvoie la plateforme dont le preset correspond aux flags actuels, ou null
@@ -882,10 +884,28 @@ function saveFlags() {
 }
 function flag(id) { return !!state.flags[id]; }
 
+// La marque affichée ne suit que le dernier preset cliqué, pas l'état exact
+// des interrupteurs : sinon retoucher un seul flag en cours de démo Touchbase
+// (ex. désactiver « Optimiser le tour ») fait retomber le logo sur ImmoContact
+// et donne l'impression d'avoir quitté Touchbase, alors que rien d'autre n'a
+// changé.
+const BRAND_PLATFORM_KEY = 'ic-buyers-tour-brand-v1';
+function loadBrandPlatform() {
+  try {
+    const saved = localStorage.getItem(BRAND_PLATFORM_KEY);
+    if (saved && PLATFORMS.some(p => p.id === saved)) return saved;
+  } catch (e) { /* storage unavailable (private mode) — default is fine */ }
+  return PLATFORMS[0].id;
+}
+function saveBrandPlatform() {
+  try { localStorage.setItem(BRAND_PLATFORM_KEY, state.brandPlatform); } catch (e) { /* ignore */ }
+}
+
 /* ---------------- State ---------------- */
 
 const state = {
   flags: loadFlags(),
+  brandPlatform: loadBrandPlatform(), // marque affichée — ne suit que le dernier preset cliqué, voir renderBrand()
   screen: 'list',           // list | contact | buyerForm | builder | properties
   listTab: 'upcoming',      // upcoming | past
   listSearch: '',
@@ -1319,11 +1339,12 @@ function builderTitle() {
 }
 
 // Le logotype suit la plateforme choisie dans les réglages : la démo doit
-// porter la marque du client à qui on la montre. Quand les interrupteurs ont
-// été bougés à la main, aucune plateforme ne correspond — on garde alors la
-// marque par défaut plutôt que de laisser un bandeau sans logo.
+// porter la marque du client à qui on la montre. Il retient le dernier preset
+// cliqué (`state.brandPlatform`) plutôt que l'état exact des interrupteurs :
+// affiner un flag après coup (ex. désactiver « Optimiser le tour » sous
+// Touchbase) ne doit pas faire retomber le logo sur la marque par défaut.
 function renderBrand() {
-  const p = PLATFORMS.find(p => p.id === currentPlatform()) || PLATFORMS[0];
+  const p = PLATFORMS.find(p => p.id === state.brandPlatform) || PLATFORMS[0];
   document.querySelectorAll('[data-brand-logo]').forEach(img => {
     if (img.getAttribute('src') === p.logo) return;
     img.setAttribute('src', p.logo);
