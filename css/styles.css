@@ -796,6 +796,11 @@ body[data-screen="propertyAvailability"] .topbar-back { display: inline-flex; }
    elle porte le bleu d'action, là où crayon et corbeille restent neutres. */
 .btn-icon.send-request { color: var(--bleu-secondaire); border-color: var(--bleu-action-30); }
 .btn-icon.send-request:hover { background: var(--bleu-secondaire); border-color: var(--bleu-secondaire); color: var(--blanc); }
+/* Le calendrier de disponibilité de la fiche interdit l'envoi pour ce
+   créneau : le bouton redevient un simple bouton désactivé, sans l'accent
+   bleu qui inviterait quand même à cliquer. */
+.btn-icon.send-request:disabled { color: var(--texte-secondaire); border-color: var(--bordures); background: var(--blanc); cursor: not-allowed; }
+.btn-icon.send-request:disabled:hover { background: var(--blanc); }
 
 /* Liste cochable de l'envoi groupé. La ligne entière est la cible : une case à
    cocher seule fait 16px, très en dessous des 44px confortables (Fitts). */
@@ -813,6 +818,15 @@ body[data-screen="propertyAvailability"] .topbar-back { display: inline-flex; }
 .send-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .send-row-address { font-size: 14px; font-weight: 600; color: var(--texte-principal); }
 .send-row-meta { font-size: 12.5px; color: var(--texte-secondaire); }
+/* Ce que le calendrier de disponibilité tranche déjà pour ce créneau : une
+   ligne « impossible » se grise et refuse la case, une ligne auto-confirmable
+   le dit d'avance — jamais seulement par la couleur (WCAG 1.4.1). */
+.send-row-note { display: flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; margin-top: 2px; }
+.send-row-note svg { width: 13px; height: 13px; flex-shrink: 0; }
+.send-row-note.tone-ok { color: #17792a; }
+.send-row-note.tone-danger { color: var(--rouge-dark); }
+.send-row.is-blocked { cursor: not-allowed; opacity: 0.7; }
+.send-row.is-blocked:hover { border-color: var(--bordures); }
 
 .stop-body { flex: 1; min-width: 0; }
 .stop-address { font-size: 14.5px; font-weight: 700; margin: 0 0 2px; }
@@ -868,19 +882,22 @@ body[data-screen="propertyAvailability"] .topbar-back { display: inline-flex; }
 .pick-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 38px; min-width: 38px; padding: 0 9px;
-  border: 1px solid var(--bordures); border-radius: var(--radius-lg);
-  /* L'état non coché était à 1,62:1 — illisible, et en mobile l'étiquette est
-     visible, donc c'est du texte, pas seulement une icône. Le gris secondaire
-     monte à 9,0:1 sans rapprocher les deux états : coché reste le seul à
-     porter un fond et une bordure bleus. */
-  background: var(--blanc); color: var(--texte-secondaire); cursor: pointer;
+  /* Perdu au milieu du crayon et de la poubelle, ce bouton est celui qui
+     enregistre la décision de l'acheteur — la seule action de la rangée qui
+     compte encore une fois la visite envoyée au courtier ou le tour envoyé au
+     client. Il porte donc en permanence l'accent bleu (même identité que
+     « Envoyer la demande »), pas seulement au survol ou une fois coché :
+     sinon il se confond avec les icônes neutres tant qu'on ne l'a pas trouvé. */
+  border: 1px solid var(--bleu-action-30); border-radius: var(--radius-lg);
+  background: var(--blanc); color: var(--bleu-secondaire); cursor: pointer;
   font-family: inherit; font-size: 12.5px; font-weight: 700; white-space: nowrap;
   transition: color 150ms ease-out, border-color 150ms ease-out, background 150ms ease-out;
 }
 .pick-btn svg { width: 16px; height: 16px; }
-.pick-btn:hover { border-color: var(--bleu-secondaire); color: var(--bleu-secondaire); }
+.pick-btn:hover { background: var(--bleu-action-10); border-color: var(--bleu-secondaire); }
 .pick-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
-.pick-btn.is-on { background: var(--bleu-action-10); border-color: var(--bleu-secondaire); color: var(--bleu-secondaire); }
+.pick-btn.is-on { background: var(--bleu-secondaire); border-color: var(--bleu-secondaire); color: var(--blanc); }
+.pick-btn.is-on:hover { background: var(--bleu-action-dark); border-color: var(--bleu-action-dark); }
 /* Sur desktop la rangée est serrée : l'étiquette cède, l'infobulle reste. */
 .pick-label { display: none; }
 
@@ -984,6 +1001,30 @@ body[data-screen="propertyAvailability"] .topbar-back { display: inline-flex; }
 .arret-kind-option:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .arret-kind-option:hover .arret-kind-icon, .arret-kind-option.active .arret-kind-icon { background: var(--bleu-action-10); }
 
+/* Suggestions d'adresse personnalisée, façon recherche de lieu : même wrapper
+   position:relative + dépliant absolu que le sélecteur de type juste
+   au-dessus, pour un menu qui se pose sous le champ sans repousser le reste
+   du formulaire. */
+.arret-address-field { position: relative; }
+.arret-suggestions {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 5; margin-top: 4px;
+  background: var(--blanc); border: 1px solid var(--bordures); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md); overflow: hidden;
+}
+.arret-suggestion-row {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  border: 0; border-bottom: 1px solid var(--bordures); background: var(--blanc);
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.arret-suggestion-row:last-child { border-bottom: none; }
+.arret-suggestion-row:hover, .arret-suggestion-row:focus-visible { background: var(--lumiere-principale); }
+.arret-suggestion-row:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
+.arret-suggestion-row .result-pin { width: 36px; height: 36px; border-radius: var(--radius-md); flex-shrink: 0; }
+.arret-suggestion-row .result-pin svg { width: 16px; height: 16px; }
+.arret-suggestion-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.arret-suggestion-name { font-size: 14px; font-weight: 600; color: var(--texte-principal); }
+.arret-suggestion-address { font-size: 12.5px; color: var(--texte-secondaire); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .info-banner { display: flex; gap: 10px; align-items: flex-start; background: var(--bleu-action-10); color: var(--bleu-action-dark); padding: 12px 14px; border-radius: var(--radius-md); border-left: 4px solid var(--bleu-secondaire); font-size: 13.5px; margin-bottom: 4px; }
 .info-banner svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
 .info-banner.clickable { cursor: pointer; }
@@ -1002,6 +1043,11 @@ body[data-screen="propertyAvailability"] .topbar-back { display: inline-flex; }
 .result-row:last-child { border-bottom: none; }
 .result-thumb { width: 77px; height: 50px; border-radius: var(--radius-lg); flex-shrink: 0; object-fit: cover; display: block; }
 .result-address { flex: 1; font-size: 14.5px; font-weight: 600; }
+/* Recherche par nom de courtier : une seconde ligne confirme qui a été
+   trouvé, avant même de cliquer. */
+.result-address-group { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.result-address-group .result-address { flex: none; }
+.result-subtitle { font-size: 12.5px; font-weight: 400; color: var(--texte-secondaire); }
 .result-add-btn { width: 30px; height: 30px; border-radius: 999px; border: 1px solid var(--bleu-secondaire); color: var(--bleu-secondaire); background: var(--blanc); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .result-add-btn:hover { background: var(--bleu-action-10); }
 .result-add-btn svg { width: 15px; height: 15px; }
@@ -1089,13 +1135,23 @@ body[data-screen="propertyAvailability"] .topbar-back { display: inline-flex; }
 
 .vr-note { font-size: 12.5px; color: var(--texte-principal); margin: -8px 0 14px; }
 
+/* Ce que le calendrier de disponibilité décide pour le créneau demandé, à
+   l'endroit même où ce créneau se choisit — sans ça, rien ici ne dit qu'une
+   visite libre ou pré-approuvée se confirmera seule, ni qu'un « impossible »
+   demande de changer l'heure avant même d'enregistrer. Un ton par issue
+   (jamais la seule couleur : l'icône et le texte portent aussi l'information
+   — WCAG 1.4.1), au lieu du jaune unique qui ne disait jamais rien de réel. */
 .vr-availability {
-  background: #F5F87F;
-  color: var(--texte-principal);
-  font-size: 14px; font-weight: 600; text-align: center;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; font-weight: 600; text-align: left;
   padding: 13px; border-radius: var(--radius-md);
   margin-bottom: 16px;
 }
+.vr-availability svg { width: 18px; height: 18px; flex-shrink: 0; }
+.vr-availability.tone-ok { background: var(--succes-bg); color: #17792a; }
+.vr-availability.tone-info { background: var(--bleu-action-10); color: var(--bleu-action-dark); }
+.vr-availability.tone-danger { background: var(--rouge-10); color: var(--rouge-dark); }
+.vr-availability.tone-warn { background: var(--attention-bg); color: #8a5a05; }
 
 .vr-comment { height: auto; min-height: 84px; padding: 12px 14px; resize: vertical; font-family: inherit; }
 .vr-charcount { font-size: 12.5px; color: var(--texte-secondaire); text-align: right; margin: 6px 0 0; }

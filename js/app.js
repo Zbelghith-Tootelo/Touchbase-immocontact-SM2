@@ -185,10 +185,11 @@ const BUYERS = [
 
 const COURTIERS_INSCRIPTEURS = ['Marie-Ève Gagnon', 'Patrick Simard', 'Nathalie Côté', 'Éric Bouchard', 'Sylvie Paquette'];
 
-// Annuaire ImmoContact. Une demande de visite doit partir à un courtier inscrit,
-// donc la recherche ne propose que cet annuaire — un nom tapé à la main n'est
-// jamais retenu. Séparé du pool d'attribution ci-dessus : y ajouter un nom
-// réattribuerait sinon le courtier de toutes les fiches existantes.
+// Annuaire des courtiers inscripteurs, commun aux deux plateformes. Une
+// demande de visite doit partir à un courtier inscrit, donc la recherche ne
+// propose que cet annuaire — un nom tapé à la main n'est jamais retenu.
+// Séparé du pool d'attribution ci-dessus : y ajouter un nom réattribuerait
+// sinon le courtier de toutes les fiches existantes.
 const COURTIER_DIRECTORY = [
   { nom: 'Marie-Ève Gagnon', bureau: 'Montréal' },
   { nom: 'Patrick Simard', bureau: 'Laval' },
@@ -349,21 +350,36 @@ function propertyAvailability(mls) {
 // rien à consulter, donc rien d'autre à répondre que « ça passe par le
 // courtier ».
 const AVAILABILITY_TAGS = {
-  'visite-libre': { labelFr: 'Visite libre', labelEn: 'Open showing', tone: 'ok' },
-  'pre-approuve': { labelFr: 'Pré-approuvée', labelEn: 'Pre-approved', tone: 'info' },
-  impossible:     { labelFr: 'Impossible dans cette plage horaire', labelEn: 'Not available at this time', tone: 'danger' },
-  none:           { labelFr: 'Besoin d\'approbation du courtier', labelEn: 'Needs broker approval', tone: 'warn' },
+  'visite-libre': { id: 'visite-libre', labelFr: 'Visite libre', labelEn: 'Open showing', tone: 'ok' },
+  'pre-approuve': { id: 'pre-approuve', labelFr: 'Pré-approuvée', labelEn: 'Pre-approved', tone: 'info' },
+  impossible:     { id: 'impossible', labelFr: 'Impossible dans cette plage horaire', labelEn: 'Not available at this time', tone: 'danger' },
+  none:           { id: 'none', labelFr: 'Besoin d\'approbation du courtier', labelEn: 'Needs broker approval', tone: 'warn' },
 };
 function availabilityTagLabel(tag) { return tag ? tr(tag.labelFr, tag.labelEn) : ''; }
-function availabilityTagFor(stop, start) {
+// `date` par défaut celle du tour, mais le formulaire de demande de visite
+// peut viser une autre date que celle du tour (elle ne s'y applique que si
+// c'est le premier arrêt) : il doit pouvoir interroger la date qu'il propose
+// réellement, pas celle du tour en cours.
+function availabilityTagFor(stop, start, date = state.draft.date) {
   if (stop.external || !stop.mls) return AVAILABILITY_TAGS.none;
   const end = start + stop.duration;
   // Un créneau ne « couvre » l'arrêt que s'il le contient en entier : un
   // chevauchement partiel resterait un faux sans-détour, moins sûr qu'un
   // aller-retour évité à tort.
   const covering = propertyAvailability(stop.mls).find(ev =>
-    ev.date === state.draft.date && ev.startMinutes <= start && ev.endMinutes >= end);
+    ev.date === date && ev.startMinutes <= start && ev.endMinutes >= end);
   return AVAILABILITY_TAGS[covering ? covering.type : 'none'];
+}
+
+// L'heure qui compte pour consulter le calendrier au moment d'envoyer : celle
+// déjà promise (`lockedStart`) si l'arrêt en a une, sinon celle que le tour
+// lui donnerait maintenant — la même que la puce de disponibilité affiche
+// avant l'envoi, pour qu'il n'y ait jamais de décalage entre ce qui est promis
+// à l'écran et ce que l'envoi vérifie.
+function scheduledStartFor(stop, schedule) {
+  if (stop.lockedStart) return timeToMinutes(stop.lockedStart);
+  const row = (schedule || computeSchedule(state.draft)).find(r => r.stop.id === stop.id);
+  return row ? row.start : null;
 }
 
 // Sur ImmoContact, une adresse absente du catalogue reste visitable : le
@@ -408,6 +424,33 @@ function addressSuggestions(q) {
     .map(street => ({ id: 'sug-' + num + '-' + hashStr(street), address: `${num} ${street}` }))
     .filter(sug => !known.has(normalizeText(sug.address)))
     .slice(0, 4);
+}
+
+// Repères pour l'onglet Adresse personnalisée : les mêmes enseignes qu'on
+// taperait dans Google Maps, avec de vraies coordonnées pour que la carte
+// Leaflet les place au bon endroit plutôt qu'à une position générée au
+// hasard depuis le texte (voir `coordsFor`). Dispersés dans les mêmes villes
+// que le catalogue MLS, pour rester crédibles à côté des autres arrêts.
+const ARRET_PLACE_SUGGESTIONS = [
+  { id: 'mcdo-verdun', name: 'McDonald\'s', address: '1425 Rue Wellington, Montréal, QC H3K 1W9', lat: 45.4790, lng: -73.5680 },
+  { id: 'mcdo-longueuil', name: 'McDonald\'s', address: '1111 Boulevard Roland-Therrien, Longueuil, QC J4H 4B7', lat: 45.5270, lng: -73.5030 },
+  { id: 'mcdo-brossard', name: 'McDonald\'s', address: '7255 Boulevard Taschereau, Brossard, QC J4Y 1A1', lat: 45.4570, lng: -73.4620 },
+  { id: 'mcdo-laval', name: 'McDonald\'s', address: '1600 Boulevard Le Corbusier, Laval, QC H7S 1Y7', lat: 45.5650, lng: -73.7500 },
+  { id: 'tims-boucherville', name: 'Tim Hortons', address: '1275 Rue Nobel, Boucherville, QC J4B 5H1', lat: 45.6020, lng: -73.4280 },
+  { id: 'tims-stlambert', name: 'Tim Hortons', address: '1350 Avenue Victoria, Saint-Lambert, QC J4R 1P8', lat: 45.5010, lng: -73.5040 },
+  { id: 'tims-repentigny', name: 'Tim Hortons', address: '255 Boulevard Iberville, Repentigny, QC J6A 2X9', lat: 45.7380, lng: -73.4680 },
+  { id: 'tims-quebec', name: 'Tim Hortons', address: '2700 Boulevard Laurier, Québec, QC G1V 2L8', lat: 46.7790, lng: -71.2830 },
+];
+// Recherche façon moteur de suggestions : le nom de l'enseigne ou un bout
+// d'adresse suffisent, dès la première lettre — contrairement à
+// `addressSuggestions`, on n'exige pas de numéro civique, une enseigne se
+// cherche par son nom.
+function searchArretPlaces(q) {
+  const needle = normalizeText(q).trim();
+  if (!needle) return [];
+  return ARRET_PLACE_SUGGESTIONS
+    .filter(p => normalizeText(`${p.name} ${p.address}`).includes(needle))
+    .slice(0, 5);
 }
 
 const PROVINCES_FR = [
@@ -620,13 +663,15 @@ function formatMinutes(min) {
   return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`;
 }
 
-// Properties already selected in the MLS and sent to this app's Panier
-let mlsCart = [
-  { mls: '18234671', address: '500 Rue d\'Avaugour, Boucherville, QC J4B 5E7' },
-  { mls: '18234733', address: '123 Avenue des Étoiles, Montréal, QC H3C 1A2' },
-  { mls: '18234845', address: '456 Boulevard de la Liberté, Québec, QC G1V 2M2' },
-  { mls: '18234902', address: '789 Chemin du Bonheur, Gatineau, QC J8X 3G5' },
-];
+// Properties already selected in the MLS and sent to this app's Panier — une
+// liste de numéros MLS, résolue en direct contre MLS_POOL plutôt que dupliquée
+// avec sa propre adresse. Une fiche retirée du marché après avoir été mise au
+// panier doit rester « inactive » là aussi : une copie figée l'aurait laissée
+// ajoutable au tour sans aucun avertissement.
+const MLS_CART_IDS = ['18234671', '18234733', '18234845', '18234902'];
+function mlsCartItems() {
+  return MLS_CART_IDS.map(mls => MLS_POOL.find(p => p.mls === mls)).filter(Boolean);
+}
 
 function makeStop(address, mls, opts = {}) {
   const listing = MLS_POOL.find(p => p.mls === mls);
@@ -854,8 +899,6 @@ function seedTours() {
 // the panel lists it as "à venir" rather than offering a toggle that does nothing.
 const FEATURE_FLAGS = [
   { group: 'Sources de propriétés', groupEn: 'Listing sources', id: 'mlsCart', labelFr: 'Panier et recherche MLS', labelEn: 'MLS search and cart', helpFr: 'Onglets Panier et MLS dans « Ajouter une destination ». Désactivé, on obtient le comportement ImmoContact, sans catalogue MLS.', helpEn: 'Cart and MLS tabs in "Add a destination". Disabled, you get the ImmoContact behavior, with no MLS catalogue.', default: false, wired: true },
-  { group: 'Sources de propriétés', groupEn: 'Listing sources', id: 'customAddress', labelFr: 'Adresse personnalisée', labelEn: 'Custom address', helpFr: 'La recherche par adresse propose aussi les adresses hors catalogue, ajoutables directement. Désactivé, seules les fiches existantes remontent.', helpEn: 'Address search also suggests off-catalogue addresses, addable directly. Disabled, only existing listings come up.', default: true, wired: true },
-  { group: 'Sources de propriétés', groupEn: 'Listing sources', id: 'propertyViaBrokerOnly', labelFr: 'Propriété via courtier uniquement (TB)', labelEn: 'Listing via broker only (TB)', helpFr: 'Sur TB, une propriété ne peut être ajoutée qu\'après avoir sélectionné un courtier.', helpEn: 'On TB, a listing can only be added after a broker has been selected.', default: false, wired: false },
 
   { group: 'Démo', groupEn: 'Demo', id: 'simulateConfirmation', labelFr: 'Simuler la réponse des courtiers', labelEn: 'Simulate broker responses', helpFr: 'Rend le statut de chaque visite cliquable pour basculer entre « À confirmer » et « Confirmée ». Outil de démo : en production, seul le courtier inscripteur confirme.', helpEn: 'Makes each visit\'s status clickable to toggle between "To confirm" and "Confirmed". A demo tool: in production, only the listing broker confirms.', default: true, wired: true },
   { group: 'Démo', groupEn: 'Demo', id: 'tourOptimize', labelFr: 'Optimiser le tour', labelEn: 'Optimize the tour', helpFr: 'Affiche le bouton « Optimiser le tour » dans le constructeur, qui réordonne les arrêts par proximité géographique. Désactivé, le tour ne se compose que par glisser-déposer manuel.', helpEn: 'Shows the "Optimize the tour" button in the builder, which reorders stops by geographic proximity. Disabled, the tour can only be arranged by manual drag-and-drop.', default: false, wired: true },
@@ -879,8 +922,8 @@ const PLATFORMS = [
 // encore construits : il documente la cible et s'appliquera tout seul au fur et
 // à mesure que les flags passent en `wired`.
 const PLATFORM_PRESETS = {
-  immocontact: { mlsCart: false, customAddress: true, propertyViaBrokerOnly: false, simulateConfirmation: true, tourOptimize: false },
-  touchbase: { mlsCart: true, customAddress: false, propertyViaBrokerOnly: true, simulateConfirmation: true, tourOptimize: false },
+  immocontact: { mlsCart: false, simulateConfirmation: true, tourOptimize: false },
+  touchbase: { mlsCart: true, simulateConfirmation: true, tourOptimize: false },
 };
 
 // Appliquer ne touche qu'aux flags branchés : les autres n'ont aucun
@@ -996,6 +1039,8 @@ const state = {
   destModalArretKindOpen: false,   // menu déroulant du type, déplié ou non
   destModalArretFrom: null,        // heure de départ choisie (minutes) — null : le courtier n'est pas obligé d'en fixer une
   destModalArretDuration: null,    // durée choisie (minutes) — même chose, facultative
+  destModalArretCoords: null,      // {lat,lng} d'un repère choisi dans les suggestions — null : position générée depuis le texte
+  destModalArretSuggestOpen: false, // liste de suggestions dépliée ou non
   newProperty: null,        // formulaire « Ajouter une propriété inexistante »
   newPropertyTouched: false, // les champs manquants ne sont signalés qu'après un premier envoi
   mapOpen: false,           // panneau de trajet déplié — replié par défaut, la carte reste un choix
@@ -1184,15 +1229,26 @@ function shareTourWithBuyer(buyer) {
 // l'acheteur au passage ne vaut que s'il est déjà connu ; sinon le partage
 // viendra à l'étape 2, une fois les visites confirmées.
 // Le geste élémentaire : une demande part chez un courtier inscripteur. Tout
-// envoi passe par ici, qu'il vienne de l'icône d'un arrêt ou de l'envoi groupé.
+// envoi passe par ici, qu'il vienne de l'icône d'un arrêt ou de l'envoi groupé
+// — c'est aussi pour ça que la disponibilité se tranche ici et nulle part
+// ailleurs : un « impossible » ne devient jamais un envoi, quel que soit
+// l'appelant, même si l'écran qui a mené ici avait déjà dû l'empêcher.
 function markStopsSent(stops) {
   const now = Date.now();
+  const schedule = computeSchedule(state.draft);
   stops.forEach(s => {
     // Une adresse personnalisée n'a pas de courtier inscripteur à qui envoyer
     // une demande : elle reste hors de ce régime pour toujours.
     if (s.type !== 'property' || s.sentAt || s.customKind) return;
+    const start = scheduledStartFor(s, schedule);
+    const tag = start === null ? AVAILABILITY_TAGS.none : availabilityTagFor(s, start);
+    if (tag.id === 'impossible') return;
     s.sentAt = now;
     s.relancedAt = null;
+    // Une visite libre ou pré-approuvée pour ce créneau répond déjà à la
+    // question : le courtier inscripteur n'a rien à confirmer, donc la
+    // demande se confirme toute seule au lieu de rester « en attente » à tort.
+    if (tag.id === 'visite-libre' || tag.id === 'pre-approuve') setStopStatus(s, 'confirmed');
   });
 }
 
@@ -1202,7 +1258,11 @@ function sendStopRequest(stop) {
   markStopsSent([stop]);
   commitDraft();
   render();
-  showToast(tr(
+  const autoConfirmed = effectiveStopStatus(stop) === 'confirmed';
+  showToast(autoConfirmed ? tr(
+    `Visite confirmée automatiquement chez ${stop.courtier || 'ce courtier inscripteur'} — ce créneau est déjà ouvert à la visite.`,
+    `Visit automatically confirmed with ${stop.courtier || 'this listing broker'} — that time slot is already open for showing.`
+  ) : tr(
     `Demande de visite envoyée à ${stop.courtier || 'son courtier inscripteur'}${stop.lockedStart ? ` pour ${stop.lockedStart.replace(':', 'h')}` : ''}.`,
     `Visit request sent to ${stop.courtier || 'the listing broker'}${stop.lockedStart ? ` for ${stop.lockedStart}` : ''}.`
   ), 'success');
@@ -1215,6 +1275,10 @@ function sendTourToBrokers(notifyBuyer, selectedIds = null) {
   const targets = state.draft.stops.filter(s =>
     s.type === 'property' && !s.sentAt && (!selectedIds || selectedIds.includes(s.id)));
   markStopsSent(targets);
+  const confirmedCount = targets.filter(s => effectiveStopStatus(s) === 'confirmed').length;
+  const suffix = confirmedCount
+    ? tr(` (${confirmedCount} confirmée${confirmedCount > 1 ? 's' : ''} automatiquement)`, ` (${confirmedCount} confirmed automatically)`)
+    : '';
   commitDraft({
     sharedAt: notifyBuyer && state.draft.buyer ? Date.now() : null,
   });
@@ -1222,11 +1286,11 @@ function sendTourToBrokers(notifyBuyer, selectedIds = null) {
   render();
   showToast(tr(
     notifyBuyer
-      ? `${targets.length} demande${targets.length > 1 ? 's' : ''} de visite envoyée${targets.length > 1 ? 's' : ''} aux courtiers inscripteurs et à l'acheteur.`
-      : `${targets.length} demande${targets.length > 1 ? 's' : ''} de visite envoyée${targets.length > 1 ? 's' : ''} aux courtiers inscripteurs.`,
+      ? `${targets.length} demande${targets.length > 1 ? 's' : ''} de visite envoyée${targets.length > 1 ? 's' : ''} aux courtiers inscripteurs et à l'acheteur${suffix}.`
+      : `${targets.length} demande${targets.length > 1 ? 's' : ''} de visite envoyée${targets.length > 1 ? 's' : ''} aux courtiers inscripteurs${suffix}.`,
     notifyBuyer
-      ? `${targets.length} visit request${targets.length > 1 ? 's' : ''} sent to the listing brokers and to the buyer.`
-      : `${targets.length} visit request${targets.length > 1 ? 's' : ''} sent to the listing brokers.`
+      ? `${targets.length} visit request${targets.length > 1 ? 's' : ''} sent to the listing brokers and to the buyer${suffix}.`
+      : `${targets.length} visit request${targets.length > 1 ? 's' : ''} sent to the listing brokers${suffix}.`
   ), 'success');
 }
 
@@ -1420,6 +1484,20 @@ function builderTitle() {
 // cliqué (`state.brandPlatform`) plutôt que l'état exact des interrupteurs :
 // affiner un flag après coup (ex. désactiver « Optimiser le tour » sous
 // Touchbase) ne doit pas faire retomber le logo sur la marque par défaut.
+// Le nom de marque à afficher dans un texte — pas seulement le logo. Le
+// parcours courtier (recherche, fiche, comptes rendus) nommait « Immocontact »
+// en dur : une fois ce parcours commun aux deux plateformes, il doit suivre
+// la marque active comme le fait déjà le logo.
+function currentBrandName() {
+  return (PLATFORMS.find(p => p.id === state.brandPlatform) || PLATFORMS[0]).brand;
+}
+// « Immocontact » commence par une voyelle (d'Immocontact, an Immocontact
+// broker), « Touchbase » par une consonne (de Touchbase, a Touchbase broker) —
+// un nom de marque codé en dur pouvait ignorer l'élision, un nom qui varie ne
+// le peut plus.
+function brandArticleFr() { return /^[aeiouyàâéèêëîïôùû]/i.test(currentBrandName()) ? 'd’' : 'de '; }
+function brandArticleEn() { return /^[aeiou]/i.test(currentBrandName()) ? 'an' : 'a'; }
+
 function renderBrand() {
   const p = PLATFORMS.find(p => p.id === state.brandPlatform) || PLATFORMS[0];
   document.querySelectorAll('[data-brand-logo]').forEach(img => {
@@ -1673,7 +1751,7 @@ function renderAvailEventCard(ev) {
     <div class="avail-event" data-avail-event="${esc(ev.id)}"
       style="top:${top}px;height:${height}px;--avail-color:${meta.color};--avail-bg:${meta.bg}">
       <span class="avail-event-type">${esc(availTypeLabel(ev.type))}</span>
-      ${showTime ? `<span class="avail-event-time">${minutesToHHMM(ev.startMinutes)} – ${minutesToHHMM(ev.endMinutes)}</span>` : ''}
+      ${showTime ? `<span class="avail-event-time">${minutesToLabel(ev.startMinutes)} – ${minutesToLabel(ev.endMinutes)}</span>` : ''}
       <span class="avail-event-handle" data-avail-resize="${esc(ev.id)}" aria-hidden="true"></span>
     </div>`;
 }
@@ -2307,6 +2385,13 @@ function renderStopCard(stop, start, { variant = 'builder', sameSlot = false, is
   const pinnedTitle = stopIsDraggable(stop) ? '' : `title="${tr('Demande envoyée : l\'heure de cet arrêt se change par « Éditer »', 'Request sent: this stop\'s time can only be changed via "Edit"')}"`;
   const reportTitle = !stop.visited ? tr('Faire le compte rendu de visite', 'Fill out the visit report')
     : reportPending ? tr('Reprendre le compte rendu et l\'envoyer', 'Resume the report and send it') : tr('Voir le compte rendu de visite', 'View the visit report');
+  // Le calendrier de disponibilité tranche déjà avant que le courtier
+  // inscripteur n'ait à le faire : « impossible » n'est pas une raison
+  // d'envoyer quand même, c'est une raison de changer l'heure d'abord
+  // (Nielsen #5 — prévenir l'erreur plutôt que la corriger après l'envoi).
+  const sendBlockedReason = availTag && availTag.id === 'impossible'
+    ? tr('Impossible dans ce créneau : changez l\'heure de la visite avant d\'envoyer.', 'Not available at this time: change the visit time before sending.')
+    : null;
 
   return `
     <div class="stop-card${sameSlot ? ' same-slot' : ''}${stopIsDraggable(stop) ? '' : ' is-pinned'}" draggable="${stopIsDraggable(stop)}" data-stop-id="${stop.id}">
@@ -2337,7 +2422,7 @@ function renderStopCard(stop, start, { variant = 'builder', sameSlot = false, is
         ${st === 'sandbox'
           // Envoyer et rendre compte ne coexistent jamais dans le temps : la
           // troisième place revient à celui des deux qui a un sens ici.
-          ? `<button class="btn-icon send-request" data-send-stop="${stop.id}" title="${tr('Envoyer la demande de visite à', 'Send the visit request to')} ${esc(stop.courtier || tr('ce courtier inscripteur', 'this listing broker'))}" aria-label="${tr('Envoyer la demande de visite du', 'Send the visit request for')} ${esc(stop.address)} ${tr('à', 'to')} ${esc(stop.courtier || tr('ce courtier inscripteur', 'this listing broker'))}">${icon('send')}</button>`
+          ? `<button class="btn-icon send-request" data-send-stop="${stop.id}"${sendBlockedReason ? ` disabled aria-describedby="send-why-${stop.id}"` : ''} title="${sendBlockedReason || `${tr('Envoyer la demande de visite à', 'Send the visit request to')} ${esc(stop.courtier || tr('ce courtier inscripteur', 'this listing broker'))}`}" aria-label="${tr('Envoyer la demande de visite du', 'Send the visit request for')} ${esc(stop.address)} ${tr('à', 'to')} ${esc(stop.courtier || tr('ce courtier inscripteur', 'this listing broker'))}">${icon('send')}</button>${sendBlockedReason ? `<span id="send-why-${stop.id}" class="sr-only">${sendBlockedReason}</span>` : ''}`
           : `<button class="btn-icon toggle-visited ${!stop.visited ? '' : reportPending ? 'todo' : 'active'}" data-toggle-visited="${stop.id}" title="${reportTitle}" aria-label="${reportTitle} — ${esc(stop.address)}">${icon('star')}</button>`}
       </div>`}
     </div>`;
@@ -2708,10 +2793,17 @@ function renderFooterActions(propertyCount, status, tally) {
   // que de laisser un bouton grisé sans explication. Le décompte des réponses
   // est porté par le panneau de validation en haut de l'écran : le répéter sur
   // le bouton le transformait en indicateur alors qu'il doit nommer une action.
-  const remaining = tally.waiting + tally.toHandle;
+  //
+  // « Relancer » ne veut dire quelque chose que pour un arrêt dont le statut
+  // brut est encore « pending » (qu'il s'affiche « en attente » ou « sans
+  // réponse » selon le délai écoulé) — c'est le seul cas où relanceTour()
+  // change réellement l'horloge de relance. Une visite déjà refusée, annulée
+  // ou contre-proposée a déjà sa réponse : rien à relancer, seulement une
+  // décision à prendre, déjà proposée sur sa propre carte.
+  const canRelance = state.draft.stops.some(s => s.type === 'property' && s.sentAt && s.status === 'pending');
   return `
     <button class="btn btn-primary" id="btn-share-buyer">${shareLabel}</button>
-    ${remaining ? `<button class="btn btn-outline" id="btn-relance">${tr('Relancer les courtiers', 'Follow up with the brokers')}</button>` : ''}
+    ${canRelance ? `<button class="btn btn-outline" id="btn-relance">${tr('Relancer les courtiers', 'Follow up with the brokers')}</button>` : ''}
     ${del}
   `;
 }
@@ -3016,7 +3108,26 @@ function renderNewPropertyModal() {
 function renderVisitRequestModal() {
   const m = state.modal;
   const courtier = m.external ? m.courtier : courtierFor(m.mls);
-  const fromOptions = TIME_OPTIONS.map(t => `<option value="${timeToMinutes(t)}" ${timeToMinutes(t) === m.from ? 'selected' : ''}>${t}</option>`).join('');
+  const fromOptions = TIME_OPTIONS.map(t => `<option value="${timeToMinutes(t)}" ${timeToMinutes(t) === m.from ? 'selected' : ''}>${state.lang === 'en' ? t : t.replace(':', 'h')}</option>`).join('');
+
+  // Le champ Date de ce formulaire ne déplace le tour que s'il n'a qu'une
+  // propriété (même règle qu'à l'enregistrement) : sinon la date qui compte
+  // reste celle du tour, et c'est elle qu'il faut interroger ici pour que le
+  // message affiché corresponde à ce que l'envoi vérifiera vraiment.
+  const vrPropCount = state.draft.stops.filter(s => s.type === 'property').length + (m.editStopId ? 0 : 1);
+  const vrDateApplies = m.date !== state.draft.date && vrPropCount === 1;
+  const vrTag = availabilityTagFor({ mls: m.mls, external: m.external, duration: m.duration }, m.from, vrDateApplies ? m.date : state.draft.date);
+  // Ce que le calendrier de disponibilité de la fiche décide pour ce créneau
+  // précis, avant même d'enregistrer la demande : sans ça, rien ne dit au
+  // courtier acheteur qu'une visite libre ou pré-approuvée se confirmera
+  // toute seule à l'envoi, ni qu'un « impossible » l'obligera à changer
+  // l'heure — la seule information disponible ici restait un bandeau statique
+  // qui ne disait jamais rien de réel.
+  const vrAvailabilityMsg = vrTag.id === 'visite-libre' || vrTag.id === 'pre-approuve'
+    ? tr(`${availabilityTagLabel(vrTag)} — cette demande sera confirmée automatiquement à l'envoi.`, `${availabilityTagLabel(vrTag)} — this request will be confirmed automatically when sent.`)
+    : vrTag.id === 'impossible'
+      ? tr(`${availabilityTagLabel(vrTag)} — changez l'heure avant d'envoyer.`, `${availabilityTagLabel(vrTag)} — change the time before sending.`)
+      : tr(`${availabilityTagLabel(vrTag)} — la demande restera en attente de sa confirmation.`, `${availabilityTagLabel(vrTag)} — the request will stay awaiting confirmation.`);
 
   // Modifier un arrêt déjà soumis, c'est renégocier avec le courtier
   // inscripteur : le bouton nomme cet envoi. Tant que rien n'est parti, il n'y a
@@ -3048,14 +3159,14 @@ function renderVisitRequestModal() {
       <span class="vr-broker-avatar">${esc(initialsOf(courtier))}</span>
       <div>
         <p class="vr-broker-name">${esc(courtier)}</p>
-        <p class="vr-broker-agency">${tr('Courtier inscripteur, Immocontact', 'Listing broker, Immocontact')}</p>
+        <p class="vr-broker-agency">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing broker, ${currentBrandName()}`)}</p>
       </div>
     </div>` : courtier ? `
     <div class="vr-broker">
       <span class="vr-broker-avatar">${esc(initialsOf(courtier))}</span>
       <div>
         <p class="vr-broker-name">${esc(courtier)}</p>
-        <p class="vr-broker-agency">${tr('Courtier inscripteur, Immocontact', 'Listing broker, Immocontact')}${courtierEntry(courtier) ? ' — ' + esc(courtierEntry(courtier).bureau) : ''}</p>
+        <p class="vr-broker-agency">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing broker, ${currentBrandName()}`)}${courtierEntry(courtier) ? ' — ' + esc(courtierEntry(courtier).bureau) : ''}</p>
       </div>
       <button class="btn-inline ghost" id="vr-courtier-clear">${tr('Changer', 'Change')}</button>
     </div>` : (() => {
@@ -3066,21 +3177,21 @@ function renderVisitRequestModal() {
       <label class="field-label" for="vr-courtier-search">${tr('Courtier inscripteur', 'Listing broker')} <span class="req">*</span></label>
       <div class="search-bar" style="margin-bottom:0;">
         <input type="text" class="input" id="vr-courtier-search" autocomplete="off"
-          placeholder="${tr('Rechercher un courtier d\'Immocontact…', 'Search an Immocontact broker…')}" value="${esc(q)}">
+          placeholder="${tr(`Rechercher un courtier ${brandArticleFr()}${currentBrandName()}…`, `Search ${brandArticleEn()} ${currentBrandName()} broker…`)}" value="${esc(q)}">
         ${icon('search')}
       </div>
-      ${!q ? `<p class="helper-text" style="margin:8px 0 0;">${tr('Tapez un nom ou un bureau. Seuls les courtiers inscrits à Immocontact peuvent recevoir une demande de visite.', 'Type a name or an office. Only brokers registered with Immocontact can receive a visit request.')}</p>` : found.length ? `
+      ${!q ? `<p class="helper-text" style="margin:8px 0 0;">${tr(`Tapez un nom ou un bureau. Seuls les courtiers inscrits à ${currentBrandName()} peuvent recevoir une demande de visite.`, `Type a name or an office. Only brokers registered with ${currentBrandName()} can receive a visit request.`)}</p>` : found.length ? `
         <div class="courtier-results">
           ${found.map(c => `
             <button type="button" class="courtier-row" data-pick-courtier="${esc(c.nom)}">
               <span class="vr-broker-avatar">${esc(initialsOf(c.nom))}</span>
               <span class="courtier-id">
                 <span class="courtier-name">${esc(c.nom)}</span>
-                <span class="courtier-office">${tr('Courtier inscripteur, Immocontact', 'Listing broker, Immocontact')} — ${esc(c.bureau)}</span>
+                <span class="courtier-office">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing broker, ${currentBrandName()}`)} — ${esc(c.bureau)}</span>
               </span>
             </button>`).join('')}
         </div>` : `
-        <p class="dest-empty">${tr('Aucun courtier de ce nom à Immocontact. Vérifiez l\'orthographe : la demande ne peut partir qu\'à un courtier inscrit.', 'No broker by that name at Immocontact. Check the spelling: the request can only go to a registered broker.')}</p>`}
+        <p class="dest-empty">${tr(`Aucun courtier de ce nom à ${currentBrandName()}. Vérifiez l'orthographe : la demande ne peut partir qu'à un courtier inscrit.`, `No broker by that name at ${currentBrandName()}. Check the spelling: the request can only go to a registered broker.`)}</p>`}
     </div>`;
     })();
 
@@ -3116,13 +3227,13 @@ function renderVisitRequestModal() {
               <label class="field-label" for="vr-duration">${tr('À :', 'To:')}</label>
               <select class="input select" id="vr-duration">
                 ${[...new Set([15, 30, m.duration])].sort((a, b) => a - b).map(d => `
-                  <option value="${d}" ${m.duration === d ? 'selected' : ''}>${state.lang === 'en' ? minutesToLabel(m.from + d) : minutesToLabel(m.from + d).replace('h', ':')}</option>`).join('')}
+                  <option value="${d}" ${m.duration === d ? 'selected' : ''}>${minutesToLabel(m.from + d)}</option>`).join('')}
               </select>
             </div>
           </div>
           <p class="vr-note">${tr('La durée de visite est limitée à 30 minutes', 'Visit length is limited to 30 minutes')}</p>
 
-          <div class="vr-availability">${tr('Disponibilité à confirmer', 'Availability to confirm')}</div>
+          <div class="vr-availability tone-${vrTag.tone}">${icon(vrTag.id === 'impossible' ? 'warning' : vrTag.id === 'none' ? 'warning' : 'check')}<span>${vrAvailabilityMsg}</span></div>
 
           <div class="field" style="margin-bottom:4px;">
             <!-- Le texte d'invite ne tenait pas lieu d'étiquette : il disparaît
@@ -3157,7 +3268,18 @@ function renderSendRequestsModal() {
   // une demande : elle n'apparaît jamais dans cette liste.
   const pending = state.draft.stops.filter(s => s.type === 'property' && !s.sentAt && !s.customKind);
   const chosen = state.sendSelection || [];
-  const n = chosen.length;
+  const sendSchedule = computeSchedule(state.draft);
+  // Un « impossible » ne compte jamais parmi les cases cochées, même si la
+  // sélection le portait encore (ex. l'heure vient de changer sous ses
+  // pieds) : le bouton d'envoi ne doit jamais promettre un envoi qui n'aura
+  // pas lieu.
+  const blockedIds = new Set(pending
+    .filter(s => {
+      const start = scheduledStartFor(s, sendSchedule);
+      return start !== null && availabilityTagFor(s, start).id === 'impossible';
+    })
+    .map(s => s.id));
+  const n = chosen.filter(id => !blockedIds.has(id)).length;
   // Nommer l'acheteur n'est pas vouloir le prévenir. Tant qu'aucune visite
   // n'est confirmée, le tour n'a rien à lui annoncer : on refuse d'offrir un
   // courriel irréversible comme chemin de moindre résistance (Nielsen #5).
@@ -3170,18 +3292,32 @@ function renderSendRequestsModal() {
   const buyer = anyConfirmed ? state.draft.buyer : null;
 
   const rows = pending.map(s => {
-    const row = computeSchedule(state.draft).find(r => r.stop.id === s.id);
+    const row = sendSchedule.find(r => r.stop.id === s.id);
     const heure = s.lockedStart ? (state.lang === 'en' ? s.lockedStart : s.lockedStart.replace(':', 'h')) : (row ? minutesToLabel(row.start) : '');
-    const on = chosen.includes(s.id);
+    const start = scheduledStartFor(s, sendSchedule);
+    const tag = start === null ? AVAILABILITY_TAGS.none : availabilityTagFor(s, start);
+    const blocked = blockedIds.has(s.id);
+    const autoConfirm = tag.id === 'visite-libre' || tag.id === 'pre-approuve';
+    const on = !blocked && chosen.includes(s.id);
+    // Ce que le calendrier de disponibilité a déjà décidé pour ce créneau se
+    // dit ici, avant l'envoi : un « impossible » n'est jamais cochable — le
+    // temps de changer l'heure, pas de découvrir l'échec après coup — et une
+    // visite libre ou pré-approuvée annonce qu'elle se confirmera seule.
+    const note = blocked
+      ? `<span class="send-row-note tone-danger">${icon('warning')}${tr('Impossible à cette heure — modifiez le créneau', 'Not available at this time — change the slot')}</span>`
+      : autoConfirm
+        ? `<span class="send-row-note tone-ok">${icon('check')}${tr('Sera confirmée automatiquement', 'Will be confirmed automatically')}</span>`
+        : '';
     return `
-      <label class="send-row${on ? ' is-on' : ''}">
-        <input type="checkbox" data-send-pick="${s.id}" ${on ? 'checked' : ''}>
+      <label class="send-row${on ? ' is-on' : ''}${blocked ? ' is-blocked' : ''}">
+        <input type="checkbox" data-send-pick="${s.id}" ${on ? 'checked' : ''}${blocked ? ' disabled' : ''}>
         ${s.external
           ? `<span class="result-pin">${icon('mapPinOutline')}</span>`
           : `<img class="result-thumb" src="${thumbFor(s.mls, s.address)}" alt="">`}
         <span class="send-row-text">
           <span class="send-row-address">${esc(s.address)}</span>
           <span class="send-row-meta">${heure}${s.courtier ? ` <span class="dot">•</span> ${esc(s.courtier)}` : ''}</span>
+          ${note}
         </span>
       </label>`;
   }).join('');
@@ -3256,6 +3392,8 @@ function renderConfirmRemoveStopModal() {
     ? tr('Cet arrêt disparaît du tour. Aucune demande n\'a été envoyée pour cette adresse.', 'This stop disappears from the tour. No request was sent for this address.')
     : st === 'refused'
       ? tr(`${esc(courtier)} a déjà refusé cette visite. Il n'y a rien à annuler.`, `${esc(courtier)} already declined this visit. There's nothing to cancel.`)
+      : st === 'cancelled'
+        ? tr(`${esc(courtier)} a déjà annulé cette visite. Il n'y a rien d'autre à annuler.`, `${esc(courtier)} already cancelled this visit. There's nothing else to cancel.`)
       : st === 'noreply'
         ? tr(`${esc(courtier)} n'a pas répondu. La demande de visite sera annulée.`, `${esc(courtier)} hasn't responded. The visit request will be cancelled.`)
         : sent
@@ -3393,6 +3531,15 @@ function resetArretForm() {
   state.destModalArretKindOpen = false;
   state.destModalArretFrom = null;
   state.destModalArretDuration = null;
+  state.destModalArretCoords = null;
+  state.destModalArretSuggestOpen = false;
+}
+
+function closeArretSuggestOnClickOutside(e) {
+  if (!state.destModalArretSuggestOpen) return;
+  if (e.target.closest('.arret-address-field')) return;
+  state.destModalArretSuggestOpen = false;
+  render();
 }
 
 function renderDestinationModal() {
@@ -3405,7 +3552,11 @@ function renderDestinationModal() {
   const tabs = destTabs();
   // The active tab can become hidden if the mlsCart flag is switched off while open.
   const tab = editingArret ? 'arret' : (tabs.some(t => t.id === state.destModalTab) ? state.destModalTab : tabs[0].id);
-  const q = state.destModalSearch.trim().toLowerCase();
+  // normalizeText, pas juste toLowerCase : sans elle, taper « etoiles » sans
+  // accent ne retrouvait pas « Avenue des Étoiles », alors que la recherche de
+  // courtier (demande de visite) et les suggestions d'adresse l'ignorent déjà
+  // très bien toutes les deux — la même saisie devait se comporter pareil ici.
+  const q = normalizeText(state.destModalSearch).trim();
 
   let body = '';
 
@@ -3415,19 +3566,20 @@ function renderDestinationModal() {
     if (q) {
       results = MLS_POOL.filter(p => {
         if (tab === 'mls') return p.mls.includes(q);
-        if (tab === 'adresse') return p.address.toLowerCase().includes(q);
-        return courtierFor(p.mls).toLowerCase().includes(q);
+        if (tab === 'adresse') return normalizeText(p.address).includes(q);
+        return normalizeText(courtierFor(p.mls)).includes(q);
       }).slice(0, 8);
     }
-    // Recherche par adresse sur ImmoContact : le catalogue n'est pas la seule
-    // source. Ce qui s'y trouve se sélectionne, le reste s'ajoute — les deux
-    // groupes le disent, plutôt que de laisser croire à une liste vide.
-    const suggestions = tab === 'adresse' && q && flag('customAddress') ? addressSuggestions(q) : [];
-    const grouped = tab === 'adresse' && flag('customAddress');
+    // Recherche par adresse : le catalogue n'est pas la seule source, sur
+    // aucune des deux plateformes. Ce qui s'y trouve se sélectionne, le reste
+    // s'ajoute — les deux groupes le disent, plutôt que de laisser croire à
+    // une liste vide.
+    const suggestions = tab === 'adresse' && q ? addressSuggestions(q) : [];
+    const grouped = tab === 'adresse';
     const nothingFound = !!q && !results.length && !suggestions.length;
     const listHtml = !q ? '' : grouped ? `
       ${results.length ? `
-        <p class="result-group">${tr('Propriétés Immocontact', 'Immocontact listings')}</p>
+        <p class="result-group">${tr(`Propriétés ${currentBrandName()}`, `${currentBrandName()} listings`)}</p>
         ${results.map(p => resultRow(p, addedMls)).join('')}` : ''}
       ${suggestions.length ? `
         <p class="result-group">${tr('Propriétés à ajouter', 'Listings to add')}</p>
@@ -3436,7 +3588,7 @@ function renderDestinationModal() {
         <p class="dest-empty">${tr('Aucun résultat, veuillez raffiner votre recherche ou ajouter une nouvelle adresse.', 'No results — refine your search or add a new address.')}</p>
         <button class="btn btn-primary btn-block" data-new-property style="margin-top:14px;">${icon('plus')} ${tr('Ajouter une nouvelle adresse', 'Add a new address')}</button>` : ''}
     ` : `
-      ${results.map(p => resultRow(p, addedMls)).join('') || `
+      ${results.map(p => resultRow(p, addedMls, tab === 'nom' ? courtierFor(p.mls) : null)).join('') || `
         <p class="helper-text" style="margin-top:14px;">${tr('Aucun résultat.', 'No results.')}</p>
         ${tab === 'adresse' ? `
           <div class="info-banner clickable" data-goto-arret style="margin-top:10px;">${icon('plus')} <span>${tr('Adresse introuvable ? L\'ajouter comme adresse personnalisée.', 'Can\'t find the address? Add it as a custom address.')}</span></div>
@@ -3457,7 +3609,7 @@ function renderDestinationModal() {
     body = `
       <div class="info-banner">${icon('info')} <span>${tr('Ces propriétés proviennent de votre sélection MLS.', 'These listings come from your MLS selection.')}</span></div>
       <div style="margin-top:10px;">
-        ${mlsCart.map(p => resultRow(p, addedMls)).join('') || `<p class="helper-text" style="margin-top:14px;">${tr('Votre panier MLS est vide.', 'Your MLS cart is empty.')}</p>`}
+        ${mlsCartItems().map(p => resultRow(p, addedMls)).join('') || `<p class="helper-text" style="margin-top:14px;">${tr('Votre panier MLS est vide.', 'Your MLS cart is empty.')}</p>`}
       </div>
     `;
   } else if (tab === 'arret') {
@@ -3471,19 +3623,38 @@ function renderDestinationModal() {
     const kindOpen = state.destModalArretKindOpen;
     const kindLabel = tr('Choisir votre type d\'adresse', 'Choose your address type');
     const fromOptions = `<option value="" disabled hidden ${from === null ? 'selected' : ''}>${tr('Choisir l\'heure', 'Choose the time')}</option>` +
-      TIME_OPTIONS.map(t => `<option value="${timeToMinutes(t)}" ${timeToMinutes(t) === from ? 'selected' : ''}>${t}</option>`).join('');
+      TIME_OPTIONS.map(t => `<option value="${timeToMinutes(t)}" ${timeToMinutes(t) === from ? 'selected' : ''}>${state.lang === 'en' ? t : t.replace(':', 'h')}</option>`).join('');
     const durationOptions = `<option value="" disabled hidden ${duration === null ? 'selected' : ''}>${tr('Choisir la durée', 'Choose the length')}</option>` +
       [15, 30].map(d => {
-        const label = from === null ? `${d} ${tr('minutes', 'minutes')}` : (state.lang === 'en' ? minutesToLabel(from + d) : minutesToLabel(from + d).replace('h', ':'));
+        const label = from === null ? `${d} ${tr('minutes', 'minutes')}` : minutesToLabel(from + d);
         return `<option value="${d}" ${d === duration ? 'selected' : ''}>${label}</option>`;
       }).join('');
 
+    // Suggestions façon Google Maps : McDonald's, Tim Hortons... des repères
+    // reconnaissables plutôt qu'un numéro civique, pour qu'une adresse
+    // personnalisée se cherche aussi facilement qu'une propriété.
+    const arretMatches = state.destModalArretSuggestOpen ? searchArretPlaces(state.destModalPrefillAddress) : [];
+    const arretSuggestions = !arretMatches.length ? '' : `
+      <div class="arret-suggestions" role="listbox" aria-label="${tr('Repères suggérés', 'Suggested places')}">
+        ${arretMatches.map(p => `
+          <button type="button" role="option" class="arret-suggestion-row" data-arret-place="${p.id}">
+            <span class="result-pin">${icon('mapPinOutline')}</span>
+            <span class="arret-suggestion-text">
+              <span class="arret-suggestion-name">${esc(p.name)}</span>
+              <span class="arret-suggestion-address">${esc(p.address)}</span>
+            </span>
+          </button>`).join('')}
+      </div>`;
+
     body = `
       <div class="field">
-        <div class="search-bar" style="margin-bottom:0;">
-          <input type="text" class="input" id="arret-address" autocomplete="off"
-            placeholder="${tr('Entrez l\'adresse...', 'Enter the address...')}" value="${esc(state.destModalPrefillAddress)}">
-          ${icon('search')}
+        <div class="arret-address-field">
+          <div class="search-bar" style="margin-bottom:0;">
+            <input type="text" class="input" id="arret-address" autocomplete="off"
+              placeholder="${tr('Entrez l\'adresse... (ex. Tim Hortons, McDonald\'s)', 'Enter the address... (e.g. Tim Hortons, McDonald\'s)')}" value="${esc(state.destModalPrefillAddress)}">
+            ${icon('search')}
+          </div>
+          ${arretSuggestions}
         </div>
       </div>
       <div class="field">
@@ -3544,7 +3715,7 @@ function renderDestinationModal() {
             ${tabs.map(t => `
               <button type="button" role="tab" aria-selected="${tab === t.id}" class="dest-tab ${tab === t.id ? 'active' : ''}" data-dest-tab="${t.id}">
                 ${icon(t.icon)} ${esc(tr(t.labelFr, t.labelEn))}
-                ${t.id === 'cart' && mlsCart.length ? `<span class="tab-badge">${mlsCart.length}</span>` : ''}
+                ${t.id === 'cart' && mlsCartItems().length ? `<span class="tab-badge">${mlsCartItems().length}</span>` : ''}
               </button>`).join('')}
           </div>`}
           ${insertHint}
@@ -3557,7 +3728,11 @@ function renderDestinationModal() {
     </div>`;
 }
 
-function resultRow(p, addedMls) {
+// `subtitle` affiche une seconde ligne sous l'adresse — le courtier
+// inscripteur, quand la recherche se fait justement par son nom : sans elle,
+// rien ne confirme qu'on a trouvé le bon avant de cliquer, surtout entre deux
+// noms proches (Nielsen #1 et #6).
+function resultRow(p, addedMls, subtitle) {
   const already = addedMls.has(p.mls);
   // Une inscription retirée du marché reste visible — sinon le courtier la
   // cherche sans comprendre pourquoi elle a disparu — mais ne s'ajoute pas.
@@ -3568,13 +3743,16 @@ function resultRow(p, addedMls) {
         <div class="result-address">${esc(p.address)} <span class="result-inactive-tag">(${tr('inactive', 'inactive')})</span></div>
       </div>`;
   }
+  const addressBlock = subtitle
+    ? `<div class="result-address-group"><div class="result-address">${esc(p.address)}</div><div class="result-subtitle">${esc(subtitle)}</div></div>`
+    : `<div class="result-address">${esc(p.address)}</div>`;
   // The whole row is the click target and toggles the selection:
   // one click adds the property to the tour, a second click removes it.
   return `
     <button type="button" class="result-row ${already ? 'is-added' : ''}" data-toggle-property="${p.mls}" aria-pressed="${already}">
       <img class="result-thumb" src="${thumbFor(p.mls, p.address)}" alt="">
 
-      <div class="result-address">${esc(p.address)}</div>
+      ${addressBlock}
       <span class="result-add-btn ${already ? 'added' : ''}">
         ${icon(already ? 'check' : 'plus')}
       </span>
@@ -3625,7 +3803,7 @@ function renderReportScreen() {
       <span class="vr-broker-avatar">${esc(initials)}</span>
       <div>
         <p class="vr-broker-name">${esc(courtier)}</p>
-        <p class="vr-broker-agency">${tr('Courtier inscripteur, Immocontact', 'Listing broker, Immocontact')}</p>
+        <p class="vr-broker-agency">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing broker, ${currentBrandName()}`)}</p>
       </div>
     </div>
     <div class="vr-property">
@@ -3697,8 +3875,15 @@ function renderReportScreen() {
 
     <div style="max-width:300px;margin-top:20px;">
       <!-- Le bouton porte le nom que le toast lui donnera : une action garde
-           son nom d'un bout à l'autre du geste. -->
-      <button class="btn btn-primary btn-block" id="btn-send-report">${tr('Envoyer aux vendeurs', 'Send to the sellers')}</button>
+           son nom d'un bout à l'autre du geste. Un compte rendu sans intérêt
+           noté n'a rien à transmettre au vendeur — on bloque plutôt que de
+           laisser partir une page vide (Enregistrer pour plus tard, lui,
+           n'a personne en face : rien n'oblige à le compléter d'avance). -->
+      ${(() => {
+        const sendReportWhy = whenBlocked('btn-send-report', draft.interet > 0,
+          tr('Donnez au moins une note d\'intérêt global avant d\'envoyer.', 'Rate at least the overall interest before sending.'));
+        return `<button class="btn btn-primary btn-block" id="btn-send-report"${sendReportWhy.a}>${tr('Envoyer aux vendeurs', 'Send to the sellers')}</button>${sendReportWhy.n}`;
+      })()}
       <button class="btn btn-outline btn-block" id="btn-send-report-later" style="margin-top:15px;">${tr('Enregistrer pour plus tard', 'Save for later')}</button>
     </div>
 
@@ -3738,6 +3923,8 @@ function openArretEditor(stop) {
   state.destModalArretKindOpen = false;
   state.destModalArretFrom = stop.lockedStart ? timeToMinutes(stop.lockedStart) : null;
   state.destModalArretDuration = stop.lockedStart ? stop.duration : null;
+  state.destModalArretCoords = (stop.lat != null && stop.lng != null) ? { lat: stop.lat, lng: stop.lng } : null;
+  state.destModalArretSuggestOpen = false;
   render();
 }
 
@@ -4220,8 +4407,17 @@ function bindBuilderEvents() {
   const sendBtn = document.getElementById('btn-send-tour');
   if (sendBtn) sendBtn.onclick = () => {
     // Tout est coché d'avance : envoyer l'ensemble reste un clic, choisir
-    // devient possible sans devenir obligatoire.
-    state.sendSelection = state.draft.stops.filter(s => s.type === 'property' && !s.sentAt && !s.customKind).map(s => s.id);
+    // devient possible sans devenir obligatoire. Sauf ce que le calendrier de
+    // disponibilité interdit déjà : cocher un « impossible » par défaut
+    // ferait miroiter un envoi qui n'aura pas lieu.
+    const schedule = computeSchedule(state.draft);
+    state.sendSelection = state.draft.stops
+      .filter(s => s.type === 'property' && !s.sentAt && !s.customKind)
+      .filter(s => {
+        const start = scheduledStartFor(s, schedule);
+        return start === null || availabilityTagFor(s, start).id !== 'impossible';
+      })
+      .map(s => s.id);
     state.modal = { type: 'sendRequests' };
     render();
   };
@@ -4247,11 +4443,22 @@ function bindBuilderEvents() {
     };
   });
 
-  // Étape 4 : le partage passe par le choix du client. Quand le tour en a déjà
-  // un, on repart quand même de cet écran — c'est là qu'on peut le changer.
+  // Étape 4 : le partage passe par le choix du client. Quand le tour n'en a
+  // pas encore, ou que l'acheteur retenu n'a pas de courriel, l'écran reste
+  // nécessaire — c'est là qu'on choisit ou complète le contact. Mais quand le
+  // tour porte déjà un acheteur joignable, le bouton dit « Envoyer le tour à
+  // l'acheteur » : il n'y a plus rien à choisir, revenir sur cet écran ne
+  // ferait que répéter un clic pour rien.
   const goToShare = () => {
+    const buyer = state.draft.buyer;
+    if (buyer && (buyer.email || '').trim()) {
+      shareTourWithBuyer(buyer);
+      render();
+      showToast(tr(`Tour envoyé à ${buyer.prenom} ${buyer.nom}.`, `Tour sent to ${buyer.prenom} ${buyer.nom}.`), 'success');
+      return;
+    }
     state.contactPurpose = 'share';
-    state.contactSelectedBuyer = state.draft.buyer || null;
+    state.contactSelectedBuyer = buyer || null;
     state.contactSearch = '';
     state.showBuyerForm = false;
     state.buyerFormDraft = null;
@@ -4941,14 +5148,17 @@ function bindVisitRequestModalEvents() {
     setTimeout(() => { const el = document.getElementById('vr-courtier-search'); if (el) el.focus(); }, 0);
   };
 
+  // Les trois champs qui décident du créneau redessinent le bandeau de
+  // disponibilité : sans re-rendu, il continuerait d'afficher ce qui valait
+  // pour le choix précédent.
   const dateInput = document.getElementById('vr-date');
-  if (dateInput) dateInput.onchange = () => { m.date = dateInput.value; };
+  if (dateInput) dateInput.onchange = () => { m.date = dateInput.value; render(); };
 
   const fromSelect = document.getElementById('vr-from');
   if (fromSelect) fromSelect.onchange = () => { m.from = +fromSelect.value; render(); };
 
   const durSelect = document.getElementById('vr-duration');
-  if (durSelect) durSelect.onchange = () => { m.duration = +durSelect.value; };
+  if (durSelect) durSelect.onchange = () => { m.duration = +durSelect.value; render(); };
 
   const comment = document.getElementById('vr-comment');
   if (comment) comment.oninput = () => {
@@ -4961,7 +5171,7 @@ function bindVisitRequestModalEvents() {
 
   const saveBtn = document.getElementById('vr-save');
   if (saveBtn) saveBtn.onclick = () => {
-    // Sans courtier inscrit à Immocontact, la demande n'a pas de destinataire.
+    // Sans courtier inscrit à l'annuaire, la demande n'a pas de destinataire.
     // Le bouton est déjà désactivé ; ce garde-fou couvre l'appel direct.
     if (m.external && !courtierEntry(m.courtier)) return;
     // Edit mode: update the existing stop in place; otherwise add a new one.
@@ -5083,7 +5293,7 @@ function bindDestinationModalEvents() {
         render();
         return;
       }
-      const prop = MLS_POOL.find(p => p.mls === mls) || mlsCart.find(p => p.mls === mls);
+      const prop = MLS_POOL.find(p => p.mls === mls);
       if (!prop) return;
       // Adding a property goes through the "Demande de visite" step where the
       // tour creator picks the visit time before the request goes to the broker.
@@ -5115,10 +5325,48 @@ function bindDestinationModalEvents() {
     state.insertBeforeId = null;
     if (stop) openVisitEditor(stop);
   };
-  // Sans ce lien, ouvrir le menu du type (qui redessine tout le modal) perdrait
-  // l'adresse tapée : elle n'existerait que dans le champ, pas dans l'état.
+  // Chaque frappe peut changer la liste de suggestions, donc redessine le
+  // modal — contrairement au reste du formulaire, qui met juste à jour l'état
+  // sans re-rendre. On perd le focus/curseur au passage : on les restaure
+  // juste après, comme pour la recherche des autres onglets (`dest-search`).
+  // Retaper efface un repère choisi : le texte ne lui correspond plus
+  // forcément, la position générée depuis le texte reprend le relais.
   const arretAddress = document.getElementById('arret-address');
-  if (arretAddress) arretAddress.oninput = () => { state.destModalPrefillAddress = arretAddress.value; };
+  if (arretAddress) arretAddress.oninput = () => {
+    state.destModalPrefillAddress = arretAddress.value;
+    state.destModalArretCoords = null;
+    state.destModalArretSuggestOpen = true;
+    render();
+    setTimeout(() => {
+      const el = document.getElementById('arret-address');
+      if (el) { el.focus(); el.selectionStart = el.selectionEnd = el.value.length; }
+    }, 0);
+  };
+  if (arretAddress) arretAddress.onfocus = () => {
+    if (!state.destModalArretSuggestOpen && state.destModalPrefillAddress) {
+      state.destModalArretSuggestOpen = true;
+      render();
+      setTimeout(() => {
+        const el = document.getElementById('arret-address');
+        if (el) { el.focus(); el.selectionStart = el.selectionEnd = el.value.length; }
+      }, 0);
+    }
+  };
+  document.querySelectorAll('[data-arret-place]').forEach(el => {
+    el.onclick = () => {
+      const place = ARRET_PLACE_SUGGESTIONS.find(p => p.id === el.getAttribute('data-arret-place'));
+      if (!place) return;
+      state.destModalPrefillAddress = `${place.name}, ${place.address}`;
+      state.destModalArretCoords = { lat: place.lat, lng: place.lng };
+      state.destModalArretSuggestOpen = false;
+      // Un repère de restauration nomme déjà son type — inutile de forcer un
+      // choix que l'enseigne vient de faire à la place du courtier, sauf s'il
+      // en avait déjà retenu un autre.
+      if (!state.destModalArretKind) state.destModalArretKind = 'restaurant';
+      render();
+    };
+  });
+  document.addEventListener('click', closeArretSuggestOnClickOutside);
   const kindTrigger = document.getElementById('arret-kind-trigger');
   if (kindTrigger) kindTrigger.onclick = () => {
     state.destModalArretKindOpen = !state.destModalArretKindOpen;
@@ -5144,12 +5392,20 @@ function bindDestinationModalEvents() {
     // place dans l'ordre du tour, comme n'importe quelle autre destination
     // qu'on n'a pas encore fixée.
     const from = state.destModalArretFrom;
+    // Un repère choisi dans les suggestions porte ses propres coordonnées —
+    // sinon `coordsFor` retombe sur une position générée depuis le texte.
+    // Toujours écrire les deux clés, même à null : sans ça, corriger le texte
+    // après avoir choisi un repère laisserait les anciennes coordonnées
+    // collées à une adresse qui ne leur correspond plus.
+    const coords = state.destModalArretCoords;
     const fields = {
       address,
       customKind: state.destModalArretKind || 'visite',
       duration: state.destModalArretDuration ?? 30,
       locked: from !== null,
       lockedStart: from !== null ? minutesToLabel(from).replace('h', ':') : null,
+      lat: coords ? coords.lat : null,
+      lng: coords ? coords.lng : null,
     };
     const editId = state.modal.arretEditId;
     if (editId) {
