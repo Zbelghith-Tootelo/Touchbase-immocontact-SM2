@@ -1,4 +1,4 @@
-# Buyers Tour V3 — Prototype « Tour de visites » Immocontact
+# Touchbase-immocontact-SM2 — Prototype « Tour de visites »
 
 Prototype cliquable du flow **Tour de visites** pour Immocontact / Touchbase Real Estate.
 Données fictives, aucune dépendance — HTML/CSS/JS statique.
