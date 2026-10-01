@@ -1420,8 +1420,11 @@ body[data-screen="contactForm"] .topbar-back { display: inline-flex; }
 .directory-row:last-child { border-bottom: none; }
 .directory-row-head { background: #f9fafb; min-height: 41px; }
 .directory-cell-muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.directory-col-actions { text-align: right; }
-.directory-row-actions { display: flex; gap: 10px; justify-content: flex-end; }
+/* Alignée à gauche comme Nom/Prénom/Email/Téléphone — pas plaquée contre le
+   bord droit : une colonne qui lit différemment du reste casse la grille de
+   lecture que les quatre autres entêtes installent (loi de Gestalt de
+   continuité). */
+.directory-row-actions { display: flex; gap: 10px; justify-content: flex-start; }
 
 /* Même logique que le crochet « Choix de l'acheteur » : l'action porte sa
    propre teinte plutôt que de se fondre parmi des icônes neutres. */
