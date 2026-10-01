@@ -215,7 +215,8 @@ body[data-screen="contact"] .topbar-back,
 body[data-screen="builder"] .topbar-back,
 body[data-screen="report"] .topbar-back,
 body[data-screen="propertyDetail"] .topbar-back,
-body[data-screen="propertyAvailability"] .topbar-back { display: inline-flex; }
+body[data-screen="propertyAvailability"] .topbar-back,
+body[data-screen="contactForm"] .topbar-back { display: inline-flex; }
 .topbar-back:hover { color: var(--bleu-secondaire); }
 .topbar-back:focus-visible { outline: var(--focus-ring); outline-offset: 3px; border-radius: var(--radius-sm); }
 
@@ -1369,6 +1370,135 @@ body[data-screen="propertyAvailability"] .topbar-back { display: inline-flex; }
 .property-row-address { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; color: var(--bleu-principal); }
 .property-row-chevron { color: var(--bleu-principal); flex-shrink: 0; display: flex; align-items: center; }
 .property-row-chevron svg, .property-row-chevron img { width: 9px; height: 15px; }
+
+/* ---------- Répertoire des contacts ---------- */
+
+/* Écran de données dense (recherche + onglets + tableau + pagination) :
+   contrairement au reste de l'app, il se lit mieux posé sur une carte que
+   directement sur le fond de page — c'est ce que dit la maquette Figma. */
+.page-card {
+  background: var(--blanc);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.directory-header { display: flex; gap: 20px; align-items: center; }
+.directory-header .btn { flex-shrink: 0; }
+.directory-searchbar {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;
+  border: 1px solid var(--bordures); border-radius: var(--radius-md); height: 44px; padding: 0 12px;
+  background: var(--blanc);
+}
+.directory-searchbar svg { width: 20px; height: 20px; color: var(--texte-secondaire); flex-shrink: 0; }
+.directory-searchbar input { flex: 1; min-width: 0; border: none; background: transparent; font-size: 14px; font-family: inherit; }
+.directory-searchbar input:focus { outline: none; }
+.directory-searchbar:focus-within { border-color: var(--bleu-secondaire); }
+
+.directory-tabs { display: flex; gap: 14px; flex-wrap: wrap; }
+.directory-pill {
+  height: 32px; padding: 0 16px; border-radius: 50px; border: 1px solid var(--bordures);
+  background: var(--blanc); color: var(--bleu-principal); font-size: 14px; font-weight: 500;
+  cursor: pointer; font-family: inherit;
+}
+.directory-pill.active { background: var(--bleu-secondaire); border-color: var(--bleu-secondaire); color: var(--blanc); }
+
+.directory-table { border: 1px solid #e5e7eb; border-radius: var(--radius-md); overflow-x: auto; }
+.directory-row {
+  display: grid; grid-template-columns: 180px 160px minmax(200px, 1fr) 140px 180px;
+  align-items: center; gap: 8px; min-height: 50px; min-width: 760px; padding: 8px 16px;
+  border-bottom: 1px solid #e5e7eb; font-size: 14px; font-weight: 500; color: var(--texte-principal);
+}
+/* L'annuaire des courtiers porte une colonne Agence en plus que les contacts
+   qu'on gère soi-même — sa grille a donc une piste de plus. */
+.directory-table-courtier .directory-row {
+  grid-template-columns: 160px 140px 160px minmax(200px, 1fr) 140px 160px;
+  min-width: 900px;
+}
+.directory-row:last-child { border-bottom: none; }
+.directory-row-head { background: #f9fafb; min-height: 41px; }
+.directory-cell-muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.directory-col-actions { text-align: right; }
+.directory-row-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Même logique que le crochet « Choix de l'acheteur » : l'action porte sa
+   propre teinte plutôt que de se fondre parmi des icônes neutres. */
+.directory-row-actions .btn-icon.danger { background: var(--rouge-10); border-color: transparent; }
+.directory-row-actions .btn-icon.directory-action-mail,
+.directory-row-actions .btn-icon.directory-action-phone,
+.directory-row-actions .btn-icon.directory-action-tour { background: var(--bleu-action-10); border-color: transparent; color: var(--bleu-secondaire); }
+.directory-row-actions .btn-icon.directory-action-mail:hover,
+.directory-row-actions .btn-icon.directory-action-phone:hover,
+.directory-row-actions .btn-icon.directory-action-tour:hover { background: var(--bleu-action-30); }
+
+.directory-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.directory-pagination p { font-size: 14px; font-weight: 500; color: var(--texte-principal); margin: 0; }
+.directory-pagination-controls { display: flex; align-items: center; gap: 8px; }
+.pagination-arrow {
+  width: 32px; height: 32px; border-radius: 50px; border: 1px solid var(--bordures);
+  background: var(--blanc); color: var(--bleu-principal); display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.pagination-arrow:disabled { opacity: 0.4; cursor: not-allowed; }
+.pagination-arrow svg { width: 16px; height: 16px; }
+.pagination-num {
+  min-width: 32px; height: 32px; padding: 0 10px; border-radius: 50px; border: 1px solid var(--bordures);
+  background: var(--blanc); color: var(--bleu-principal); font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit;
+}
+.pagination-num.active { background: var(--bleu-principal); border-color: var(--bleu-principal); color: var(--blanc); }
+.pagination-ellipsis { color: var(--bleu-principal); font-size: 14px; padding: 0 4px; }
+
+/* Carte mobile d'un contact : cachée par défaut, elle prend le relais du
+   tableau sous 768px (voir la règle inverse ci-dessous) plutôt que de forcer
+   un défilement horizontal qui sortirait les actions du cadre. */
+.directory-card { display: none; }
+
+@media (max-width: 768px) {
+  .page-card { padding: 16px; }
+  .directory-header { flex-direction: column; align-items: stretch; }
+  .directory-header .btn { width: 100%; justify-content: center; }
+
+  .directory-row { display: none; }
+  .directory-table {
+    border: none; overflow: visible; background: transparent;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .directory-card {
+    display: flex; flex-direction: column; gap: 10px;
+    border: 1px solid var(--bordures); border-radius: var(--radius-lg); padding: 14px;
+    background: var(--blanc);
+  }
+  .directory-card-main { min-width: 0; }
+  .directory-card-name { margin: 0; font-size: 15px; font-weight: 700; color: var(--texte-principal); }
+  .directory-card-line { display: flex; align-items: center; gap: 7px; margin: 5px 0 0; font-size: 13px; color: var(--texte-secondaire); }
+  .directory-card-line svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .directory-card-line span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Rangée d'actions plutôt que colonne : quatre boutons empilés à côté d'un
+     nom sur une ligne rendraient la carte bancale (haute d'un côté, courte
+     de l'autre) — une bande basse, comme le reste de l'app, reste équilibrée
+     que la carte porte deux actions (courtier) ou quatre (contact). */
+  .directory-card-actions { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--bordures); }
+  .directory-card-actions .btn-icon { flex: 1; }
+}
+
+/* ---------- Fiche contact (ajout / modification) ---------- */
+
+.contact-form-prefs { display: flex; flex-direction: column; gap: 16px; padding-top: 8px; }
+.contact-form-prefs-title { font-size: 16px; font-weight: 700; color: var(--bleu-principal); margin: 0; }
+.contact-form-checks { display: flex; gap: 28px; flex-wrap: wrap; }
+.check-inline { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: var(--texte-principal); cursor: pointer; }
+.check-inline input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--bleu-secondaire); margin: 0; }
+
+.input-icon-group { display: flex; align-items: center; gap: 10px; border: 1px solid var(--bordures); border-radius: var(--radius-md); padding: 0 14px; }
+.input-icon-group svg { width: 18px; height: 18px; color: var(--texte-secondaire); flex-shrink: 0; }
+.input-icon-group input { flex: 1; min-width: 0; border: none; padding: 12px 0; font-size: 15px; background: transparent; font-family: inherit; }
+.input-icon-group input:focus { outline: none; }
+.input-icon-group:focus-within { border-color: var(--bleu-secondaire); }
+
+.contact-form-actions { display: flex; flex-direction: column; gap: 12px; max-width: 340px; margin-top: 8px; }
+.contact-form-actions .btn { width: 100%; }
 
 /* ---------- Fiche propriété (Figma 1655:6163) ---------- */
 

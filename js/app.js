@@ -34,6 +34,10 @@ const ICONS = {
   cart: `<circle cx="9" cy="20" r="1.4" fill="currentColor"/><circle cx="18" cy="20" r="1.4" fill="currentColor"/><path d="M2 3h2l2.6 12.6a2 2 0 002 1.6h8.9a2 2 0 002-1.6L21 7H6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
   sync: `<path d="M3 12a9 9 0 0115.3-6.4M21 12a9 9 0 01-15.3 6.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M18.6 3.6v4.2h-4.2M5.4 20.4v-4.2h4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
   layers: `<path d="M12 3l8.5 4.5L12 12 3.5 7.5 12 3z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M3.5 12.5L12 17l8.5-4.5M3.5 16.5L12 21l8.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+  mail: `<path d="M4 6h16a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V7a1 1 0 011-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none"/><path d="M3.5 7l8.5 6 8.5-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+  phone: `<path d="M6.5 3h3l2 5-2.5 1.5a11 11 0 005 5L15.5 12l5 2v3a2 2 0 01-2 2C10.6 19 5 13.4 5 6a2 2 0 011.5-2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none"/>`,
+  chevronLeft: `<path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+  tourAdd: `<path d="M12 21.5s7-6.1 7-11.2A7 7 0 005 10.3c0 5.1 7 11.2 7 11.2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none"/><path d="M12 7.3v4M10 9.3h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`,
   star: { viewBox: '0 0 27 26', content: `<path d="M13.1016 0.5C13.8575 0.5 14.5467 0.933553 14.873 1.61523L17.7061 7.49512L24.0322 8.4375L24.0332 8.43848C24.7731 8.55044 25.3802 9.07198 25.6123 9.78027C25.8454 10.4919 25.6556 11.2766 25.1279 11.8027L20.5322 16.3887L21.623 22.873V22.875C21.7455 23.6167 21.4391 24.3637 20.834 24.8076C20.222 25.2564 19.4148 25.3039 18.7539 24.9521L18.752 24.9502L13.1064 21.9092L7.46094 24.9502L7.45898 24.9521C6.79541 25.3053 5.99013 25.2494 5.38184 24.8096C4.77244 24.3687 4.46771 23.6146 4.58984 22.875V22.874L5.6748 16.3887L1.08008 11.8027C0.550316 11.2744 0.369538 10.4904 0.594727 9.78418C0.822466 9.07009 1.43758 8.55008 2.1748 8.43848L2.17578 8.4375L8.49707 7.49512L11.3311 1.61523L11.332 1.61426C11.6616 0.936913 12.3428 0.500156 13.1016 0.5Z" stroke="currentColor"/>` },
 };
 // Les icônes sont décoratives : le nom d'un bouton vient de son texte visible
@@ -183,6 +187,37 @@ const BUYERS = [
   { id: 'b7', prenom: 'Isabelle', nom: 'Roy', email: 'i.roy@email.com', tel: '(438) 777-8899' },
 ];
 
+// Répertoire des contacts : acheteurs et vendeurs que le courtier gère
+// lui-même (ajout, modification, suppression) — distinct de BUYERS, qui reste
+// la liste choisie au moment d'envoyer un tour. `type` porte les deux
+// indépendamment : rien n'empêche un même contact d'être acheteur et vendeur.
+const CONTACTS = [
+  { id: 'c1', prenom: 'Jean', nom: 'Dupont', email: 'jean.dupont@gmail.com', tel: '418 123 4567', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c2', prenom: 'Sophie', nom: 'Martin', email: 'sophie.martin@orange.com', tel: '604 987 6543', type: { acheteur: true, vendeur: true }, alerts: true },
+  { id: 'c3', prenom: 'Marc', nom: 'Lefebvre', email: 'marc.lefebvre@yahoo.com', tel: '438 555 1234', type: { acheteur: false, vendeur: true }, alerts: false },
+  { id: 'c4', prenom: 'Camille', nom: 'Durand', email: 'camille.durand@icloud.com', tel: '403 876 5432', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c5', prenom: 'Pierre', nom: 'Bernard', email: 'pierre.bernard@protonmail.com', tel: '514 222 3344', type: { acheteur: false, vendeur: true }, alerts: false },
+  { id: 'c6', prenom: 'Juliette', nom: 'Sophie', email: 'juliette.sophie@example.com', tel: '438 555 1234', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c7', prenom: 'Clara', nom: 'Leroux', email: 'clara.leroux@example.com', tel: '438 555 5678', type: { acheteur: true, vendeur: true }, alerts: true },
+  { id: 'c8', prenom: 'Élodie', nom: 'Dufresne', email: 'elodie.dufresne@example.com', tel: '438 555 9101', type: { acheteur: false, vendeur: true }, alerts: false },
+  { id: 'c9', prenom: 'Margaux', nom: 'Benoît', email: 'margaux.benoit@example.com', tel: '438 555 1122', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c10', prenom: 'Chloé', nom: 'Gagnon', email: 'chloe.gagnon@example.com', tel: '438 555 3344', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c11', prenom: 'François', nom: 'Morin', email: 'f.morin@email.com', tel: '(514) 111-2233', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c12', prenom: 'Julien', nom: 'Lefevre', email: 'j.lefevre@email.com', tel: '(514) 222-3344', type: { acheteur: true, vendeur: true }, alerts: false },
+  { id: 'c13', prenom: 'Sophie', nom: 'Dubois', email: 's.dubois@email.com', tel: '(438) 333-4455', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c14', prenom: 'Nicolas', nom: 'Roy', email: 'nicolas.roy@example.com', tel: '514 444 8899', type: { acheteur: false, vendeur: true }, alerts: false },
+  { id: 'c15', prenom: 'Amélie', nom: 'Bouchard', email: 'amelie.bouchard@example.com', tel: '450 555 2233', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c16', prenom: 'Olivier', nom: 'Tremblay', email: 'olivier.tremblay@example.com', tel: '514 666 3344', type: { acheteur: false, vendeur: true }, alerts: false },
+  { id: 'c17', prenom: 'Maxime', nom: 'Côté', email: 'maxime.cote@example.com', tel: '438 777 4455', type: { acheteur: true, vendeur: true }, alerts: true },
+  { id: 'c18', prenom: 'Laurie', nom: 'Paquette', email: 'laurie.paquette@example.com', tel: '450 888 5566', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c19', prenom: 'Simon', nom: 'Fortin', email: 'simon.fortin@example.com', tel: '514 999 6677', type: { acheteur: false, vendeur: true }, alerts: false },
+  { id: 'c20', prenom: 'Rosalie', nom: 'Bergeron', email: 'rosalie.bergeron@example.com', tel: '438 111 7788', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c21', prenom: 'Hugo', nom: 'Desjardins', email: 'hugo.desjardins@example.com', tel: '450 222 8899', type: { acheteur: false, vendeur: true }, alerts: false },
+  { id: 'c22', prenom: 'Alice', nom: 'Pelletier', email: 'alice.pelletier@example.com', tel: '514 333 9900', type: { acheteur: true, vendeur: false }, alerts: true },
+  { id: 'c23', prenom: 'Thomas', nom: 'Girard', email: 'thomas.girard@example.com', tel: '438 444 0011', type: { acheteur: false, vendeur: true }, alerts: false },
+  { id: 'c24', prenom: 'Emma', nom: 'Lévesque', email: 'emma.levesque@example.com', tel: '450 555 1122', type: { acheteur: true, vendeur: true }, alerts: true },
+];
+
 const COURTIERS_INSCRIPTEURS = ['Marie-Ève Gagnon', 'Patrick Simard', 'Nathalie Côté', 'Éric Bouchard', 'Sylvie Paquette'];
 
 // Annuaire des courtiers inscripteurs, commun aux deux plateformes. Une
@@ -191,18 +226,18 @@ const COURTIERS_INSCRIPTEURS = ['Marie-Ève Gagnon', 'Patrick Simard', 'Nathalie
 // Séparé du pool d'attribution ci-dessus : y ajouter un nom réattribuerait
 // sinon le courtier de toutes les fiches existantes.
 const COURTIER_DIRECTORY = [
-  { nom: 'Marie-Ève Gagnon', bureau: 'Montréal' },
-  { nom: 'Patrick Simard', bureau: 'Laval' },
-  { nom: 'Nathalie Côté', bureau: 'Longueuil' },
-  { nom: 'Éric Bouchard', bureau: 'Boucherville' },
-  { nom: 'Sylvie Paquette', bureau: 'Brossard' },
-  { nom: 'Jean-François Tremblay', bureau: 'Saint-Lambert' },
-  { nom: 'Caroline Lévesque', bureau: 'Repentigny' },
-  { nom: 'Martin Pelletier', bureau: 'Terrebonne' },
-  { nom: 'Isabelle Fortin', bureau: 'Montréal' },
-  { nom: 'Sébastien Roy', bureau: 'Laval' },
-  { nom: 'Geneviève Bergeron', bureau: 'Saint-Jérôme' },
-  { nom: 'Alain Desjardins', bureau: 'Vaudreuil-Dorion' },
+  { nom: 'Marie-Ève Gagnon', bureau: 'Montréal', tel: '514 555 0101', email: 'marie-eve.gagnon@courtier.com' },
+  { nom: 'Patrick Simard', bureau: 'Laval', tel: '450 555 0102', email: 'patrick.simard@courtier.com' },
+  { nom: 'Nathalie Côté', bureau: 'Longueuil', tel: '450 555 0103', email: 'nathalie.cote@courtier.com' },
+  { nom: 'Éric Bouchard', bureau: 'Boucherville', tel: '450 555 0104', email: 'eric.bouchard@courtier.com' },
+  { nom: 'Sylvie Paquette', bureau: 'Brossard', tel: '450 555 0105', email: 'sylvie.paquette@courtier.com' },
+  { nom: 'Jean-François Tremblay', bureau: 'Saint-Lambert', tel: '450 555 0106', email: 'jean-francois.tremblay@courtier.com' },
+  { nom: 'Caroline Lévesque', bureau: 'Repentigny', tel: '450 555 0107', email: 'caroline.levesque@courtier.com' },
+  { nom: 'Martin Pelletier', bureau: 'Terrebonne', tel: '450 555 0108', email: 'martin.pelletier@courtier.com' },
+  { nom: 'Isabelle Fortin', bureau: 'Montréal', tel: '514 555 0109', email: 'isabelle.fortin@courtier.com' },
+  { nom: 'Sébastien Roy', bureau: 'Laval', tel: '450 555 0110', email: 'sebastien.roy@courtier.com' },
+  { nom: 'Geneviève Bergeron', bureau: 'Saint-Jérôme', tel: '450 555 0111', email: 'genevieve.bergeron@courtier.com' },
+  { nom: 'Alain Desjardins', bureau: 'Vaudreuil-Dorion', tel: '450 555 0112', email: 'alain.desjardins@courtier.com' },
 ];
 
 function courtierEntry(nom) {
@@ -1024,6 +1059,11 @@ const state = {
   availMiniCalMonth: null,  // 'YYYY-MM' du mini-calendrier ouvert
   tours: seedTours(),
   buyers: BUYERS.slice(),
+  contacts: CONTACTS.slice(),
+  directoryTab: 'tous',      // tous | acheteurs | vendeurs | courtiers
+  directorySearch: '',
+  directoryPage: 1,
+  contactFormDraft: null,    // { id?, prenom, nom, tel, email, acheteur, vendeur, alerts, touched }
   draft: null,              // tour being created/edited
   editingTourId: null,      // if editing an existing tour from the list
   contactSearch: '',
@@ -1418,6 +1458,7 @@ const NAV_ITEMS = [
   { id: 'waiting', labelFr: 'Attente de réponse', labelEn: 'Pending responses', img: 'assets/menu/wait.svg', badge: 3 },
   { id: 'tours', labelFr: 'Tour de visites', labelEn: 'Buyer\'s tours', img: 'assets/menu/tour.svg' },
   { id: 'properties', labelFr: 'Mes propriétés', labelEn: 'My listings', img: 'assets/menu/properties.svg' },
+  { id: 'directory', labelFr: 'Répertoire', labelEn: 'Directory', img: 'assets/menu/directory.svg' },
   { id: 'reports', labelFr: 'Rapports', labelEn: 'Reports', img: 'assets/menu/reports.svg' },
   { id: 'calendar', labelFr: 'Calendrier', labelEn: 'Calendar', img: 'assets/menu/calendar.svg' },
   { id: 'map', labelFr: 'Carte', labelEn: 'Map', img: 'assets/menu/map.svg' },
@@ -1429,18 +1470,22 @@ function navItemLabel(item) { return tr(item.labelFr, item.labelEn); }
 // Sections câblées dans ce prototype, au-delà du tour de visites. Une section
 // câblée n'affiche plus la réserve « absente de ce prototype », qu'elle soit
 // ou non l'écran courant.
-const WIRED_NAV = new Set(['tours', 'properties']);
+const WIRED_NAV = new Set(['tours', 'properties', 'directory']);
 
 // Une seule section à la fois se dit « courante » : le tour de visites tant
-// qu'on y est (liste, composition, envoi...), Mes propriétés dès qu'on y entre.
+// qu'on y est (liste, composition, envoi...), Mes propriétés dès qu'on y entre,
+// le Répertoire pour sa liste et sa fiche de contact.
 function navActiveId() {
   const inProperties = state.screen === 'properties' || state.screen === 'propertyDetail' || state.screen === 'propertyAvailability';
-  return inProperties ? 'properties' : 'tours';
+  const inDirectory = state.screen === 'directory' || state.screen === 'contactForm';
+  if (inProperties) return 'properties';
+  if (inDirectory) return 'directory';
+  return 'tours';
 }
 
 // Glyphe blanc dédié par section active, comme le veut la maquette Figma : le
 // reste des icônes n'a qu'une seule teinte, pensée pour le fond clair.
-const NAV_ACTIVE_ICONS = { tours: 'assets/menu/tour-white.svg', properties: 'assets/menu/properties-white.svg' };
+const NAV_ACTIVE_ICONS = { tours: 'assets/menu/tour-white.svg', properties: 'assets/menu/properties-white.svg', directory: 'assets/menu/directory-white.svg' };
 
 function renderSidebarNav() {
   const el = document.getElementById('sidebar-nav');
@@ -1566,6 +1611,8 @@ function render() {
   else if (state.screen === 'properties') { setTopbarTitle(tr('Mes propriétés', 'My listings')); main.innerHTML = renderPropertiesScreen(); }
   else if (state.screen === 'propertyDetail') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderPropertyDetailScreen(); }
   else if (state.screen === 'propertyAvailability') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderAvailabilityScreen(); }
+  else if (state.screen === 'directory') { setTopbarTitle(tr('Répertoire des contacts', 'Contacts directory')); main.innerHTML = renderDirectoryScreen(); }
+  else if (state.screen === 'contactForm') { setTopbarTitle(state.contactFormDraft && state.contactFormDraft.id ? tr('Modifier le contact', 'Edit contact') : tr('Nouveau contact', 'New contact')); main.innerHTML = renderContactFormScreen(); }
   document.body.dataset.screen = state.screen;
   renderModal();
   bindEvents();
@@ -1640,6 +1687,352 @@ function bindPropertiesEvents() {
       render();
     };
   });
+}
+
+/* ----- Screen: répertoire des contacts -----
+   Acheteurs et vendeurs que le courtier gère lui-même vivent dans
+   `state.contacts` ; les courtiers inscripteurs restent dans l'annuaire
+   existant (COURTIER_DIRECTORY) — un registre externe, jamais mélangé aux
+   contacts qu'on ajoute ou retire soi-même. Seul l'onglet Courtiers l'affiche. */
+
+const DIRECTORY_PAGE_SIZE = 10;
+
+function contactMatchesTab(c, tab) {
+  if (tab === 'acheteurs') return c.type.acheteur;
+  if (tab === 'vendeurs') return c.type.vendeur;
+  return true;
+}
+
+function directoryRows() {
+  if (state.directoryTab === 'courtiers') {
+    return COURTIER_DIRECTORY.map(c => {
+      const [prenom, ...rest] = c.nom.split(' ');
+      return { kind: 'courtier', id: c.nom, prenom, nom: rest.join(' ') || c.nom, bureau: c.bureau, email: c.email, tel: c.tel };
+    });
+  }
+  return state.contacts.filter(c => contactMatchesTab(c, state.directoryTab)).map(c => ({ kind: 'contact', ...c }));
+}
+
+function filteredDirectoryRows() {
+  const q = normalizeText(state.directorySearch).trim();
+  const rows = directoryRows();
+  if (!q) return rows;
+  return rows.filter(r => normalizeText(`${r.prenom} ${r.nom} ${r.email || ''} ${r.tel || ''} ${r.bureau || ''}`).includes(q));
+}
+
+// 1, 2, 3 … dernière : le même schéma que la maquette, sans énumérer 50 pages
+// quand il n'y en a que 3 — l'ellipse ne sert que si la liste s'allonge un jour.
+function paginationNumbers(page, totalPages) {
+  const nums = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) nums.push(i);
+  } else {
+    nums.push(1, 2, 3);
+    if (page > 4 && page < totalPages - 2) nums.push('…', page);
+    else nums.push('…');
+    nums.push(totalPages);
+  }
+  const seen = new Set();
+  return nums
+    .filter(n => { if (n === '…') return true; if (seen.has(n)) return false; seen.add(n); return true; })
+    .map(n => n === '…'
+      ? `<span class="pagination-ellipsis">…</span>`
+      : `<button class="pagination-num ${n === page ? 'active' : ''}" data-directory-page="${n}" aria-current="${n === page ? 'page' : 'false'}">${n}</button>`)
+    .join('');
+}
+
+// En dessous de 768px, la grille à 5-6 colonnes n'a plus de place : elle
+// forçait un défilement horizontal qui cachait la colonne Actions hors champ
+// (loi de Fitts, et reconnaissance plutôt que rappel — Nielsen #6). Chaque
+// ligne rend donc aussi une carte, jamais affichée en même temps que la
+// ligne (bascule au md, comme le fait déjà le reste de l'app entre ses
+// chromes desktop et mobile) : même DOM, même liants d'événements, deux
+// présentations.
+function directoryRowHtml(r) {
+  const isCourtier = r.kind === 'courtier';
+  const messageBtn = `<button class="btn-icon directory-action-mail" data-directory-message="${esc(r.id)}" title="${tr('Envoyer un message à', 'Message')} ${esc(r.prenom)} ${esc(r.nom)}" aria-label="${tr('Envoyer un message à', 'Message')} ${esc(r.prenom)} ${esc(r.nom)}">${icon('mail')}</button>`;
+  const emailLine = r.email ? `<p class="directory-card-line">${icon('mail')}<span>${esc(r.email)}</span></p>` : '';
+  const telLine = r.tel ? `<p class="directory-card-line">${icon('phone')}<span>${esc(r.tel)}</span></p>` : '';
+  const cardName = `<p class="directory-card-name">${esc(r.prenom)} ${esc(r.nom)}</p>`;
+
+  // Un courtier inscripteur ne s'édite ni ne se supprime depuis cet écran —
+  // c'est un annuaire externe, jamais l'acheteur d'un tour — donc seuls les
+  // moyens de le joindre ont un sens ici.
+  if (isCourtier) {
+    const actions = `
+      <button class="btn-icon directory-action-phone" data-directory-call="${esc(r.id)}" title="${tr('Appeler', 'Call')} ${esc(r.prenom)} ${esc(r.nom)}" aria-label="${tr('Appeler', 'Call')} ${esc(r.prenom)} ${esc(r.nom)}">${icon('phone')}</button>
+      ${messageBtn}`;
+    const agenceLine = `<p class="directory-card-line">${icon('mapPinOutline')}<span>${esc(r.bureau)}</span></p>`;
+    return `
+    <div class="directory-row directory-row-courtier">
+      <span>${esc(r.nom)}</span>
+      <span>${esc(r.prenom)}</span>
+      <span class="directory-cell-muted">${esc(r.bureau)}</span>
+      <span class="directory-cell-muted">${r.email ? esc(r.email) : '—'}</span>
+      <span class="directory-cell-muted">${r.tel ? esc(r.tel) : '—'}</span>
+      <span class="directory-col-actions directory-row-actions">${actions}</span>
+    </div>
+    <div class="directory-card">
+      <div class="directory-card-main">${cardName}${agenceLine}${emailLine}${telLine}</div>
+      <div class="directory-card-actions">${actions}</div>
+    </div>`;
+  }
+  const actions = `
+      <button class="btn-icon" data-directory-edit="${r.id}" title="${tr('Modifier le contact', 'Edit contact')}" aria-label="${tr('Modifier', 'Edit')} ${esc(r.prenom)} ${esc(r.nom)}">${icon('pencil')}</button>
+      <button class="btn-icon danger" data-directory-delete="${r.id}" title="${tr('Supprimer le contact', 'Delete contact')}" aria-label="${tr('Supprimer', 'Delete')} ${esc(r.prenom)} ${esc(r.nom)}">${icon('trash')}</button>
+      ${messageBtn}
+      <button class="btn-icon directory-action-tour" data-directory-tour="${r.id}" title="${tr('Créer un tour pour ce contact', 'Start a tour for this contact')}" aria-label="${tr('Créer un tour pour', 'Start a tour for')} ${esc(r.prenom)} ${esc(r.nom)}">${icon('tourAdd')}</button>`;
+
+  return `
+    <div class="directory-row">
+      <span>${esc(r.nom)}</span>
+      <span>${esc(r.prenom)}</span>
+      <span class="directory-cell-muted">${r.email ? esc(r.email) : '—'}</span>
+      <span class="directory-cell-muted">${r.tel ? esc(r.tel) : '—'}</span>
+      <span class="directory-col-actions directory-row-actions">${actions}</span>
+    </div>
+    <div class="directory-card">
+      <div class="directory-card-main">${cardName}${emailLine}${telLine}</div>
+      <div class="directory-card-actions">${actions}</div>
+    </div>`;
+}
+
+function renderDirectoryScreen() {
+  const tab = state.directoryTab;
+  const allRows = filteredDirectoryRows();
+  const totalPages = Math.max(1, Math.ceil(allRows.length / DIRECTORY_PAGE_SIZE));
+  const page = Math.min(state.directoryPage, totalPages);
+  const start = (page - 1) * DIRECTORY_PAGE_SIZE;
+  const pageRows = allRows.slice(start, start + DIRECTORY_PAGE_SIZE);
+
+  const tabs = [
+    { id: 'tous', labelFr: 'Tous les contacts', labelEn: 'All contacts' },
+    { id: 'acheteurs', labelFr: 'Acheteurs', labelEn: 'Buyers' },
+    { id: 'vendeurs', labelFr: 'Vendeurs', labelEn: 'Sellers' },
+    { id: 'courtiers', labelFr: 'Courtiers', labelEn: 'Brokers' },
+  ];
+  const tabsHtml = tabs.map(t => `
+    <button class="directory-pill ${tab === t.id ? 'active' : ''}" data-directory-tab="${t.id}" role="tab" aria-selected="${tab === t.id}">${tr(t.labelFr, t.labelEn)}</button>`).join('');
+
+  const emptyMsg = state.directorySearch.trim()
+    ? tr('Aucun contact ne correspond à cette recherche.', 'No contact matches this search.')
+    : tab === 'courtiers'
+      ? tr('Aucun courtier dans l\'annuaire.', 'No broker in the directory.')
+      : tr('Aucun contact pour le moment.', 'No contact yet.');
+
+  // L'annuaire des courtiers porte une colonne de plus (Agence) que les
+  // contacts qu'on gère soi-même — eux n'en ont pas — d'où l'en-tête et la
+  // grille distincts plutôt qu'une colonne vide sur les trois autres onglets.
+  const isCourtierTab = tab === 'courtiers';
+  const headHtml = isCourtierTab ? `
+        <span>${tr('Nom', 'Last name')}</span>
+        <span>${tr('Prénom', 'First name')}</span>
+        <span>${tr('Agence', 'Brokerage')}</span>
+        <span>${tr('Email', 'Email')}</span>
+        <span>${tr('Téléphone', 'Phone')}</span>
+        <span class="directory-col-actions">${tr('Actions', 'Actions')}</span>` : `
+        <span>${tr('Nom', 'Last name')}</span>
+        <span>${tr('Prénom', 'First name')}</span>
+        <span>${tr('Email', 'Email')}</span>
+        <span>${tr('Téléphone', 'Phone')}</span>
+        <span class="directory-col-actions">${tr('Actions', 'Actions')}</span>`;
+
+  const table = allRows.length === 0
+    ? `<div class="empty-state"><p>${emptyMsg}</p></div>`
+    : `
+    <div class="directory-table${isCourtierTab ? ' directory-table-courtier' : ''}">
+      <div class="directory-row directory-row-head">${headHtml}</div>
+      ${pageRows.map(directoryRowHtml).join('')}
+    </div>
+    <div class="directory-pagination">
+      <p>${tr(
+        `${allRows.length ? start + 1 : 0}-${Math.min(start + DIRECTORY_PAGE_SIZE, allRows.length)} sur ${allRows.length} résultat${allRows.length > 1 ? 's' : ''}`,
+        `${allRows.length ? start + 1 : 0}-${Math.min(start + DIRECTORY_PAGE_SIZE, allRows.length)} of ${allRows.length} result${allRows.length > 1 ? 's' : ''}`
+      )}</p>
+      <div class="directory-pagination-controls">
+        <button class="pagination-arrow" data-directory-page="${page - 1}" ${page <= 1 ? 'disabled' : ''} aria-label="${tr('Page précédente', 'Previous page')}">${icon('chevronLeft')}</button>
+        ${paginationNumbers(page, totalPages)}
+        <button class="pagination-arrow" data-directory-page="${page + 1}" ${page >= totalPages ? 'disabled' : ''} aria-label="${tr('Page suivante', 'Next page')}">${icon('chevronRight')}</button>
+      </div>
+    </div>`;
+
+  return `
+    <div class="page-card">
+      <div class="directory-header">
+        <button class="btn btn-primary" id="btn-add-contact">${icon('plus')} ${tr('Nouveau contact', 'New contact')}</button>
+        <div class="directory-searchbar">
+          ${icon('search')}
+          <input type="text" id="directory-search" placeholder="${tr('Rechercher…', 'Search…')}" value="${esc(state.directorySearch)}" aria-label="${tr('Rechercher un contact', 'Search a contact')}">
+        </div>
+      </div>
+      <div class="directory-tabs" role="tablist" aria-label="${tr('Filtrer le répertoire', 'Filter the directory')}">${tabsHtml}</div>
+      ${table}
+    </div>`;
+}
+
+// Convertir un contact en acheteur d'un tour, c'est le geste que fait déjà
+// le formulaire de nom d'acheteur (resolveContactBuyer) : on cherche par
+// courriel avant de créer, pour ne pas dupliquer quelqu'un déjà connu.
+function startTourForContact(c) {
+  let buyer = c.email ? state.buyers.find(b => b.email && b.email === c.email) : null;
+  if (!buyer) {
+    buyer = { id: uid(), prenom: c.prenom, nom: c.nom, email: c.email, tel: c.tel };
+    state.buyers.push(buyer);
+  }
+  leaveTour(() => {
+    state.draft = newDraft(buyer);
+    state.screen = 'builder';
+    showToast(tr(`Tour créé pour ${c.prenom} ${c.nom}.`, `Tour created for ${c.prenom} ${c.nom}.`), 'success');
+  });
+}
+
+function bindDirectoryEvents() {
+  document.querySelectorAll('[data-directory-tab]').forEach(btn => {
+    btn.onclick = () => { state.directoryTab = btn.getAttribute('data-directory-tab'); state.directoryPage = 1; render(); };
+  });
+  const search = document.getElementById('directory-search');
+  if (search) search.oninput = () => {
+    state.directorySearch = search.value;
+    state.directoryPage = 1;
+    render();
+    setTimeout(() => {
+      const el = document.getElementById('directory-search');
+      if (el) { el.focus(); el.selectionStart = el.selectionEnd = el.value.length; }
+    }, 0);
+  };
+  document.querySelectorAll('[data-directory-page]').forEach(btn => {
+    btn.onclick = () => { state.directoryPage = +btn.getAttribute('data-directory-page'); render(); };
+  });
+  const addBtn = document.getElementById('btn-add-contact');
+  if (addBtn) addBtn.onclick = () => {
+    state.contactFormDraft = { prenom: '', nom: '', tel: '', email: '', acheteur: false, vendeur: false, alerts: false };
+    state.screen = 'contactForm';
+    render();
+  };
+  document.querySelectorAll('[data-directory-edit]').forEach(btn => {
+    btn.onclick = () => {
+      const c = state.contacts.find(c => c.id === btn.getAttribute('data-directory-edit'));
+      if (!c) return;
+      state.contactFormDraft = { id: c.id, prenom: c.prenom, nom: c.nom, tel: c.tel, email: c.email, acheteur: c.type.acheteur, vendeur: c.type.vendeur, alerts: c.alerts };
+      state.screen = 'contactForm';
+      render();
+    };
+  });
+  document.querySelectorAll('[data-directory-delete]').forEach(btn => {
+    btn.onclick = () => { state.modal = { type: 'confirmDeleteContact', contactId: btn.getAttribute('data-directory-delete') }; render(); };
+  });
+  document.querySelectorAll('[data-directory-message]').forEach(btn => {
+    btn.onclick = () => showToast(tr('L\'envoi de message n\'est pas encore disponible dans ce prototype.', 'Sending a message isn\'t wired up in this prototype yet.'));
+  });
+  document.querySelectorAll('[data-directory-call]').forEach(btn => {
+    btn.onclick = () => showToast(tr('L\'appel n\'est pas encore disponible dans ce prototype.', 'Calling isn\'t wired up in this prototype yet.'));
+  });
+  document.querySelectorAll('[data-directory-tour]').forEach(btn => {
+    btn.onclick = () => {
+      const c = state.contacts.find(c => c.id === btn.getAttribute('data-directory-tour'));
+      if (c) startTourForContact(c);
+    };
+  });
+}
+
+/* ----- Screen: fiche contact (ajout / modification) ----- */
+
+function contactFormValid(f) {
+  return !!(f.prenom.trim() && f.nom.trim());
+}
+
+function renderContactFormScreen() {
+  const f = state.contactFormDraft;
+  if (!f) return '';
+  const editing = !!f.id;
+  const valid = contactFormValid(f);
+  const reason = tr('Renseignez au moins le prénom et le nom.', 'Fill in at least the first and last name.');
+
+  return `
+    <div class="page-card contact-form-card">
+      <p class="helper-text" style="margin:0;">${tr('Veuillez remplir les informations obligatoires ci-dessous pour enregistrer le contact dans la base de données.', 'Fill in the required information below to save the contact.')}</p>
+      <div class="field">
+        <label class="field-label" for="cf-prenom">${tr('Prénom', 'First name')} <span class="req">*</span></label>
+        <input class="input" id="cf-prenom" value="${esc(f.prenom)}" placeholder="${tr('Ex: Jean', 'E.g. John')}">
+      </div>
+      <div class="field">
+        <label class="field-label" for="cf-nom">${tr('Nom', 'Last name')} <span class="req">*</span></label>
+        <input class="input" id="cf-nom" value="${esc(f.nom)}" placeholder="${tr('Ex: Dupont', 'E.g. Smith')}">
+      </div>
+      <div class="field">
+        <label class="field-label" for="cf-tel">${tr('Numéro de téléphone', 'Phone number')}</label>
+        <div class="input-icon-group">${icon('phone')}<input class="input" id="cf-tel" type="tel" value="${esc(f.tel)}" placeholder="${tr('Ex: +1 (418) 123-4567', 'E.g. +1 (418) 123-4567')}"></div>
+      </div>
+      <div class="field">
+        <label class="field-label" for="cf-email">${tr('Adresse email', 'Email address')}</label>
+        <div class="input-icon-group">${icon('mail')}<input class="input" id="cf-email" type="email" value="${esc(f.email)}" placeholder="${tr('Ex: jean.dupont@gmail.com', 'E.g. jean.dupont@gmail.com')}"></div>
+      </div>
+      <div class="contact-form-prefs">
+        <p class="contact-form-prefs-title">${tr('Type de contact & Permissions', 'Contact type & permissions')}</p>
+        <div class="contact-form-checks">
+          <label class="check-inline"><input type="checkbox" id="cf-acheteur" ${f.acheteur ? 'checked' : ''}> ${tr('Acheteur', 'Buyer')}</label>
+          <label class="check-inline"><input type="checkbox" id="cf-vendeur" ${f.vendeur ? 'checked' : ''}> ${tr('Vendeur', 'Seller')}</label>
+          <label class="check-inline"><input type="checkbox" id="cf-alerts" ${f.alerts ? 'checked' : ''}> ${tr('Autoriser les alertes SMS / Email', 'Allow SMS / email alerts')}</label>
+        </div>
+      </div>
+      <div class="contact-form-actions">
+        <button class="btn btn-primary" id="contact-save" ${valid ? '' : 'disabled'} title="${valid ? '' : reason}" aria-describedby="contact-save-why">${editing ? tr('Enregistrer les modifications', 'Save changes') : tr('Enregistrer le contact', 'Save contact')}</button>
+        <span id="contact-save-why" class="sr-only">${reason}</span>
+        <button class="btn btn-outline" id="contact-cancel">${tr('Annuler', 'Cancel')}</button>
+      </div>
+    </div>`;
+}
+
+function bindContactFormEvents() {
+  const f = state.contactFormDraft;
+  if (!f) return;
+
+  // Rien de plus, sur cet écran, ne dépend de la frappe que l'état du bouton
+  // « Enregistrer » : on le resynchronise directement au lieu de rejouer tout
+  // le rendu, qui ferait perdre le focus au champ en cours de saisie.
+  const syncSaveState = () => {
+    const btn = document.getElementById('contact-save');
+    if (!btn) return;
+    const ok = contactFormValid(f);
+    btn.disabled = !ok;
+    btn.title = ok ? '' : tr('Renseignez au moins le prénom et le nom.', 'Fill in at least the first and last name.');
+  };
+  const bindField = (id, key, syncButton) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.oninput = () => { f[key] = el.value; if (syncButton) syncSaveState(); };
+  };
+  bindField('cf-prenom', 'prenom', true);
+  bindField('cf-nom', 'nom', true);
+  bindField('cf-tel', 'tel', false);
+  bindField('cf-email', 'email', false);
+  [['cf-acheteur', 'acheteur'], ['cf-vendeur', 'vendeur'], ['cf-alerts', 'alerts']].forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.onchange = () => { f[key] = el.checked; };
+  });
+
+  const cancelBtn = document.getElementById('contact-cancel');
+  if (cancelBtn) cancelBtn.onclick = () => { state.contactFormDraft = null; state.screen = 'directory'; render(); };
+
+  const saveBtn = document.getElementById('contact-save');
+  if (saveBtn) saveBtn.onclick = () => {
+    if (!contactFormValid(f)) return;
+    const payload = {
+      prenom: f.prenom.trim(), nom: f.nom.trim(), tel: f.tel.trim(), email: f.email.trim(),
+      type: { acheteur: f.acheteur, vendeur: f.vendeur }, alerts: f.alerts,
+    };
+    const wasEditing = !!f.id;
+    if (wasEditing) {
+      const idx = state.contacts.findIndex(c => c.id === f.id);
+      if (idx >= 0) state.contacts[idx] = { ...state.contacts[idx], ...payload };
+    } else {
+      state.contacts.push({ id: uid(), ...payload });
+    }
+    state.contactFormDraft = null;
+    state.screen = 'directory';
+    render();
+    showToast(wasEditing ? tr('Contact mis à jour.', 'Contact updated.') : tr('Contact enregistré.', 'Contact saved.'), 'success');
+  };
 }
 
 /* ----- Screen: property detail ----- */
@@ -2829,6 +3222,15 @@ function renderModal() {
     root.innerHTML = renderConfirmModal(tr('Supprimer le tour', 'Delete the tour'), body, 'btn-confirm-delete-tour');
     return;
   }
+  if (state.modal.type === 'confirmDeleteContact') {
+    const c = state.contacts.find(c => c.id === state.modal.contactId);
+    const body = tr(
+      `Cette action supprimera définitivement ${esc(c ? `${c.prenom} ${c.nom}` : 'ce contact')} du répertoire. Cette action est irréversible.`,
+      `This will permanently delete ${esc(c ? `${c.prenom} ${c.nom}` : 'this contact')} from the directory. This action can't be undone.`
+    );
+    root.innerHTML = renderConfirmModal(tr('Supprimer le contact', 'Delete the contact'), body, 'btn-confirm-delete-contact');
+    return;
+  }
   // Nielsen #5 dit prévenir, pas interdire : réencoder un tour d'hier est un
   // besoin réel. On ne bloque donc pas la date passée — on nomme sa
   // conséquence, qui est que le tour quitte la liste où le courtier le cherche.
@@ -3957,13 +4359,14 @@ function bindEvents() {
     };
   });
 
-  // Sidebar nav + mobile menu grid (only "tours" is wired; others show a toast)
+  // Sidebar nav + mobile menu grid (tours, properties and directory are wired; others show a toast)
   document.querySelectorAll('[data-nav]').forEach(el => {
     el.onclick = (e) => {
       e.preventDefault();
       const id = el.getAttribute('data-nav');
       if (id === 'tours') { leaveTour(() => { state.screen = 'list'; state.draft = null; }); return; }
       if (id === 'properties') { leaveTour(() => { state.screen = 'properties'; state.draft = null; }); return; }
+      if (id === 'directory') { leaveTour(() => { state.screen = 'directory'; state.draft = null; state.contactFormDraft = null; }); return; }
       if (id === 'logout') { showToast(tr('Déconnexion — hors scope du prototype.', 'Disconnect — out of scope for this prototype.')); return; }
       showToast(tr('Cette section n\'est pas incluse dans ce prototype.', 'This section isn\'t included in this prototype.'));
     };
@@ -3980,6 +4383,7 @@ function bindEvents() {
     // Sans lien avec un tour en cours : pas de leaveTour, retour direct à la liste.
     if (state.screen === 'propertyAvailability') { state.screen = 'propertyDetail'; state.availMiniCalOpen = false; render(); return; }
     if (state.screen === 'propertyDetail') { state.screen = 'properties'; state.propertyDetailMls = null; render(); return; }
+    if (state.screen === 'contactForm') { state.screen = 'directory'; state.contactFormDraft = null; render(); return; }
     leaveTour(() => {
       if (state.screen === 'contact' || state.screen === 'builder') { state.screen = 'list'; state.draft = null; }
       else { state.screen = 'menu'; }
@@ -4000,6 +4404,8 @@ function bindEvents() {
   if (state.screen === 'properties') bindPropertiesEvents();
   if (state.screen === 'propertyDetail') bindPropertyDetailEvents();
   if (state.screen === 'propertyAvailability') bindAvailabilityEvents();
+  if (state.screen === 'directory') bindDirectoryEvents();
+  if (state.screen === 'contactForm') bindContactFormEvents();
   bindModalEvents();
 }
 
@@ -4995,6 +5401,15 @@ function bindModalEvents() {
       state.draft = null;
       render();
       showToast(tr('Tour de visites supprimé.', 'Buyer\'s tour deleted.'));
+    };
+  }
+  if (state.modal.type === 'confirmDeleteContact') {
+    const btn = document.getElementById('btn-confirm-delete-contact');
+    if (btn) btn.onclick = () => {
+      state.contacts = state.contacts.filter(c => c.id !== state.modal.contactId);
+      state.modal = null;
+      render();
+      showToast(tr('Contact supprimé.', 'Contact deleted.'));
     };
   }
   if (state.modal.type === 'confirmLeave') {
