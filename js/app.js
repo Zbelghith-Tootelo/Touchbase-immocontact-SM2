@@ -1096,6 +1096,13 @@ const state = {
   tours: seedTours(),
   buyers: BUYERS.slice(),
   contacts: CONTACTS.slice(),
+  team: seedTeam(),          // membres de « Mon équipe » (voir seedTeam)
+  teamFilter: 'all',         // all | active | pending
+  teamSelected: [],          // ids cochés dans la liste
+  teamCart: [],              // courtiers choisis dans « Ajouter une personne »
+  teamQuery: '',
+  teamOpen: false,           // liste de suggestions dépliée ou non
+  teamActive: 0,             // suggestion en surbrillance (clavier)
   settingsLangOpen: false,   // accordéon « Langue » des Paramètres
   directoryTab: 'tous',      // tous | acheteurs | vendeurs | prospects | courtiers | favoris
   directorySearch: '',
@@ -1518,7 +1525,7 @@ function navActiveId() {
   const inDirectory = state.screen === 'directory' || state.screen === 'contactForm';
   if (inProperties) return 'properties';
   if (inDirectory) return 'directory';
-  if (state.screen === 'settings') return 'settings';
+  if (state.screen === 'settings' || state.screen === 'team' || state.screen === 'teamAdd') return 'settings';
   return 'tours';
 }
 
@@ -1717,6 +1724,8 @@ function render() {
   else if (state.screen === 'properties') { setTopbarTitle(tr('Mes propriétés', 'My listings')); main.innerHTML = renderPropertiesScreen(); }
   else if (state.screen === 'propertyDetail') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderPropertyDetailScreen(); }
   else if (state.screen === 'propertyAvailability') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderAvailabilityScreen(); }
+  else if (state.screen === 'team') { setTopbarTitle(tr('Mon équipe', 'My team')); main.innerHTML = renderTeamScreen(); }
+  else if (state.screen === 'teamAdd') { setTopbarTitle(tr('Ajouter une personne', 'Add a person')); main.innerHTML = renderTeamAddScreen(); }
   else if (state.screen === 'settings') { setTopbarTitle(tr('Paramètres', 'Settings')); main.innerHTML = renderSettingsScreen(); }
   else if (state.screen === 'directory') { setTopbarTitle(tr('Répertoire', 'Directory')); main.innerHTML = renderDirectoryScreen(); }
   else if (state.screen === 'contactForm') { setTopbarTitle(state.contactFormDraft && state.contactFormDraft.id ? tr('Modifier le contact', 'Edit contact') : tr('Créer un contact', 'Create contact')); main.innerHTML = renderContactFormScreen(); }
@@ -2365,7 +2374,7 @@ function renderSettingsScreen() {
   return `
     <div class="settings-page">
       <div class="settings-user">
-        <img class="settings-user-photo" src="assets/avatar.png" alt="">
+        <img class="settings-user-photo" src="assets/avatar-emma-lucky.jpg" alt="">
         <p class="settings-user-name">Emma<br>Lucky</p>
       </div>
       <div class="settings-options">
@@ -2384,7 +2393,12 @@ function renderSettingsScreen() {
 
 function bindSettingsEvents() {
   document.querySelectorAll('[data-settings-option]').forEach(btn => {
-    btn.onclick = () => showToast(tr('Cette rubrique n\'est pas encore disponible dans ce prototype.', 'This section isn\'t wired up in this prototype yet.'));
+    btn.onclick = () => {
+      if (btn.getAttribute('data-settings-option') === 'team') {
+        state.screen = 'team'; state.teamSelected = []; state.teamFilter = 'all'; render(); return;
+      }
+      showToast(tr('Cette rubrique n\'est pas encore disponible dans ce prototype.', 'This section isn\'t wired up in this prototype yet.'));
+    };
   });
   const toggle = document.getElementById('settings-lang-toggle');
   if (toggle) toggle.onclick = () => { state.settingsLangOpen = !state.settingsLangOpen; render(); const again = document.getElementById('settings-lang-toggle'); if (again) again.focus(); };
@@ -2399,6 +2413,324 @@ function bindSettingsEvents() {
       if (again) again.focus();
     };
   });
+}
+
+/* ----- Screens: mon équipe (liste) et ajouter une personne -----
+   Une personne d'équipe est un courtier qui existe déjà : on le cherche, on le
+   « met au panier », puis une demande part à chacun. Tant qu'il n'a pas
+   répondu, il reste « en attente » ; celui qui demande à nous rejoindre, c'est
+   nous qui l'approuvons. */
+
+const TEAM_MIN_LETTERS = 3;
+const TEAM_SEARCH_LIMIT = 5;
+
+// Annuaire de recherche : des courtiers rattachés à une agence, hors de
+// l'équipe actuelle. `agency` est ce que la recherche compare avec le nom.
+const TEAM_CANDIDATES = [
+  { id: 't1', name: 'Emma Laurent', agency: 'Dynamic Realty', photo: 'assets/team/emma-laurent-v2.jpg' },
+  { id: 't2', name: 'Emma Anderson', agency: 'Dynamic Realty', photo: '' },
+  { id: 't3', name: 'Emma Thompson', agency: 'Dynamic Realty', photo: 'assets/team/emma-thompson-v2.jpg' },
+  { id: 't4', name: 'Sophie Martin', agency: 'Remax Québec', photo: '' },
+  { id: 't5', name: 'Marc Leblanc', agency: 'Century 21', photo: '' },
+  { id: 't6', name: 'Julie Tremblay', agency: 'Sutton Groupe Admiral', photo: '' },
+  { id: 't7', name: 'Alexandre Roy', agency: 'Royal LePage', photo: '' },
+  { id: 't8', name: 'Nathalie Gagnon', agency: 'Proprio Direct', photo: '' },
+  { id: 't9', name: 'Patrick Côté', agency: 'Via Capitale', photo: '' },
+  { id: 't10', name: 'Isabelle Fortin', agency: 'Engel & Völkers Montréal', photo: '' },
+  { id: 't11', name: 'David Bergeron', agency: 'Coldwell Banker', photo: '' },
+  { id: 't12', name: 'Marie-Ève Lavoie', agency: 'Remax Altitude', photo: '' },
+];
+
+// status : 'active' | 'pending-out' (on a invité, il n'a pas répondu) |
+// 'pending-in' (il demande à nous rejoindre — c'est à nous d'approuver).
+function seedTeam() {
+  return [
+    { id: 'me', name: 'Emma Lucky', agency: 'Dynamic Realty', photo: 'assets/avatar-emma-lucky.jpg', status: 'active', isMe: true },
+    { id: 't3', name: 'Emma Thompson', agency: 'Dynamic Realty', photo: 'assets/team/emma-thompson-v2.jpg', status: 'active' },
+    { id: 'm20', name: 'Oliver Thompson', agency: 'Proprio Direct', photo: 'assets/team/oliver-thompson.jpg', status: 'pending-out' },
+    { id: 'm22', name: 'Sophia Williams', agency: 'Royal LePage', photo: 'assets/team/sophia-williams.jpg', status: 'pending-in' },
+    { id: 'm23', name: 'Noah Brown', agency: 'Via Capitale', photo: 'assets/team/noah-brown.jpg', status: 'pending-in' },
+  ];
+}
+
+const TEAM_ICONS = {
+  check: `<svg viewBox="0 0 15 15" width="15" height="15" fill="none" aria-hidden="true"><path d="M13.7871 3.08789C14.1533 3.4541 14.1533 4.04883 13.7871 4.41504L6.28711 11.915C5.9209 12.2813 5.32617 12.2813 4.95996 11.915L1.20996 8.16504C0.84375 7.79883 0.84375 7.2041 1.20996 6.83789C1.57617 6.47168 2.1709 6.47168 2.53711 6.83789L5.625 9.92285L12.4629 3.08789C12.8291 2.72168 13.4238 2.72168 13.79 3.08789H13.7871Z" fill="currentColor"/></svg>`,
+  trash: `<svg viewBox="0 0 12.1875 13.4375" width="15" height="15" fill="none" aria-hidden="true"><path d="M1.25 10.4688V4.21875C1.25 3.95987 1.45987 3.75 1.71875 3.75C1.97763 3.75 2.1875 3.95987 2.1875 4.21875V10.4688C2.1875 11.5906 3.09692 12.5 4.21875 12.5H7.96875C9.09058 12.5 10 11.5906 10 10.4688V4.21875C10 3.95987 10.2099 3.75 10.4688 3.75C10.7276 3.75 10.9375 3.95987 10.9375 4.21875V10.4688C10.9375 12.1083 9.60835 13.4375 7.96875 13.4375H4.21875C2.57915 13.4375 1.25 12.1083 1.25 10.4688ZM4.375 9.84375V6.09375C4.375 5.83487 4.58487 5.625 4.84375 5.625C5.10263 5.625 5.3125 5.83487 5.3125 6.09375V9.84375C5.3125 10.1026 5.10263 10.3125 4.84375 10.3125C4.58487 10.3125 4.375 10.1026 4.375 9.84375ZM6.875 9.84375V6.09375C6.875 5.83487 7.08487 5.625 7.34375 5.625C7.60263 5.625 7.8125 5.83487 7.8125 6.09375V9.84375C7.8125 10.1026 7.60263 10.3125 7.34375 10.3125C7.08487 10.3125 6.875 10.1026 6.875 9.84375ZM6.6748 0C7.24946 1.15181e-05 7.7861 0.287236 8.10486 0.765381L8.8446 1.875H11.7188C11.9776 1.875 12.1875 2.08487 12.1875 2.34375C12.1875 2.60263 11.9776 2.8125 11.7188 2.8125H0.46875C0.209867 2.8125 0 2.60263 0 2.34375C0 2.08487 0.209867 1.875 0.46875 1.875H3.3429L4.08264 0.765381C4.4014 0.287236 4.93804 1.15181e-05 5.5127 0H6.6748ZM5.5127 0.9375C5.25149 0.937512 5.00756 1.06807 4.86267 1.2854L4.4696 1.875H7.7179L7.32483 1.2854C7.17994 1.06807 6.936 0.937512 6.6748 0.9375H5.5127Z" fill="currentColor"/></svg>`,
+  addCircle: `<svg viewBox="0 0 18.1667 18.1667" width="20" height="20" fill="none" aria-hidden="true"><path d="M9.08333 5.75V12.4167M12.4167 9.08333H5.75M9.08333 17.4167C13.6857 17.4167 17.4167 13.6857 17.4167 9.08333C17.4167 4.48096 13.6857 0.75 9.08333 0.75C4.48096 0.75 0.75 4.48096 0.75 9.08333C0.75 13.6857 4.48096 17.4167 9.08333 17.4167Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  checkCircle: `<svg viewBox="0 0 21.5 21.5" width="24" height="24" fill="none" aria-hidden="true"><path d="M10.75 0C16.6871 0 21.5 4.81294 21.5 10.75C21.5 16.6871 16.6871 21.5 10.75 21.5C4.81294 21.5 0 16.6871 0 10.75C0 4.81294 4.81294 0 10.75 0ZM15.4258 7.0127C15.0187 6.63955 14.3859 6.66712 14.0127 7.07422L9.21875 12.3047L7.45703 10.543C7.06651 10.1524 6.43349 10.1524 6.04297 10.543C5.65245 10.9335 5.65245 11.5665 6.04297 11.957L8.54297 14.457C8.73578 14.6498 8.99888 14.7559 9.27148 14.75C9.54417 14.7441 9.803 14.6268 9.9873 14.4258L15.4873 8.42578C15.8605 8.01866 15.8329 7.38587 15.4258 7.0127Z" fill="currentColor"/></svg>`,
+  removeCircle: `<svg viewBox="0 0 20 20" width="22" height="22" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8.6" stroke="currentColor" stroke-width="1.5"/><path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  user: `<svg viewBox="0 0 12.4443 16" width="21" height="27" fill="none" aria-hidden="true"><path d="M6.22 7.5A3.5 3.5 0 106.22.5a3.5 3.5 0 000 7zM0.5 15.5a6.22 6.22 0 0111.44 0" fill="currentColor"/></svg>`,
+};
+
+function teamAvatar(m, size = 50) {
+  return m.photo
+    ? `<img class="team-avatar" src="${esc(m.photo)}" alt="" style="width:${size}px;height:${size}px">`
+    : `<span class="team-avatar team-avatar-fallback" aria-hidden="true" style="width:${size}px;height:${size}px">${TEAM_ICONS.user}</span>`;
+}
+
+function teamStatusLabel(m) {
+  return m.status === 'active' ? tr('Membre actif', 'Active member') : tr('En attente d\'approbation', 'Pending approval');
+}
+
+/* ----- Liste ----- */
+
+// Toujours dans le même ordre, quel que soit le filtre : moi d'abord, puis les
+// membres actifs, puis ceux qui attendent une réponse. Un membre approuvé
+// remonte donc seul parmi les actifs, sans que l'ordre ait à être géré à la main.
+// (`sort` est stable : à rang égal, l'ordre d'ajout est conservé.)
+function teamRank(m) { return m.isMe ? 0 : m.status === 'active' ? 1 : 2; }
+
+function teamVisibleMembers() {
+  return state.team
+    .filter(m => {
+      if (state.teamFilter === 'active') return m.status === 'active';
+      if (state.teamFilter === 'pending') return m.status !== 'active';
+      return true;
+    })
+    .sort((a, b) => teamRank(a) - teamRank(b));
+}
+
+function renderTeamScreen() {
+  // « Tout sélectionner » porte sur ce qui est affiché : cocher des lignes que
+  // le filtre cache, puis agir dessus, serait agir à l'aveugle (Nielsen #1).
+  const selectable = teamVisibleMembers().filter(m => !m.isMe).map(m => m.id);
+  const sel = new Set(state.teamSelected.filter(id => selectable.includes(id)));
+  const allSelected = selectable.length > 0 && selectable.every(id => sel.has(id));
+  const approvable = state.team.filter(m => sel.has(m.id) && m.status === 'pending-in');
+  // Les invitations que nous avons envoyées attendent l'autre personne : elles
+  // ne s'approuvent pas d'ici, et le bouton dit combien de demandes il traite.
+  const approveLabel = allSelected
+    ? tr(`Tout approuver (${approvable.length})`, `Approve all (${approvable.length})`)
+    : tr(`Approuver la sélection (${approvable.length})`, `Approve selected (${approvable.length})`);
+
+  const checkbox = (checked) => `<span class="team-check ${checked ? 'on' : ''}" aria-hidden="true">${checked ? TEAM_ICONS.check : ''}</span>`;
+
+  const bar = `
+    <div class="team-bar">
+      <button class="team-pill team-pill--select ${allSelected ? 'active' : ''}" id="team-select-all" aria-pressed="${allSelected}">${checkbox(allSelected)}<span>${tr('Tout sélectionner', 'Select all')}</span></button>
+      ${approvable.length ? `<button class="team-pill team-pill--approve" id="team-bulk-approve">${TEAM_ICONS.check}${approveLabel}</button>` : ''}
+      ${sel.size ? `<button class="team-pill team-pill--delete" id="team-bulk-delete">${TEAM_ICONS.trash}${tr('Retirer la sélection', 'Remove selected')} (${sel.size})</button>` : ''}
+      <button class="team-pill ${state.teamFilter === 'active' ? 'active' : ''}" data-team-filter="active" aria-pressed="${state.teamFilter === 'active'}">${tr('Membres actifs', 'Active members')}</button>
+      <button class="team-pill ${state.teamFilter === 'pending' ? 'active' : ''}" data-team-filter="pending" aria-pressed="${state.teamFilter === 'pending'}">${tr('En attente d\'approbation', 'Awaiting approval')}</button>
+    </div>`;
+
+  const rows = teamVisibleMembers().map(m => {
+    const isSel = sel.has(m.id);
+    const pending = m.status !== 'active';
+    const who = esc(m.name);
+    const actions = m.isMe ? '' : `
+        <div class="team-row-actions">
+          ${m.status === 'pending-out' ? `<span class="team-wait" title="${tr('En attente de la réponse du courtier', 'Waiting for the agent to answer')}" role="img" aria-label="${tr('En attente de la réponse de', 'Waiting for an answer from')} ${who}">${icon('hourglass')}</span>` : ''}
+          ${m.status === 'pending-in' ? `<button class="team-icon-btn team-icon-btn--approve" data-team-approve="${m.id}" title="${tr('Approuver', 'Approve')} ${who}" aria-label="${tr('Approuver', 'Approve')} ${who}">${TEAM_ICONS.check}</button>` : ''}
+          <button class="team-icon-btn team-icon-btn--remove" data-team-remove="${m.id}" title="${tr('Retirer de l\'équipe', 'Remove from team')}" aria-label="${tr('Retirer', 'Remove')} ${who} ${tr('de l\'équipe', 'from the team')}">${TEAM_ICONS.trash}</button>
+        </div>`;
+    return `
+      <div class="team-row ${isSel ? 'selected' : ''}">
+        ${m.isMe ? '<span class="team-check-spacer"></span>' : `<button class="team-row-check" data-team-toggle="${m.id}" aria-pressed="${isSel}" aria-label="${tr('Sélectionner', 'Select')} ${who}">${checkbox(isSel)}</button>`}
+        ${teamAvatar(m)}
+        <div class="team-row-text">
+          <p class="team-row-name">${who}${m.isMe ? ` (${tr('moi', 'me')})` : ''}</p>
+          <p class="team-row-status ${pending ? 'pending' : 'active'}">${teamStatusLabel(m)}</p>
+        </div>
+        ${actions}
+      </div>`;
+  }).join('');
+
+  const empty = rows ? '' : `<div class="empty-state"><p>${tr('Aucun membre ne correspond à ce filtre.', 'No member matches this filter.')}</p></div>`;
+
+  return `
+    <div class="team-page">
+      ${bar}
+      <div class="team-list" aria-live="polite">${rows}${empty}</div>
+      <button class="btn btn-primary team-add-btn" id="team-add-open">${icon('plus')} ${tr('Ajouter un membre', 'Add team member')}</button>
+    </div>`;
+}
+
+function bindTeamEvents() {
+  const selectable = teamVisibleMembers().filter(m => !m.isMe).map(m => m.id);
+  const keepFocus = (selector) => { const el = document.querySelector(selector); if (el) el.focus(); };
+
+  const selectAll = document.getElementById('team-select-all');
+  if (selectAll) selectAll.onclick = () => {
+    const all = selectable.length > 0 && selectable.every(id => state.teamSelected.includes(id));
+    state.teamSelected = all ? [] : selectable.slice();
+    render(); keepFocus('#team-select-all');
+  };
+  document.querySelectorAll('[data-team-toggle]').forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.getAttribute('data-team-toggle');
+      state.teamSelected = state.teamSelected.includes(id) ? state.teamSelected.filter(x => x !== id) : [...state.teamSelected, id];
+      render(); keepFocus(`[data-team-toggle="${id}"]`);
+    };
+  });
+  document.querySelectorAll('[data-team-filter]').forEach(btn => {
+    btn.onclick = () => {
+      const f = btn.getAttribute('data-team-filter');
+      state.teamFilter = state.teamFilter === f ? 'all' : f;
+      state.teamSelected = [];
+      render(); keepFocus(`[data-team-filter="${f}"]`);
+    };
+  });
+
+  const approve = (ids) => {
+    const set = new Set(ids);
+    let n = 0;
+    state.team.forEach(m => { if (set.has(m.id) && m.status === 'pending-in') { m.status = 'active'; n++; } });
+    state.teamSelected = state.teamSelected.filter(id => !set.has(id));
+    render();
+    if (n) showToast(n > 1 ? tr(`${n} personnes sont maintenant membres actifs.`, `${n} people are now active members.`) : tr('Membre approuvé : il est maintenant actif.', 'Member approved: now active.'), 'success');
+  };
+  document.querySelectorAll('[data-team-approve]').forEach(btn => { btn.onclick = () => approve([btn.getAttribute('data-team-approve')]); });
+  const bulkApprove = document.getElementById('team-bulk-approve');
+  if (bulkApprove) bulkApprove.onclick = () => approve(state.teamSelected);
+
+  // Retirer quelqu'un annule une invitation ou une adhésion : on confirme, en
+  // nommant la personne, plutôt que de la faire disparaître d'un clic.
+  document.querySelectorAll('[data-team-remove]').forEach(btn => {
+    btn.onclick = () => { state.modal = { type: 'confirmRemoveTeam', ids: [btn.getAttribute('data-team-remove')] }; render(); };
+  });
+  const bulkDelete = document.getElementById('team-bulk-delete');
+  if (bulkDelete) bulkDelete.onclick = () => { state.modal = { type: 'confirmRemoveTeam', ids: state.teamSelected.slice() }; render(); };
+
+  const open = document.getElementById('team-add-open');
+  if (open) open.onclick = () => { state.screen = 'teamAdd'; state.teamQuery = ''; state.teamCart = []; state.teamOpen = false; state.teamActive = 0; render(); };
+}
+
+/* ----- Ajouter une personne ----- */
+
+function teamSearchResults() {
+  const q = normalizeText(state.teamQuery).trim();
+  if (q.length < TEAM_MIN_LETTERS) return [];
+  const inTeam = new Set(state.team.map(m => m.id));
+  return TEAM_CANDIDATES
+    .filter(c => !inTeam.has(c.id) && normalizeText(`${c.name} ${c.agency}`).includes(q))
+    .slice(0, TEAM_SEARCH_LIMIT);
+}
+
+function renderTeamAddScreen() {
+  const q = state.teamQuery.trim();
+  const long = q.length >= TEAM_MIN_LETTERS;
+  const results = teamSearchResults();
+  const inCart = new Set(state.teamCart.map(c => c.id));
+  const open = state.teamOpen && long;
+  const active = Math.min(state.teamActive, Math.max(0, results.length - 1));
+  const n = state.teamCart.length;
+
+  const options = results.map((c, i) => {
+    const picked = inCart.has(c.id);
+    return `
+        <li class="team-option ${picked ? 'picked' : ''} ${i === active ? 'active' : ''}" role="option" id="team-opt-${i}" aria-selected="${picked}" data-team-pick="${c.id}">
+          ${teamAvatar(c)}
+          <span class="team-option-text"><strong>${esc(c.name)}</strong><span>${esc(c.agency)}</span></span>
+          <span class="team-option-mark ${picked ? 'on' : ''}" aria-hidden="true">${picked ? TEAM_ICONS.checkCircle : TEAM_ICONS.addCircle}</span>
+        </li>`;
+  }).join('');
+  const dropdown = open ? `
+      <ul class="team-dropdown" id="team-listbox" role="listbox" aria-label="${tr('Courtiers trouvés', 'Agents found')}">
+        ${results.length ? options : `<li class="team-dropdown-empty" role="presentation">${tr(`Aucun courtier ne correspond à « ${esc(q)} ». Vérifiez l'orthographe ou essayez le nom d'une agence.`, `No agent matches “${esc(q)}”. Check the spelling or try an agency name.`)}</li>`}
+      </ul>` : '';
+
+  const cart = n ? `
+      <div class="team-cart" aria-label="${tr('Courtiers sélectionnés', 'Selected agents')}">
+        ${state.teamCart.map(c => `
+        <div class="team-row team-row--cart">
+          ${teamAvatar(c)}
+          <div class="team-row-text"><p class="team-row-name">${esc(c.name)}</p><p class="team-row-agency">${esc(c.agency)}</p></div>
+          <button class="team-remove-circle" data-team-uncart="${c.id}" title="${tr('Retirer', 'Remove')}" aria-label="${tr('Retirer', 'Remove')} ${esc(c.name)}">${TEAM_ICONS.removeCircle}</button>
+        </div>`).join('')}
+      </div>` : '';
+
+  const hint = !n && !open
+    ? `<p class="team-empty">${tr('Aucun membre n\'a encore été ajouté.', 'No team member has been added yet.')}<br>${tr('Tapez au moins 3 lettres pour chercher', 'Type at least 3 letters to search')}</p>`
+    : '';
+  const note = n ? `
+      <div class="team-note">
+        ${icon('info')}
+        <p>${tr('Vous pouvez en ajouter plusieurs, puis cliquer sur « Ajouter à mon équipe » : une demande sera envoyée à chaque courtier.', 'You can add several, then click “Add to my team”: a request will be sent to each agent.')}</p>
+      </div>` : '';
+  const reason = tr('Ajoutez au moins un courtier.', 'Add at least one agent.');
+
+  return `
+    <div class="team-page">
+      <div class="team-search-block">
+        <p class="team-title">${tr('Sélectionnez les courtiers à ajouter à votre équipe :', 'Select the agents to add to your team:')}</p>
+        <label class="team-label" for="team-search">${tr('Rechercher par nom ou agence', 'Search by name or agency')}</label>
+        <div class="team-search-wrap" id="team-search-wrap">
+          <div class="team-search ${open ? 'open' : ''}">
+            <input type="text" id="team-search" role="combobox" aria-expanded="${open}" aria-controls="team-listbox" aria-autocomplete="list" ${open && results.length ? `aria-activedescendant="team-opt-${active}"` : ''} value="${esc(state.teamQuery)}" placeholder="${tr('Nom ou agence…', 'Name or agency…')}" autocomplete="off">
+            ${icon('search')}
+          </div>
+          ${dropdown}
+        </div>
+      </div>
+      ${cart}${hint}${note}
+      <div class="team-actions">
+        <button class="btn btn-primary" id="team-submit" ${n ? '' : 'disabled'} aria-describedby="team-submit-why">${tr('Ajouter à mon équipe', 'Add to my team')}</button>
+        <span id="team-submit-why" class="sr-only">${n ? '' : reason}</span>
+        <button class="btn btn-outline" id="team-cancel">${tr('Annuler', 'Cancel')}</button>
+      </div>
+    </div>`;
+}
+
+// Un seul écouteur de clic extérieur, retiré à chaque nouveau rendu : bindEvents
+// repasse ici après chaque render() et en empilerait un par frappe sinon.
+let teamOutsideHandler = null;
+
+function bindTeamAddEvents() {
+  const refocus = () => setTimeout(() => {
+    const el = document.getElementById('team-search');
+    if (el) { el.focus(); el.selectionStart = el.selectionEnd = el.value.length; }
+  }, 0);
+  const pick = (id) => {
+    const c = TEAM_CANDIDATES.find(x => x.id === id);
+    if (!c) return;
+    if (state.teamCart.some(x => x.id === id)) state.teamCart = state.teamCart.filter(x => x.id !== id);
+    else state.teamCart = [...state.teamCart, c];
+    state.teamQuery = ''; state.teamOpen = false; state.teamActive = 0;
+    render(); refocus();
+  };
+
+  const search = document.getElementById('team-search');
+  if (search) {
+    search.oninput = () => { state.teamQuery = search.value; state.teamOpen = true; state.teamActive = 0; render(); refocus(); };
+    search.onfocus = () => { if (!state.teamOpen && state.teamQuery.trim().length >= TEAM_MIN_LETTERS) { state.teamOpen = true; render(); refocus(); } };
+    search.onkeydown = (e) => {
+      const results = teamSearchResults();
+      if (e.key === 'ArrowDown' && results.length) { e.preventDefault(); state.teamOpen = true; state.teamActive = (state.teamActive + 1) % results.length; render(); refocus(); }
+      else if (e.key === 'ArrowUp' && results.length) { e.preventDefault(); state.teamActive = (state.teamActive - 1 + results.length) % results.length; render(); refocus(); }
+      else if (e.key === 'Enter' && state.teamOpen && results.length) { e.preventDefault(); pick(results[Math.min(state.teamActive, results.length - 1)].id); }
+      else if (e.key === 'Escape' && state.teamOpen) { e.preventDefault(); state.teamOpen = false; render(); refocus(); }
+    };
+  }
+  // mousedown plutôt que click : le champ perdrait le focus (et la liste se
+  // refermerait) avant que le clic sur une suggestion n'arrive.
+  document.querySelectorAll('[data-team-pick]').forEach(li => {
+    li.onmousedown = (e) => { e.preventDefault(); pick(li.getAttribute('data-team-pick')); };
+  });
+  document.querySelectorAll('[data-team-uncart]').forEach(btn => {
+    btn.onclick = () => { state.teamCart = state.teamCart.filter(c => c.id !== btn.getAttribute('data-team-uncart')); render(); };
+  });
+
+  if (teamOutsideHandler) document.removeEventListener('mousedown', teamOutsideHandler);
+  teamOutsideHandler = (e) => {
+    const wrap = document.getElementById('team-search-wrap');
+    if (state.screen === 'teamAdd' && state.teamOpen && wrap && !wrap.contains(e.target)) { state.teamOpen = false; render(); }
+  };
+  document.addEventListener('mousedown', teamOutsideHandler);
+
+  const cancel = document.getElementById('team-cancel');
+  if (cancel) cancel.onclick = () => { state.screen = 'team'; state.teamCart = []; render(); };
+  const submit = document.getElementById('team-submit');
+  if (submit) submit.onclick = () => {
+    const added = state.teamCart;
+    if (!added.length) return;
+    state.team.push(...added.map(c => ({ id: c.id, name: c.name, agency: c.agency, photo: c.photo, status: 'pending-out' })));
+    state.teamCart = []; state.teamQuery = ''; state.teamOpen = false;
+    state.screen = 'team';
+    render();
+    const n = added.length;
+    showToast(tr(`${n} demande${n > 1 ? 's' : ''} envoyée${n > 1 ? 's' : ''} · Statut : en attente d'approbation`, `${n} request${n > 1 ? 's' : ''} sent · Status: pending approval`), 'success');
+  };
 }
 
 /* ----- Screen: property detail ----- */
@@ -3588,6 +3920,13 @@ function renderModal() {
     root.innerHTML = renderConfirmModal(tr('Supprimer le tour', 'Delete the tour'), body, 'btn-confirm-delete-tour');
     return;
   }
+  if (state.modal.type === 'confirmRemoveTeam') {
+    const members = state.team.filter(m => state.modal.ids.includes(m.id));
+    const who = members.length === 1 ? esc(members[0].name) : tr(`${members.length} membres`, `${members.length} members`);
+    const body = tr(`${who} sera retiré${members.length > 1 ? 's' : ''} de votre équipe. Une demande en attente sera annulée.`, `${who} will be removed from your team. Any pending request will be cancelled.`);
+    root.innerHTML = renderConfirmModal(tr('Retirer de l\'équipe', 'Remove from team'), body, 'btn-confirm-remove-team', tr('Retirer', 'Remove'));
+    return;
+  }
   if (state.modal.type === 'confirmDeleteContact') {
     const c = state.contacts.find(c => c.id === state.modal.contactId);
     const body = tr(
@@ -4750,6 +5089,8 @@ function bindEvents() {
     // Sans lien avec un tour en cours : pas de leaveTour, retour direct à la liste.
     if (state.screen === 'propertyAvailability') { state.screen = 'propertyDetail'; state.availMiniCalOpen = false; render(); return; }
     if (state.screen === 'propertyDetail') { state.screen = 'properties'; state.propertyDetailMls = null; render(); return; }
+    if (state.screen === 'teamAdd') { state.screen = 'team'; state.teamCart = []; render(); return; }
+    if (state.screen === 'team') { state.screen = 'settings'; state.teamSelected = []; render(); return; }
     if (state.screen === 'contactForm') { state.screen = 'directory'; state.contactFormDraft = null; render(); return; }
     leaveTour(() => {
       if (state.screen === 'contact' || state.screen === 'builder') { state.screen = 'list'; state.draft = null; }
@@ -4779,6 +5120,8 @@ function bindEvents() {
   if (state.screen === 'propertyDetail') bindPropertyDetailEvents();
   if (state.screen === 'propertyAvailability') bindAvailabilityEvents();
   if (state.screen === 'settings') bindSettingsEvents();
+  if (state.screen === 'team') bindTeamEvents();
+  if (state.screen === 'teamAdd') bindTeamAddEvents();
   if (state.screen === 'directory') bindDirectoryEvents();
   if (state.screen === 'contactForm') bindContactFormEvents();
   bindModalEvents();
@@ -5776,6 +6119,18 @@ function bindModalEvents() {
       state.draft = null;
       render();
       showToast(tr('Tour de visites supprimé.', 'Buyer\'s tour deleted.'));
+    };
+  }
+  if (state.modal.type === 'confirmRemoveTeam') {
+    const btn = document.getElementById('btn-confirm-remove-team');
+    if (btn) btn.onclick = () => {
+      const ids = new Set(state.modal.ids);
+      const n = ids.size;
+      state.team = state.team.filter(m => !ids.has(m.id) || m.isMe);
+      state.teamSelected = state.teamSelected.filter(id => !ids.has(id));
+      state.modal = null;
+      render();
+      showToast(n > 1 ? tr(`${n} membres retirés.`, `${n} members removed.`) : tr('Membre retiré.', 'Member removed.'));
     };
   }
   if (state.modal.type === 'confirmDeleteContact') {
