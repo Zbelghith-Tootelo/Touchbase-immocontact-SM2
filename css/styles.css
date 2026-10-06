@@ -1691,6 +1691,35 @@ body[data-screen="contactForm"] .topbar-back { display: inline-flex; }
   .contact-form-actions { max-width: none; }
 }
 
+/* ---------- Paramètres (Figma 5464:7440) ---------- */
+
+.settings-page { display: flex; flex-direction: column; gap: 20px; }
+.settings-user { display: flex; align-items: center; gap: 10px; }
+.settings-user-photo { width: 60px; height: 60px; border-radius: var(--radius-lg); object-fit: cover; flex-shrink: 0; }
+.settings-user-name { margin: 0; font-size: 18px; font-weight: 500; line-height: 1; color: #1a2740; }
+.settings-options { display: flex; flex-direction: column; gap: 13px; }
+.settings-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; min-height: 40px; padding: 10px; text-align: left;
+  background: var(--blanc); border: 1px solid var(--bordures); border-radius: var(--radius-xl);
+  font-size: 16px; font-weight: 400; font-family: inherit; color: var(--texte-principal); cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.settings-option:hover { background: var(--lumiere-principale); border-color: var(--bleu-action-30); }
+.settings-option:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.settings-option img { flex-shrink: 0; }
+.settings-chevron-down { transform: rotate(90deg); transition: transform 0.15s ease; }
+.settings-accordion.open .settings-chevron-down { transform: rotate(-90deg); }
+.settings-lang-panel { display: flex; gap: 10px; padding: 12px 10px 4px; }
+.settings-lang-panel[hidden] { display: none; }
+.settings-lang-choice {
+  height: 32px; padding: 0 16px; border-radius: 50px; border: 1px solid var(--bordures);
+  background: var(--blanc); color: var(--bleu-principal); font-size: 14px; font-weight: 500; font-family: inherit; cursor: pointer;
+}
+.settings-lang-choice.active { background: var(--bleu-secondaire); border-color: var(--bleu-secondaire); color: var(--blanc); }
+.settings-lang-choice:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+@media (prefers-reduced-motion: reduce) { .settings-chevron-down { transition: none; } }
+
 /* ---------- Fiche propriété (Figma 1655:6163) ---------- */
 
 .property-detail-photo { display: block; width: 200px; height: 113px; object-fit: cover; border-radius: var(--radius-lg); margin-bottom: 16px; }

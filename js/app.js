@@ -1096,6 +1096,7 @@ const state = {
   tours: seedTours(),
   buyers: BUYERS.slice(),
   contacts: CONTACTS.slice(),
+  settingsLangOpen: false,   // accordéon « Langue » des Paramètres
   directoryTab: 'tous',      // tous | acheteurs | vendeurs | prospects | courtiers | favoris
   directorySearch: '',
   directoryPage: 1,
@@ -1507,7 +1508,7 @@ function navItemLabel(item) { return tr(item.labelFr, item.labelEn); }
 // Sections câblées dans ce prototype, au-delà du tour de visites. Une section
 // câblée n'affiche plus la réserve « absente de ce prototype », qu'elle soit
 // ou non l'écran courant.
-const WIRED_NAV = new Set(['tours', 'properties', 'directory']);
+const WIRED_NAV = new Set(['tours', 'properties', 'directory', 'settings']);
 
 // Une seule section à la fois se dit « courante » : le tour de visites tant
 // qu'on y est (liste, composition, envoi...), Mes propriétés dès qu'on y entre,
@@ -1517,12 +1518,13 @@ function navActiveId() {
   const inDirectory = state.screen === 'directory' || state.screen === 'contactForm';
   if (inProperties) return 'properties';
   if (inDirectory) return 'directory';
+  if (state.screen === 'settings') return 'settings';
   return 'tours';
 }
 
 // Glyphe blanc dédié par section active, comme le veut la maquette Figma : le
 // reste des icônes n'a qu'une seule teinte, pensée pour le fond clair.
-const NAV_ACTIVE_ICONS = { tours: 'assets/menu/tour-white.svg', properties: 'assets/menu/properties-white.svg', directory: 'assets/menu/directory-white.svg' };
+const NAV_ACTIVE_ICONS = { tours: 'assets/menu/tour-white.svg', properties: 'assets/menu/properties-white.svg', directory: 'assets/menu/directory-white.svg', settings: 'assets/menu/settings-white.svg' };
 
 function renderSidebarNav() {
   const el = document.getElementById('sidebar-nav');
@@ -1715,6 +1717,7 @@ function render() {
   else if (state.screen === 'properties') { setTopbarTitle(tr('Mes propriétés', 'My listings')); main.innerHTML = renderPropertiesScreen(); }
   else if (state.screen === 'propertyDetail') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderPropertyDetailScreen(); }
   else if (state.screen === 'propertyAvailability') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderAvailabilityScreen(); }
+  else if (state.screen === 'settings') { setTopbarTitle(tr('Paramètres', 'Settings')); main.innerHTML = renderSettingsScreen(); }
   else if (state.screen === 'directory') { setTopbarTitle(tr('Répertoire', 'Directory')); main.innerHTML = renderDirectoryScreen(); }
   else if (state.screen === 'contactForm') { setTopbarTitle(state.contactFormDraft && state.contactFormDraft.id ? tr('Modifier le contact', 'Edit contact') : tr('Créer un contact', 'Create contact')); main.innerHTML = renderContactFormScreen(); }
   document.body.dataset.screen = state.screen;
@@ -2330,6 +2333,72 @@ function bindContactFormEvents() {
     render();
     showToast(wasEditing ? tr('Contact mis à jour.', 'Contact updated.') : tr('Contact enregistré.', 'Contact saved.'), 'success');
   };
+}
+
+/* ----- Screen: paramètres -----
+   Un menu de rubriques : chacune ouvrira son propre écran. Seule « Langue »
+   fait déjà quelque chose — la bascule FR/EN du menu y a aussi sa place. */
+
+const SETTINGS_OPTIONS = [
+  { id: 'reception', labelFr: 'Profil de réception', labelEn: 'Reception profile' },
+  { id: 'dispatch', labelFr: 'Répartition des inscriptions', labelEn: 'Listing dispatch' },
+  { id: 'notes', labelFr: 'Notes', labelEn: 'Notes' },
+  { id: 'replacements', labelFr: 'Remplacements', labelEn: 'Replacements' },
+  { id: 'team', labelFr: 'Mon équipe', labelEn: 'My team' },
+  { id: 'feedback', labelFr: 'Commentaires de visite', labelEn: 'Showing feedback' },
+  { id: 'calendarSync', labelFr: 'Synchronisation du calendrier', labelEn: 'Calendar synchronization' },
+  { id: 'communicator', labelFr: 'Touchbase Communicator', labelEn: 'Touchbase Communicator' },
+];
+
+function renderSettingsScreen() {
+  const open = state.settingsLangOpen;
+  const options = SETTINGS_OPTIONS.map(o => `
+      <button class="settings-option" data-settings-option="${o.id}">
+        <span>${esc(tr(o.labelFr, o.labelEn))}</span>
+        <img src="assets/badge-chevron.svg" alt="" width="9" height="15">
+      </button>`).join('');
+  const langs = LANGUAGES.map(l => `
+        <button class="settings-lang-choice ${state.lang === l.id ? 'active' : ''}" data-settings-lang="${l.id}" aria-pressed="${state.lang === l.id}">
+          ${l.id === 'fr' ? 'Français' : 'English'}
+        </button>`).join('');
+
+  return `
+    <div class="settings-page">
+      <div class="settings-user">
+        <img class="settings-user-photo" src="assets/avatar.png" alt="">
+        <p class="settings-user-name">Emma<br>Lucky</p>
+      </div>
+      <div class="settings-options">
+        ${options}
+        <div class="settings-accordion ${open ? 'open' : ''}">
+          <button class="settings-option" id="settings-lang-toggle" aria-expanded="${open}" aria-controls="settings-lang-panel">
+            <span>${tr('Langue', 'Language')}</span>
+            <img class="settings-chevron-down" src="assets/badge-chevron.svg" alt="" width="9" height="15">
+          </button>
+          <div class="settings-lang-panel" id="settings-lang-panel" role="group" aria-label="${tr('Langue', 'Language')}" ${open ? '' : 'hidden'}>${langs}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function bindSettingsEvents() {
+  document.querySelectorAll('[data-settings-option]').forEach(btn => {
+    btn.onclick = () => showToast(tr('Cette rubrique n\'est pas encore disponible dans ce prototype.', 'This section isn\'t wired up in this prototype yet.'));
+  });
+  const toggle = document.getElementById('settings-lang-toggle');
+  if (toggle) toggle.onclick = () => { state.settingsLangOpen = !state.settingsLangOpen; render(); const again = document.getElementById('settings-lang-toggle'); if (again) again.focus(); };
+  document.querySelectorAll('[data-settings-lang]').forEach(btn => {
+    btn.onclick = () => {
+      const lang = btn.getAttribute('data-settings-lang');
+      if (lang === state.lang) return;
+      state.lang = lang;
+      saveLang();
+      render();
+      const again = document.querySelector(`[data-settings-lang="${lang}"]`);
+      if (again) again.focus();
+    };
+  });
 }
 
 /* ----- Screen: property detail ----- */
@@ -4663,6 +4732,7 @@ function bindEvents() {
       const id = el.getAttribute('data-nav');
       if (id === 'tours') { leaveTour(() => { state.screen = 'list'; state.draft = null; }); return; }
       if (id === 'properties') { leaveTour(() => { state.screen = 'properties'; state.draft = null; }); return; }
+      if (id === 'settings') { leaveTour(() => { state.screen = 'settings'; state.draft = null; }); return; }
       if (id === 'directory') { leaveTour(() => { state.screen = 'directory'; state.draft = null; state.contactFormDraft = null; }); return; }
       if (id === 'logout') { showToast(tr('Déconnexion — hors scope du prototype.', 'Disconnect — out of scope for this prototype.')); return; }
       showToast(tr('Cette section n\'est pas incluse dans ce prototype.', 'This section isn\'t included in this prototype.'));
@@ -4708,6 +4778,7 @@ function bindEvents() {
   if (state.screen === 'properties') bindPropertiesEvents();
   if (state.screen === 'propertyDetail') bindPropertyDetailEvents();
   if (state.screen === 'propertyAvailability') bindAvailabilityEvents();
+  if (state.screen === 'settings') bindSettingsEvents();
   if (state.screen === 'directory') bindDirectoryEvents();
   if (state.screen === 'contactForm') bindContactFormEvents();
   bindModalEvents();
