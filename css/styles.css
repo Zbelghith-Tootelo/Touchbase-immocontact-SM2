@@ -77,14 +77,30 @@ a { color: inherit; text-decoration: none; }
   position: sticky;
   top: 0;
   height: 100vh;
+  transition: width 0.18s ease, padding-left 0.18s ease, padding-right 0.18s ease;
 }
 
-.sidebar-top { margin-bottom: 19px; }
+.sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 19px; }
 
-.logo { display: flex; align-items: center; }
+.logo { display: flex; align-items: center; min-width: 0; overflow: hidden; position: relative; }
 /* Hauteur fixe, largeur libre : les deux logotypes de marque n'ont pas le même
    rapport, et une largeur imposée écraserait le plus court. */
 .logo img { display: block; height: 31px; width: auto; }
+/* Icône seule, affichée uniquement menu réduit (voir plus bas) : au repos elle
+   ne prend aucune place dans l'en-tête déplié. */
+.logo .logo-mark { display: none; }
+
+/* Bouton qui réduit le menu aux seules icônes — toujours visible, même rang
+   que le logo, jamais plus loin qu'un clic. */
+.sidebar-collapse-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex-shrink: 0;
+  background: var(--blanc); border: 1px solid var(--bordures); border-radius: var(--radius-md);
+  color: var(--texte-secondaire); cursor: pointer; padding: 0;
+}
+.sidebar-collapse-btn:hover { background: var(--bleu-nav-10); color: var(--bleu-principal); }
+.sidebar-collapse-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.sidebar-collapse-btn svg { width: 16px; height: 16px; transition: transform 0.18s ease; }
 
 .sidebar-nav {
   flex: 1;
@@ -174,6 +190,43 @@ a { color: inherit; text-decoration: none; }
   padding: 0 10px;
 }
 .sidebar-flag img { width: 25px; height: 28px; flex-shrink: 0; }
+
+/* ---------- Sidebar compactée ---------- */
+/* Même convention que `body[data-screen]` : un état global se lit sur <body>,
+   pas sur chaque composant. Tout le monde garde son balisage, seul l'habillage
+   change — pas de rendu séparé à maintenir pour ce mode. */
+body.sidebar-collapsed .sidebar { width: 88px; padding-left: 20px; padding-right: 20px; }
+/* Menu réduit : le logo seul, comme ChatGPT ou Gemini. Au survol (ou au clavier),
+   l'icône cède sa place au bouton pour rouvrir le menu — même case, aucun
+   décalage, et un seul geste à apprendre. */
+body.sidebar-collapsed .sidebar-top { position: relative; justify-content: center; height: 36px; }
+body.sidebar-collapsed .logo { overflow: visible; }
+body.sidebar-collapsed .logo-mark { display: block; transition: opacity 0.15s ease; }
+body.sidebar-collapsed .logo-full { display: none; }
+body.sidebar-collapsed .sidebar-collapse-btn {
+  position: absolute; left: 50%; top: 50%; width: 36px; height: 36px;
+  transform: translate(-50%, -50%);
+  opacity: 0; transition: opacity 0.15s ease, background 0.15s ease;
+}
+body.sidebar-collapsed .sidebar-collapse-btn svg { transform: rotate(180deg); }
+body.sidebar-collapsed .sidebar-top:hover .logo-mark,
+body.sidebar-collapsed .sidebar-top:has(.sidebar-collapse-btn:focus-visible) .logo-mark { opacity: 0; }
+body.sidebar-collapsed .sidebar-top:hover .sidebar-collapse-btn,
+body.sidebar-collapsed .sidebar-collapse-btn:focus-visible { opacity: 1; }
+
+body.sidebar-collapsed .sidebar-nav { align-items: center; }
+body.sidebar-collapsed .nav-item { width: 42px; padding: 0; justify-content: center; gap: 0; }
+body.sidebar-collapsed .nav-item-label { display: none; }
+/* Le badge ne colle plus au texte : il revient se poser sur l'icône, comme un
+   badge de notification classique, plutôt que de laisser un vide à sa place. */
+body.sidebar-collapsed .nav-item { position: relative; }
+body.sidebar-collapsed .nav-badge { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; font-size: 10.5px; }
+
+body.sidebar-collapsed .sidebar-bottom { align-items: center; }
+body.sidebar-collapsed .lang-toggle { display: none; }
+body.sidebar-collapsed #sidebar-logout-label { display: none; }
+body.sidebar-collapsed .sidebar-flag { justify-content: center; padding: 0; }
+body.sidebar-collapsed #sidebar-flag-label { display: none; }
 
 .main-col {
   flex: 1;
@@ -1385,7 +1438,7 @@ body[data-screen="contactForm"] .topbar-back { display: inline-flex; }
   gap: 18px;
 }
 
-.directory-header { display: flex; gap: 20px; align-items: center; }
+.directory-header { display: flex; gap: 12px; align-items: center; }
 .directory-header .btn { flex-shrink: 0; }
 .directory-searchbar {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;
@@ -1405,36 +1458,103 @@ body[data-screen="contactForm"] .topbar-back { display: inline-flex; }
 }
 .directory-pill.active { background: var(--bleu-secondaire); border-color: var(--bleu-secondaire); color: var(--blanc); }
 
-.directory-table { border: 1px solid #e5e7eb; border-radius: var(--radius-md); overflow-x: auto; }
+.directory-add-btn { font-weight: 600; padding: 10px 16px; min-height: 42px; gap: 4px; }
+.directory-add-btn svg { width: 14px; height: 14px; }
+
+/* Tableau seul, ou tableau + fiche côte à côte (Figma 6365:14846) : la fiche
+   prend 320 px, le tableau garde le reste et perd sa colonne Actions — c'est
+   la fiche qui porte les actions du contact sélectionné. */
+.directory-body { display: flex; gap: 24px; align-items: stretch; container-type: inline-size; }
+.directory-table { flex: 1; min-width: 0; align-self: flex-start; border: 1px solid #e5e7eb; border-radius: var(--radius-lg); overflow: hidden; }
 .directory-row {
-  display: grid; grid-template-columns: 180px 160px minmax(200px, 1fr) 140px 180px;
-  align-items: center; gap: 8px; min-height: 50px; min-width: 760px; padding: 8px 16px;
+  display: grid; grid-template-columns: minmax(150px, 230fr) minmax(190px, 300fr) minmax(110px, 150fr) 192px;
+  align-items: center; column-gap: 16px; min-height: 50px; padding: 0 16px;
   border-bottom: 1px solid #e5e7eb; font-size: 14px; font-weight: 500; color: var(--texte-principal);
 }
-/* L'annuaire des courtiers porte une colonne Agence en plus que les contacts
-   qu'on gère soi-même — sa grille a donc une piste de plus. */
 .directory-table-courtier .directory-row {
-  grid-template-columns: 160px 140px 160px minmax(200px, 1fr) 140px 160px;
-  min-width: 900px;
+  grid-template-columns: minmax(150px, 220fr) minmax(100px, 140fr) minmax(170px, 260fr) minmax(110px, 150fr) 100px;
+}
+.directory-body.is-split .directory-row { grid-template-columns: minmax(130px, 260fr) minmax(140px, 280fr) minmax(100px, 168fr); }
+.directory-body.is-split .directory-col-actions { display: none; }
+/* Fenêtre étroite : tableau + fiche ne laissent plus de quoi lire trois
+   colonnes, on garde le nom et le téléphone (le courriel est dans la fiche). */
+@container (max-width: 860px) {
+  .directory-body.is-split .directory-row { grid-template-columns: minmax(120px, 1fr) minmax(100px, 140px); }
+  .directory-body.is-split .directory-row > :nth-child(2) { display: none; }
 }
 .directory-row:last-child { border-bottom: none; }
-.directory-row-head { background: #f9fafb; min-height: 41px; }
+.directory-row-head { background: #f9fafb; min-height: 43px; }
+.directory-row-contact { cursor: pointer; transition: background 0.12s ease; }
+.directory-row-contact:hover { background: var(--lumiere-principale); }
+.directory-row-contact.is-selected { background: var(--lumiere-principale); }
 .directory-cell-muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Alignée à gauche comme Nom/Prénom/Email/Téléphone — pas plaquée contre le
-   bord droit : une colonne qui lit différemment du reste casse la grille de
-   lecture que les quatre autres entêtes installent (loi de Gestalt de
-   continuité). */
+.directory-cell-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.directory-cell-name > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.directory-name-btn {
+  display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0; border: none; background: none;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.directory-name-btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.directory-name-btn:focus-visible { outline: var(--focus-ring); outline-offset: 4px; border-radius: var(--radius-sm); }
+
+.directory-avatar { border-radius: 50%; object-fit: cover; flex-shrink: 0; display: block; }
+.directory-avatar-sm { width: 25px; height: 25px; }
+.directory-avatar-md { width: 36px; height: 36px; }
+.directory-avatar-lg { width: 48px; height: 48px; }
+.directory-avatar-initials {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bleu-action-10); color: var(--bleu-principal); font-weight: 600;
+}
+.directory-avatar-sm.directory-avatar-initials { font-size: 10px; }
+.directory-avatar-md.directory-avatar-initials { font-size: 13px; }
+.directory-avatar-lg.directory-avatar-initials { font-size: 16px; }
+
 .directory-row-actions { display: flex; gap: 10px; justify-content: flex-start; }
 
-/* Même logique que le crochet « Choix de l'acheteur » : l'action porte sa
-   propre teinte plutôt que de se fondre parmi des icônes neutres. */
-.directory-row-actions .btn-icon.danger { background: var(--rouge-10); border-color: transparent; }
-.directory-row-actions .btn-icon.directory-action-mail,
-.directory-row-actions .btn-icon.directory-action-phone,
-.directory-row-actions .btn-icon.directory-action-tour { background: var(--bleu-action-10); border-color: transparent; color: var(--bleu-secondaire); }
-.directory-row-actions .btn-icon.directory-action-mail:hover,
-.directory-row-actions .btn-icon.directory-action-phone:hover,
-.directory-row-actions .btn-icon.directory-action-tour:hover { background: var(--bleu-action-30); }
+/* Bouton d'action 40 px des maquettes : blanc à filet, teinte bleue pour
+   joindre/créer, teinte rouge pour supprimer. Les icônes importées gardent
+   leur couleur propre ; celles en ligne suivent `color`. */
+.dir-btn {
+  width: 40px; height: 40px; padding: 0; flex-shrink: 0; border-radius: var(--radius-lg);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--blanc); border: 1px solid var(--bordures); color: var(--bleu-principal); cursor: pointer;
+  transition: background 0.12s ease;
+}
+.dir-btn:hover { background: var(--neutre-surface); }
+.dir-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.dir-btn img { width: 20px; height: 20px; object-fit: contain; display: block; }
+.dir-btn svg { width: 20px; height: 20px; }
+.dir-btn--blue { background: rgba(0, 102, 220, 0.1); border-color: transparent; color: var(--bleu-secondaire); }
+.dir-btn--blue:hover { background: var(--bleu-action-30); }
+.dir-btn--red { background: rgba(200, 16, 46, 0.1); border-color: transparent; color: var(--rouge-principal); }
+.dir-btn--red:hover { background: var(--rouge-10); }
+.dir-btn-star { color: var(--bleu-principal); }
+.dir-btn-star.is-favorite { color: var(--attention); }
+.dir-btn-star.is-favorite svg path { fill: currentColor; }
+
+/* Fiche du contact sélectionné */
+.directory-preview {
+  position: relative; width: 320px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between;
+  gap: 24px; padding: 24px; border: 1px solid var(--bordures); border-radius: var(--radius-2xl); background: var(--blanc);
+}
+.directory-preview-close {
+  position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: none; border-radius: var(--radius-md); color: var(--texte-secondaire); cursor: pointer;
+}
+.directory-preview-close:hover { background: var(--neutre-surface); color: var(--texte-principal); }
+.directory-preview-close:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+.directory-preview-close svg { width: 16px; height: 16px; }
+.directory-preview-body { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.directory-preview-id { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.directory-preview-name { margin: 0 0 4px; font-size: 20px; font-weight: 600; line-height: 1; color: var(--texte-principal); overflow-wrap: anywhere; }
+.directory-preview-type { margin: 0; font-size: 12px; color: var(--texte-secondaire); }
+.directory-preview-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.directory-preview-label { margin: 0; font-size: 14px; font-weight: 700; color: var(--texte-principal); }
+.directory-preview-value { margin: 0; font-size: 16px; color: var(--texte-principal); overflow-wrap: anywhere; }
+.directory-preview-notes { margin: 0; font-size: 14px; font-weight: 500; line-height: 1.35; color: var(--texte-principal); overflow-wrap: anywhere; }
+.directory-preview-empty { color: var(--texte-secondaire); font-weight: 400; }
+.directory-preview-actions { display: flex; justify-content: space-between; gap: 8px; padding: 20px 16px 0; border-top: 1px solid var(--bordures); }
 
 .directory-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .directory-pagination p { font-size: 14px; font-weight: 500; color: var(--texte-principal); margin: 0; }
@@ -1473,6 +1593,11 @@ body[data-screen="contactForm"] .topbar-back { display: inline-flex; }
     border: 1px solid var(--bordures); border-radius: var(--radius-lg); padding: 14px;
     background: var(--blanc);
   }
+  .directory-card-head { display: flex; align-items: center; gap: 10px; }
+  .directory-preview { display: none; }
+  .directory-body { display: block; }
+  .directory-add-btn { width: 100%; }
+  .directory-searchbar { flex: none; }
   .directory-card-main { min-width: 0; }
   .directory-card-name { margin: 0; font-size: 15px; font-weight: 700; color: var(--texte-principal); }
   .directory-card-line { display: flex; align-items: center; gap: 7px; margin: 5px 0 0; font-size: 13px; color: var(--texte-secondaire); }
@@ -1483,25 +1608,71 @@ body[data-screen="contactForm"] .topbar-back { display: inline-flex; }
      de l'autre) — une bande basse, comme le reste de l'app, reste équilibrée
      que la carte porte deux actions (courtier) ou quatre (contact). */
   .directory-card-actions { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--bordures); }
-  .directory-card-actions .btn-icon { flex: 1; }
+  .directory-card-actions .dir-btn { flex: 1; width: auto; }
 }
 
 /* ---------- Fiche contact (ajout / modification) ---------- */
+/* Figma 6365:15319 / 6365:15426 : champs pleine largeur sur une seule colonne,
+   libellés au-dessus, cases à cocher de 20 px au filet marine. */
 
-.contact-form-prefs { display: flex; flex-direction: column; gap: 16px; padding-top: 8px; }
-.contact-form-prefs-title { font-size: 16px; font-weight: 700; color: var(--bleu-principal); margin: 0; }
-.contact-form-checks { display: flex; gap: 28px; flex-wrap: wrap; }
-.check-inline { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: var(--texte-principal); cursor: pointer; }
-.check-inline input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--bleu-secondaire); margin: 0; }
+.contact-form-card { max-width: 982px; gap: 8px; padding: 0; background: transparent; }
+.cf-header p { margin: 0 0 8px; font-size: 14px; font-weight: 500; color: var(--bleu-principal); }
+.cf-header { border-bottom: 1px solid var(--bordures); margin-bottom: 4px; }
+.cf-section-title { margin: 0; padding: 0; font-size: 18px; font-weight: 500; line-height: 1; color: var(--bleu-principal); }
 
-.input-icon-group { display: flex; align-items: center; gap: 10px; border: 1px solid var(--bordures); border-radius: var(--radius-md); padding: 0 14px; }
-.input-icon-group svg { width: 18px; height: 18px; color: var(--texte-secondaire); flex-shrink: 0; }
-.input-icon-group input { flex: 1; min-width: 0; border: none; padding: 12px 0; font-size: 15px; background: transparent; font-family: inherit; }
-.input-icon-group input:focus { outline: none; }
-.input-icon-group:focus-within { border-color: var(--bleu-secondaire); }
+.cf-photo { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.cf-photo-row { display: flex; align-items: flex-end; gap: 12px; }
+.cf-avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: var(--bleu-principal); }
+.cf-photo-actions { display: flex; gap: 8px; width: 220px; }
+.cf-photo-btn {
+  flex: 1; min-width: 0; height: 42px; padding: 0 16px; border-radius: var(--radius-lg);
+  border: 1px solid var(--bordures); background: var(--blanc); color: var(--bleu-principal);
+  font-size: 16px; font-family: inherit; cursor: pointer;
+}
+.cf-photo-btn:hover { background: var(--lumiere-principale); }
+.cf-photo-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 
-.contact-form-actions { display: flex; flex-direction: column; gap: 12px; max-width: 340px; margin-top: 8px; }
-.contact-form-actions .btn { width: 100%; }
+.cf-fields { display: flex; flex-direction: column; gap: 20px; margin-top: 12px; }
+.cf-field { display: flex; flex-direction: column; gap: 8px; }
+.cf-label { font-size: 14px; font-weight: 500; color: var(--texte-principal); }
+.cf-input {
+  width: 100%; padding: 12px 16px; border: 1px solid var(--bordures); border-radius: var(--radius-lg);
+  background: var(--blanc); color: var(--texte-principal); font-size: 16px; font-family: inherit; line-height: 1.1;
+}
+.cf-input::placeholder, .cf-notes::placeholder { color: #b1b1b1; }
+.cf-input:focus, .cf-notes:focus { outline: none; border-color: var(--bleu-secondaire); }
+.cf-field-notes { gap: 5px; }
+.cf-field-notes .cf-label { color: #1a2740; }
+.cf-notes {
+  width: 100%; min-height: 64px; padding: 10px; resize: vertical;
+  border: 1px solid #aabbcc; border-radius: 10px; background: var(--blanc);
+  color: var(--texte-principal); font-size: 14px; font-family: inherit; line-height: 1.3;
+}
+
+.cf-group { border: none; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.cf-group legend { float: left; width: 100%; margin-bottom: 12px; }
+.cf-group legend + .cf-checks { clear: both; }
+.cf-checks { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+.cf-check-label { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; color: var(--texte-principal); cursor: pointer; }
+.cf-check {
+  appearance: none; -webkit-appearance: none; flex-shrink: 0; margin: 0;
+  width: 20px; height: 20px; border: 1px solid var(--bleu-principal); border-radius: 4px; background: var(--blanc); cursor: pointer;
+}
+.cf-check:checked {
+  background: var(--bleu-principal) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 6.3l2.4 2.4 4.6-5' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px no-repeat;
+}
+.cf-check:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+.contact-form-actions { display: flex; flex-direction: column; gap: 12px; max-width: 340px; margin-top: 12px; }
+.contact-form-actions .btn { width: 100%; min-height: 42px; }
+.contact-form-actions .btn-outline { font-weight: 700; border-color: var(--bordures); }
+.contact-form-actions .btn-primary:disabled { background: #b1b1b1; border-color: #b1b1b1; color: var(--texte-secondaire); opacity: 1; }
+
+@media (max-width: 768px) {
+  .contact-form-card { padding: 0; }
+  .cf-photo-actions { width: auto; flex: 1; }
+  .contact-form-actions { max-width: none; }
+}
 
 /* ---------- Fiche propriété (Figma 1655:6163) ---------- */
 

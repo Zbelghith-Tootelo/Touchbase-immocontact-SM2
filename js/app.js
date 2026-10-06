@@ -218,6 +218,27 @@ const CONTACTS = [
   { id: 'c24', prenom: 'Emma', nom: 'Lévesque', email: 'emma.levesque@example.com', tel: '450 555 1122', type: { acheteur: true, vendeur: true }, alerts: true },
 ];
 
+// Photos de la maquette, rattachées aux dix premiers contacts ; les autres
+// retombent sur leurs initiales. `alerts` (ancien interrupteur unique) devient
+// les deux canaux préférés de la maquette : un contact qui acceptait les alertes
+// les reçoit par courriel.
+const CONTACT_PHOTOS = {
+  c1: 'jean-dupont', c2: 'sophie-martin', c3: 'marc-lefebvre', c4: 'camille-durand', c5: 'pierre-bernard',
+  c6: 'juliette-sophie', c7: 'clara-leroux', c8: 'elodie-dufresne', c9: 'margaux-benoit', c10: 'chloe-gagnon',
+};
+const CONTACT_PROSPECTS = new Set(['c13', 'c15', 'c18']);
+const CONTACT_FAVORITES = new Set(['c1', 'c4', 'c7']);
+CONTACTS.forEach(c => {
+  c.type.prospect = CONTACT_PROSPECTS.has(c.id);
+  c.type.agent = false;
+  c.comm = { sms: false, email: !!c.alerts };
+  delete c.alerts;
+  c.favorite = CONTACT_FAVORITES.has(c.id);
+  c.photo = CONTACT_PHOTOS[c.id] ? `assets/directory/avatar-${CONTACT_PHOTOS[c.id]}.jpg` : null;
+  c.notes = '';
+});
+CONTACTS[0].notes = { fr: 'Cherche une maison jumelée à Boucherville, pas un condo.', en: 'Looking for a semi-detached home in Boucherville, not a condominium.' };
+
 const COURTIERS_INSCRIPTEURS = ['Marie-Ève Gagnon', 'Patrick Simard', 'Nathalie Côté', 'Éric Bouchard', 'Sylvie Paquette'];
 
 // Annuaire des courtiers inscripteurs, commun aux deux plateformes. Une
@@ -388,7 +409,7 @@ const AVAILABILITY_TAGS = {
   'visite-libre': { id: 'visite-libre', labelFr: 'Visite libre', labelEn: 'Open showing', tone: 'ok' },
   'pre-approuve': { id: 'pre-approuve', labelFr: 'Pré-approuvée', labelEn: 'Pre-approved', tone: 'info' },
   impossible:     { id: 'impossible', labelFr: 'Impossible dans cette plage horaire', labelEn: 'Not available at this time', tone: 'danger' },
-  none:           { id: 'none', labelFr: 'Besoin d\'approbation du courtier', labelEn: 'Needs broker approval', tone: 'warn' },
+  none:           { id: 'none', labelFr: 'Besoin d\'approbation du courtier', labelEn: 'Needs agent approval', tone: 'warn' },
 };
 function availabilityTagLabel(tag) { return tag ? tr(tag.labelFr, tag.labelEn) : ''; }
 // `date` par défaut celle du tour, mais le formulaire de demande de visite
@@ -744,15 +765,15 @@ const STOP_STATUSES = {
   // Bac à sable : la propriété est retenue, rien n'est parti. Pas de libellé —
   // il n'y a rien à dire d'un état qui n'engage personne.
   sandbox:   { labelFr: '', labelEn: '', shortFr: 'Bac à sable', shortEn: 'Sandbox', tone: 'none', action: false },
-  pending:   { labelFr: 'En attente de confirmation du courtier inscripteur', labelEn: 'Awaiting confirmation from listing broker', shortFr: 'En attente', shortEn: 'Pending', tone: 'pending', action: true },
+  pending:   { labelFr: 'En attente de confirmation du courtier inscripteur', labelEn: 'Awaiting confirmation from listing agent', shortFr: 'En attente', shortEn: 'Pending', tone: 'pending', action: true },
   confirmed: { labelFr: 'Confirmée', labelEn: 'Confirmed', shortFr: 'Confirmée', shortEn: 'Confirmed', tone: 'ok', action: false },
   proposed:  { labelFr: 'Autre créneau proposé', labelEn: 'Alternate time proposed', shortFr: 'Contre-proposition', shortEn: 'Counter-offer', tone: 'warn', action: true },
   refused:   { labelFr: 'Visite refusée', labelEn: 'Visit declined', shortFr: 'Refusée', shortEn: 'Declined', tone: 'danger', action: true },
-  noreply:   { labelFr: 'Sans réponse du courtier', labelEn: 'No response from broker', shortFr: 'Sans réponse', shortEn: 'No response', tone: 'muted', action: true },
+  noreply:   { labelFr: 'Sans réponse du courtier', labelEn: 'No response from agent', shortFr: 'Sans réponse', shortEn: 'No response', tone: 'muted', action: true },
   // Distinct du refus : un refus répond à une demande jamais accordée, une
   // annulation retire une confirmation qui existait. L'heure était promise,
   // parfois déjà transmise à l'acheteur — le tour recule d'une case.
-  cancelled: { labelFr: 'Visite annulée par le courtier inscripteur', labelEn: 'Visit cancelled by listing broker', shortFr: 'Annulée', shortEn: 'Cancelled', tone: 'danger', action: true },
+  cancelled: { labelFr: 'Visite annulée par le courtier inscripteur', labelEn: 'Visit cancelled by listing agent', shortFr: 'Annulée', shortEn: 'Cancelled', tone: 'danger', action: true },
 };
 function stopStatusLabel(status) { const m = STOP_STATUSES[status]; return m ? tr(m.labelFr, m.labelEn) : ''; }
 function stopStatusShort(status) { const m = STOP_STATUSES[status]; return m ? tr(m.shortFr, m.shortEn) : ''; }
@@ -935,7 +956,7 @@ function seedTours() {
 const FEATURE_FLAGS = [
   { group: 'Sources de propriétés', groupEn: 'Listing sources', id: 'mlsCart', labelFr: 'Panier et recherche MLS', labelEn: 'MLS search and cart', helpFr: 'Onglets Panier et MLS dans « Ajouter une destination ». Désactivé, on obtient le comportement ImmoContact, sans catalogue MLS.', helpEn: 'Cart and MLS tabs in "Add a destination". Disabled, you get the ImmoContact behavior, with no MLS catalogue.', default: false, wired: true },
 
-  { group: 'Démo', groupEn: 'Demo', id: 'simulateConfirmation', labelFr: 'Simuler la réponse des courtiers', labelEn: 'Simulate broker responses', helpFr: 'Rend le statut de chaque visite cliquable pour basculer entre « À confirmer » et « Confirmée ». Outil de démo : en production, seul le courtier inscripteur confirme.', helpEn: 'Makes each visit\'s status clickable to toggle between "To confirm" and "Confirmed". A demo tool: in production, only the listing broker confirms.', default: true, wired: true },
+  { group: 'Démo', groupEn: 'Demo', id: 'simulateConfirmation', labelFr: 'Simuler la réponse des courtiers', labelEn: 'Simulate agent responses', helpFr: 'Rend le statut de chaque visite cliquable pour basculer entre « À confirmer » et « Confirmée ». Outil de démo : en production, seul le courtier inscripteur confirme.', helpEn: 'Makes each visit\'s status clickable to toggle between "To confirm" and "Confirmed". A demo tool: in production, only the listing agent confirms.', default: true, wired: true },
   { group: 'Démo', groupEn: 'Demo', id: 'tourOptimize', labelFr: 'Optimiser le tour', labelEn: 'Optimize the tour', helpFr: 'Affiche le bouton « Optimiser le tour » dans le constructeur, qui réordonne les arrêts par proximité géographique. Désactivé, le tour ne se compose que par glisser-déposer manuel.', helpEn: 'Shows the "Optimize the tour" button in the builder, which reorders stops by geographic proximity. Disabled, the tour can only be arranged by manual drag-and-drop.', default: false, wired: true },
 ];
 
@@ -949,8 +970,8 @@ const FEATURE_FLAGS = [
 // largeur : elle est portée ici pour que le bandeau réserve la bonne place
 // avant que le SVG soit chargé.
 const PLATFORMS = [
-  { id: 'immocontact', label: 'ImmoContact', brand: 'Immocontact', logo: 'assets/logo-immocontact.svg', logoWidth: 184, helpFr: 'Adresse libre, sans catalogue MLS ni Panier.', helpEn: 'Free-form address, no MLS catalogue or cart.' },
-  { id: 'touchbase', label: 'Touchbase', brand: 'Touchbase', logo: 'assets/logo-touchbase.svg', logoWidth: 160, helpFr: 'Catalogue MLS et Panier ; la propriété passe par un courtier.', helpEn: 'MLS catalogue and cart; the listing goes through a broker.' },
+  { id: 'immocontact', label: 'ImmoContact', brand: 'Immocontact', logo: 'assets/logo-immocontact.svg', logoWidth: 184, favicon: 'assets/favicon-immocontact.svg', helpFr: 'Adresse libre, sans catalogue MLS ni Panier.', helpEn: 'Free-form address, no MLS catalogue or cart.' },
+  { id: 'touchbase', label: 'Touchbase', brand: 'Touchbase', logo: 'assets/logo-touchbase.svg', logoWidth: 160, favicon: 'assets/favicon-touchbase.svg', helpFr: 'Catalogue MLS et Panier ; la propriété passe par un courtier.', helpEn: 'MLS catalogue and cart; the listing goes through an agent.' },
 ];
 
 // Chaque preset décrit la plateforme en entier, y compris les comportements pas
@@ -1037,6 +1058,18 @@ function loadLang() {
 function saveLang() {
   try { localStorage.setItem(LANG_STORAGE_KEY, state.lang); } catch (e) { /* ignore */ }
 }
+
+/* ---------------- Menu compacté ---------------- */
+// Préférence d'affichage, pas une donnée du tour : elle doit survivre à un
+// rechargement comme la langue ou la marque, mais n'a rien à faire dans l'état
+// d'un tour ou d'un contact.
+const SIDEBAR_COLLAPSED_KEY = 'ic-buyers-tour-sidebar-collapsed-v1';
+function loadSidebarCollapsed() {
+  try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch (e) { return false; }
+}
+function saveSidebarCollapsed() {
+  try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, state.sidebarCollapsed ? '1' : '0'); } catch (e) { /* ignore */ }
+}
 // Nommé `tr`, pas `t` : ce dernier sert déjà partout comme nom de variable
 // locale (tour, type…) — un helper global `t()` serait masqué par ces
 // variables dans la plupart des fonctions où on en a justement besoin.
@@ -1048,6 +1081,7 @@ const state = {
   flags: loadFlags(),
   brandPlatform: loadBrandPlatform(), // marque affichée — ne suit que le dernier preset cliqué, voir renderBrand()
   lang: loadLang(),
+  sidebarCollapsed: loadSidebarCollapsed(),
   screen: 'list',           // list | contact | buyerForm | builder | properties
   listTab: 'upcoming',      // upcoming | past
   listSearch: '',
@@ -1060,10 +1094,11 @@ const state = {
   tours: seedTours(),
   buyers: BUYERS.slice(),
   contacts: CONTACTS.slice(),
-  directoryTab: 'tous',      // tous | acheteurs | vendeurs | courtiers
+  directoryTab: 'tous',      // tous | acheteurs | vendeurs | prospects | courtiers | favoris
   directorySearch: '',
   directoryPage: 1,
-  contactFormDraft: null,    // { id?, prenom, nom, tel, email, acheteur, vendeur, alerts, touched }
+  directorySelectedId: null, // contact dont la fiche est ouverte à droite du tableau
+  contactFormDraft: null,    // { id?, prenom, nom, tel, email, notes, photo, acheteur, vendeur, prospect, agent, sms, emailPref }
   draft: null,              // tour being created/edited
   editingTourId: null,      // if editing an existing tour from the list
   contactSearch: '',
@@ -1204,7 +1239,7 @@ function groupSameSlot(stop) {
       ? `Visite déplacée à ${slotStartFr} : la confirmation du courtier est à redemander.`
       : `Les deux visites sont demandées à ${slotStart ? slotStartFr : 'la même heure'}.`,
     wasConfirmed
-      ? `Visit moved to ${slotStartEn}: the broker's confirmation needs to be requested again.`
+      ? `Visit moved to ${slotStartEn}: the agent's confirmation needs to be requested again.`
       : `Both visits are requested at ${slotStart ? slotStartEn : 'the same time'}.`
   ), wasConfirmed ? 'default' : 'success');
 }
@@ -1301,10 +1336,10 @@ function sendStopRequest(stop) {
   const autoConfirmed = effectiveStopStatus(stop) === 'confirmed';
   showToast(autoConfirmed ? tr(
     `Visite confirmée automatiquement chez ${stop.courtier || 'ce courtier inscripteur'} — ce créneau est déjà ouvert à la visite.`,
-    `Visit automatically confirmed with ${stop.courtier || 'this listing broker'} — that time slot is already open for showing.`
+    `Visit automatically confirmed with ${stop.courtier || 'this listing agent'} — that time slot is already open for showing.`
   ) : tr(
     `Demande de visite envoyée à ${stop.courtier || 'son courtier inscripteur'}${stop.lockedStart ? ` pour ${stop.lockedStart.replace(':', 'h')}` : ''}.`,
-    `Visit request sent to ${stop.courtier || 'the listing broker'}${stop.lockedStart ? ` for ${stop.lockedStart}` : ''}.`
+    `Visit request sent to ${stop.courtier || 'the listing agent'}${stop.lockedStart ? ` for ${stop.lockedStart}` : ''}.`
   ), 'success');
 }
 
@@ -1329,8 +1364,8 @@ function sendTourToBrokers(notifyBuyer, selectedIds = null) {
       ? `${targets.length} demande${targets.length > 1 ? 's' : ''} de visite envoyée${targets.length > 1 ? 's' : ''} aux courtiers inscripteurs et à l'acheteur${suffix}.`
       : `${targets.length} demande${targets.length > 1 ? 's' : ''} de visite envoyée${targets.length > 1 ? 's' : ''} aux courtiers inscripteurs${suffix}.`,
     notifyBuyer
-      ? `${targets.length} visit request${targets.length > 1 ? 's' : ''} sent to the listing brokers and to the buyer${suffix}.`
-      : `${targets.length} visit request${targets.length > 1 ? 's' : ''} sent to the listing brokers${suffix}.`
+      ? `${targets.length} visit request${targets.length > 1 ? 's' : ''} sent to the listing agents and to the buyer${suffix}.`
+      : `${targets.length} visit request${targets.length > 1 ? 's' : ''} sent to the listing agents${suffix}.`
   ), 'success');
 }
 
@@ -1344,8 +1379,8 @@ function saveDraftToTour(notify, notifyBuyer = false) {
     !notify
       ? tr('Modifications enregistrées.', 'Changes saved.')
       : notifyBuyer
-        ? tr('Modifications enregistrées et mise à jour envoyée aux courtiers concernés et à l\'acheteur.', 'Changes saved and an update sent to the brokers involved and to the buyer.')
-        : tr('Modifications enregistrées et mise à jour envoyée aux courtiers concernés.', 'Changes saved and an update sent to the brokers involved.'),
+        ? tr('Modifications enregistrées et mise à jour envoyée aux courtiers concernés et à l\'acheteur.', 'Changes saved and an update sent to the agents involved and to the buyer.')
+        : tr('Modifications enregistrées et mise à jour envoyée aux courtiers concernés.', 'Changes saved and an update sent to the agents involved.'),
     'success'
   );
 }
@@ -1500,10 +1535,11 @@ function renderSidebarNav() {
     const hors = WIRED_NAV.has(item.id) ? '' : tr(' — section absente de ce prototype', ' — not wired up in this prototype');
     return `
     <a href="#" class="nav-item ${active ? 'active' : ''}" data-nav="${item.id}"
-      ${active ? 'aria-current="page"' : `title="${esc(label)}${hors}"`}
+      title="${esc(label)}${hors}"
+      ${active ? 'aria-current="page"' : ''}
       aria-label="${esc(label)}${item.badge ? `, ${item.badge} ${tr('en attente', 'pending')}` : ''}${hors}">
       <span class="nav-icon"><img src="${iconSrc}" alt=""></span>
-      ${esc(label)}
+      <span class="nav-item-label">${esc(label)}</span>
       ${item.badge ? `<span class="nav-badge" aria-hidden="true">${item.badge}</span>` : ''}
     </a>`;
   }).join('');
@@ -1551,6 +1587,15 @@ function renderBrand() {
     img.setAttribute('alt', p.brand);
     img.setAttribute('width', p.logoWidth);
   });
+  // Même logique que le logo complet, pour la version icône seule affichée
+  // menu réduit : elle doit suivre la plateforme active, pas rester figée sur
+  // la marque par défaut.
+  document.querySelectorAll('[data-brand-favicon]').forEach(img => {
+    if (img.getAttribute('src') === p.favicon) return;
+    img.setAttribute('src', p.favicon);
+    img.setAttribute('alt', p.brand);
+    img.setAttribute('title', p.brand);
+  });
   document.title = `${p.brand} — ${tr('Tour de visites', 'Buyer\'s tours')}`;
 }
 
@@ -1585,6 +1630,15 @@ function syncStaticChrome() {
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
+  // Le libellé dépend à la fois de la langue et de l'état courant (réduire vs
+  // agrandir) : ni un simple `data-i18n`, ni un texte figé dans le HTML ne suffit.
+  const collapseBtn = document.getElementById('sidebar-collapse-btn');
+  if (collapseBtn) {
+    const label = state.sidebarCollapsed ? tr('Agrandir le menu', 'Expand menu') : tr('Réduire le menu', 'Collapse menu');
+    collapseBtn.title = label;
+    collapseBtn.setAttribute('aria-label', label);
+    collapseBtn.setAttribute('aria-expanded', state.sidebarCollapsed ? 'false' : 'true');
+  }
 }
 
 function setTopbarTitle(title) {
@@ -1611,9 +1665,10 @@ function render() {
   else if (state.screen === 'properties') { setTopbarTitle(tr('Mes propriétés', 'My listings')); main.innerHTML = renderPropertiesScreen(); }
   else if (state.screen === 'propertyDetail') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderPropertyDetailScreen(); }
   else if (state.screen === 'propertyAvailability') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderAvailabilityScreen(); }
-  else if (state.screen === 'directory') { setTopbarTitle(tr('Répertoire des contacts', 'Contacts directory')); main.innerHTML = renderDirectoryScreen(); }
-  else if (state.screen === 'contactForm') { setTopbarTitle(state.contactFormDraft && state.contactFormDraft.id ? tr('Modifier le contact', 'Edit contact') : tr('Nouveau contact', 'New contact')); main.innerHTML = renderContactFormScreen(); }
+  else if (state.screen === 'directory') { setTopbarTitle(tr('Répertoire', 'Directory')); main.innerHTML = renderDirectoryScreen(); }
+  else if (state.screen === 'contactForm') { setTopbarTitle(state.contactFormDraft && state.contactFormDraft.id ? tr('Modifier le contact', 'Edit contact') : tr('Créer un contact', 'Create contact')); main.innerHTML = renderContactFormScreen(); }
   document.body.dataset.screen = state.screen;
+  document.body.classList.toggle('sidebar-collapsed', state.sidebarCollapsed);
   renderModal();
   bindEvents();
   // Après bindEvents : l'emplacement doit exister dans le DOM fraîchement rendu.
@@ -1700,7 +1755,25 @@ const DIRECTORY_PAGE_SIZE = 10;
 function contactMatchesTab(c, tab) {
   if (tab === 'acheteurs') return c.type.acheteur;
   if (tab === 'vendeurs') return c.type.vendeur;
+  if (tab === 'prospects') return c.type.prospect;
+  if (tab === 'favoris') return c.favorite;
   return true;
+}
+
+// Une note saisie à la main est une simple chaîne ; celles du jeu de données
+// de démo portent les deux langues pour que la fiche suive la bascule FR/EN.
+function noteText(n) {
+  if (!n) return '';
+  return typeof n === 'string' ? n : tr(n.fr, n.en);
+}
+
+function contactTypeLabel(c) {
+  const labels = [];
+  if (c.type.acheteur) labels.push(tr('Acheteur', 'Buyer'));
+  if (c.type.vendeur) labels.push(tr('Vendeur', 'Seller'));
+  if (c.type.prospect) labels.push(tr('Prospect', 'Prospect'));
+  if (c.type.agent) labels.push(tr('Agent', 'Agent'));
+  return labels.length ? labels.join(', ') : tr('Contact', 'Contact');
 }
 
 function directoryRows() {
@@ -1741,60 +1814,106 @@ function paginationNumbers(page, totalPages) {
     .join('');
 }
 
-// En dessous de 768px, la grille à 5-6 colonnes n'a plus de place : elle
-// forçait un défilement horizontal qui cachait la colonne Actions hors champ
-// (loi de Fitts, et reconnaissance plutôt que rappel — Nielsen #6). Chaque
-// ligne rend donc aussi une carte, jamais affichée en même temps que la
-// ligne (bascule au md, comme le fait déjà le reste de l'app entre ses
-// chromes desktop et mobile) : même DOM, même liants d'événements, deux
-// présentations.
+// Sans photo, des initiales : la ligne garde le même gabarit qu'un contact
+// photographié, au lieu de décaler le nom d'un cran.
+function directoryAvatar(r, size) {
+  const cls = `directory-avatar directory-avatar-${size}`;
+  return r.photo
+    ? `<img class="${cls}" src="${esc(r.photo)}" alt="">`
+    : `<span class="${cls} directory-avatar-initials" aria-hidden="true">${esc(initialsOf(`${r.prenom} ${r.nom}`))}</span>`;
+}
+
+// Les boutons d'action sont les mêmes partout (ligne, carte mobile, fiche) ;
+// seule la sélection change d'une surface à l'autre.
+function directoryActionButton(kind, r) {
+  const who = `${esc(r.prenom)} ${esc(r.nom)}`;
+  if (kind === 'edit') return `<button class="dir-btn" data-directory-edit="${r.id}" title="${tr('Modifier le contact', 'Edit contact')}" aria-label="${tr('Modifier', 'Edit')} ${who}"><img src="assets/directory/edit.svg" alt=""></button>`;
+  if (kind === 'delete') return `<button class="dir-btn dir-btn--red" data-directory-delete="${r.id}" title="${tr('Supprimer le contact', 'Delete contact')}" aria-label="${tr('Supprimer', 'Delete')} ${who}">${icon('trash')}</button>`;
+  if (kind === 'message') return `<button class="dir-btn dir-btn--blue" data-directory-message="${esc(r.id)}" title="${tr('Envoyer un message à', 'Message')} ${who}" aria-label="${tr('Envoyer un message à', 'Message')} ${who}"><img src="assets/directory/mail-send.svg" alt=""></button>`;
+  if (kind === 'call') return `<button class="dir-btn dir-btn--blue" data-directory-call="${esc(r.id)}" title="${tr('Appeler', 'Call')} ${who}" aria-label="${tr('Appeler', 'Call')} ${who}">${icon('phone')}</button>`;
+  if (kind === 'tour') return `<button class="dir-btn dir-btn--blue" data-directory-tour="${r.id}" title="${tr('Créer un tour pour ce contact', 'Start a tour for this contact')}" aria-label="${tr('Créer un tour pour', 'Start a tour for')} ${who}"><img src="assets/directory/tour-action.svg" alt=""></button>`;
+  if (kind === 'favorite') {
+    const label = r.favorite ? tr('Retirer des favoris', 'Remove from favorites') : tr('Ajouter aux favoris', 'Add to favorites');
+    return `<button class="dir-btn dir-btn-star ${r.favorite ? 'is-favorite' : ''}" data-directory-favorite="${r.id}" aria-pressed="${!!r.favorite}" title="${label}" aria-label="${label} — ${who}">${icon('star')}</button>`;
+  }
+  return '';
+}
+
+// En dessous de 768px, la grille n'a plus de place : elle forçait un défilement
+// horizontal qui cachait la colonne Actions hors champ (loi de Fitts, et
+// reconnaissance plutôt que rappel — Nielsen #6). Chaque ligne rend donc aussi
+// une carte, jamais affichée en même temps que la ligne (bascule au md, comme
+// le fait déjà le reste de l'app entre ses chromes desktop et mobile) : même
+// DOM, mêmes liants d'événements, deux présentations.
 function directoryRowHtml(r) {
   const isCourtier = r.kind === 'courtier';
-  const messageBtn = `<button class="btn-icon directory-action-mail" data-directory-message="${esc(r.id)}" title="${tr('Envoyer un message à', 'Message')} ${esc(r.prenom)} ${esc(r.nom)}" aria-label="${tr('Envoyer un message à', 'Message')} ${esc(r.prenom)} ${esc(r.nom)}">${icon('mail')}</button>`;
   const emailLine = r.email ? `<p class="directory-card-line">${icon('mail')}<span>${esc(r.email)}</span></p>` : '';
   const telLine = r.tel ? `<p class="directory-card-line">${icon('phone')}<span>${esc(r.tel)}</span></p>` : '';
-  const cardName = `<p class="directory-card-name">${esc(r.prenom)} ${esc(r.nom)}</p>`;
+  const fullName = `${esc(r.prenom)} ${esc(r.nom)}`;
+  const cardHead = `<div class="directory-card-head">${directoryAvatar(r, 'md')}<p class="directory-card-name">${fullName}</p></div>`;
 
   // Un courtier inscripteur ne s'édite ni ne se supprime depuis cet écran —
   // c'est un annuaire externe, jamais l'acheteur d'un tour — donc seuls les
   // moyens de le joindre ont un sens ici.
   if (isCourtier) {
-    const actions = `
-      <button class="btn-icon directory-action-phone" data-directory-call="${esc(r.id)}" title="${tr('Appeler', 'Call')} ${esc(r.prenom)} ${esc(r.nom)}" aria-label="${tr('Appeler', 'Call')} ${esc(r.prenom)} ${esc(r.nom)}">${icon('phone')}</button>
-      ${messageBtn}`;
+    const actions = `${directoryActionButton('call', r)}${directoryActionButton('message', r)}`;
     const agenceLine = `<p class="directory-card-line">${icon('mapPinOutline')}<span>${esc(r.bureau)}</span></p>`;
     return `
     <div class="directory-row directory-row-courtier">
-      <span>${esc(r.nom)}</span>
-      <span>${esc(r.prenom)}</span>
+      <span class="directory-cell-name">${directoryAvatar(r, 'sm')}<span>${fullName}</span></span>
       <span class="directory-cell-muted">${esc(r.bureau)}</span>
       <span class="directory-cell-muted">${r.email ? esc(r.email) : '—'}</span>
       <span class="directory-cell-muted">${r.tel ? esc(r.tel) : '—'}</span>
       <span class="directory-col-actions directory-row-actions">${actions}</span>
     </div>
     <div class="directory-card">
-      <div class="directory-card-main">${cardName}${agenceLine}${emailLine}${telLine}</div>
+      ${cardHead}
+      <div class="directory-card-main">${agenceLine}${emailLine}${telLine}</div>
       <div class="directory-card-actions">${actions}</div>
     </div>`;
   }
-  const actions = `
-      <button class="btn-icon" data-directory-edit="${r.id}" title="${tr('Modifier le contact', 'Edit contact')}" aria-label="${tr('Modifier', 'Edit')} ${esc(r.prenom)} ${esc(r.nom)}">${icon('pencil')}</button>
-      <button class="btn-icon danger" data-directory-delete="${r.id}" title="${tr('Supprimer le contact', 'Delete contact')}" aria-label="${tr('Supprimer', 'Delete')} ${esc(r.prenom)} ${esc(r.nom)}">${icon('trash')}</button>
-      ${messageBtn}
-      <button class="btn-icon directory-action-tour" data-directory-tour="${r.id}" title="${tr('Créer un tour pour ce contact', 'Start a tour for this contact')}" aria-label="${tr('Créer un tour pour', 'Start a tour for')} ${esc(r.prenom)} ${esc(r.nom)}">${icon('tourAdd')}</button>`;
 
+  const selected = state.directorySelectedId === r.id;
+  const rowActions = ['edit', 'message', 'tour', 'favorite'].map(k => directoryActionButton(k, r)).join('');
+  const cardActions = ['edit', 'delete', 'message', 'tour', 'favorite'].map(k => directoryActionButton(k, r)).join('');
   return `
-    <div class="directory-row">
-      <span>${esc(r.nom)}</span>
-      <span>${esc(r.prenom)}</span>
+    <div class="directory-row directory-row-contact ${selected ? 'is-selected' : ''}" data-directory-row="${r.id}">
+      <span class="directory-cell-name">
+        <button class="directory-name-btn" data-directory-select="${r.id}" aria-pressed="${selected}" title="${tr('Afficher la fiche de', 'Show details for')} ${fullName}">${directoryAvatar(r, 'sm')}<span>${fullName}</span></button>
+      </span>
       <span class="directory-cell-muted">${r.email ? esc(r.email) : '—'}</span>
       <span class="directory-cell-muted">${r.tel ? esc(r.tel) : '—'}</span>
-      <span class="directory-col-actions directory-row-actions">${actions}</span>
+      <span class="directory-col-actions directory-row-actions">${rowActions}</span>
     </div>
     <div class="directory-card">
-      <div class="directory-card-main">${cardName}${emailLine}${telLine}</div>
-      <div class="directory-card-actions">${actions}</div>
+      ${cardHead}
+      <div class="directory-card-main">${emailLine}${telLine}</div>
+      <div class="directory-card-actions">${cardActions}</div>
     </div>`;
+}
+
+// La fiche reprend ce que la ligne n'a plus la place d'afficher (type, notes)
+// et porte les actions que la ligne cède quand elle se resserre.
+function directoryPreviewHtml(c) {
+  const notes = noteText(c.notes);
+  const actions = ['edit', 'delete', 'message', 'tour'].map(k => directoryActionButton(k, c)).join('');
+  return `
+    <aside class="directory-preview" aria-label="${tr('Fiche du contact', 'Contact details')}">
+      <button class="directory-preview-close" data-directory-close title="${tr('Fermer la fiche', 'Close details')}" aria-label="${tr('Fermer la fiche', 'Close details')}">${icon('x')}</button>
+      <div class="directory-preview-body">
+        <div class="directory-preview-id">
+          ${directoryAvatar(c, 'lg')}
+          <div>
+            <p class="directory-preview-name">${esc(c.prenom)} ${esc(c.nom)}</p>
+            <p class="directory-preview-type">${esc(contactTypeLabel(c))}</p>
+          </div>
+        </div>
+        <div class="directory-preview-field"><p class="directory-preview-label">${tr('Numéro de téléphone', 'Phone number')}</p><p class="directory-preview-value">${c.tel ? esc(c.tel) : '—'}</p></div>
+        <div class="directory-preview-field"><p class="directory-preview-label">${tr('Courriel', 'Email')}</p><p class="directory-preview-value">${c.email ? esc(c.email) : '—'}</p></div>
+        <div class="directory-preview-field"><p class="directory-preview-label">${tr('Notes', 'Notes')}</p><p class="directory-preview-notes">${notes ? esc(notes) : `<span class="directory-preview-empty">${tr('Aucune note.', 'No notes.')}</span>`}</p></div>
+      </div>
+      <div class="directory-preview-actions">${actions}</div>
+    </aside>`;
 }
 
 function renderDirectoryScreen() {
@@ -1809,7 +1928,9 @@ function renderDirectoryScreen() {
     { id: 'tous', labelFr: 'Tous les contacts', labelEn: 'All contacts' },
     { id: 'acheteurs', labelFr: 'Acheteurs', labelEn: 'Buyers' },
     { id: 'vendeurs', labelFr: 'Vendeurs', labelEn: 'Sellers' },
-    { id: 'courtiers', labelFr: 'Courtiers', labelEn: 'Brokers' },
+    { id: 'prospects', labelFr: 'Prospects', labelEn: 'Prospects' },
+    { id: 'courtiers', labelFr: 'Courtiers', labelEn: 'Agents' },
+    { id: 'favoris', labelFr: 'Favoris', labelEn: 'Favorites' },
   ];
   const tabsHtml = tabs.map(t => `
     <button class="directory-pill ${tab === t.id ? 'active' : ''}" data-directory-tab="${t.id}" role="tab" aria-selected="${tab === t.id}">${tr(t.labelFr, t.labelEn)}</button>`).join('');
@@ -1817,37 +1938,45 @@ function renderDirectoryScreen() {
   const emptyMsg = state.directorySearch.trim()
     ? tr('Aucun contact ne correspond à cette recherche.', 'No contact matches this search.')
     : tab === 'courtiers'
-      ? tr('Aucun courtier dans l\'annuaire.', 'No broker in the directory.')
-      : tr('Aucun contact pour le moment.', 'No contact yet.');
+      ? tr('Aucun courtier dans l\'annuaire.', 'No agent in the directory.')
+      : tab === 'favoris'
+        ? tr('Aucun favori. Cliquez sur l\'étoile d\'un contact pour l\'ajouter ici.', 'No favorites yet. Click a contact\'s star to add it here.')
+        : tr('Aucun contact pour le moment.', 'No contact yet.');
 
   // L'annuaire des courtiers porte une colonne de plus (Agence) que les
   // contacts qu'on gère soi-même — eux n'en ont pas — d'où l'en-tête et la
-  // grille distincts plutôt qu'une colonne vide sur les trois autres onglets.
+  // grille distincts plutôt qu'une colonne vide sur les autres onglets.
   const isCourtierTab = tab === 'courtiers';
   const headHtml = isCourtierTab ? `
-        <span>${tr('Nom', 'Last name')}</span>
-        <span>${tr('Prénom', 'First name')}</span>
-        <span>${tr('Agence', 'Brokerage')}</span>
-        <span>${tr('Email', 'Email')}</span>
-        <span>${tr('Téléphone', 'Phone')}</span>
-        <span class="directory-col-actions">${tr('Actions', 'Actions')}</span>` : `
-        <span>${tr('Nom', 'Last name')}</span>
-        <span>${tr('Prénom', 'First name')}</span>
-        <span>${tr('Email', 'Email')}</span>
-        <span>${tr('Téléphone', 'Phone')}</span>
-        <span class="directory-col-actions">${tr('Actions', 'Actions')}</span>`;
+        <span>${tr('Nom complet', 'Full name')}</span>
+        <span>${tr('Agence', 'Agency')}</span>
+        <span>${tr('Courriel', 'Email')}</span>
+        <span>${tr('Numéro de téléphone', 'Phone number')}</span>
+        <span class="directory-col-actions"></span>` : `
+        <span>${tr('Nom complet', 'Full name')}</span>
+        <span>${tr('Courriel', 'Email')}</span>
+        <span>${tr('Numéro de téléphone', 'Phone number')}</span>
+        <span class="directory-col-actions"></span>`;
+
+  // La fiche ne s'ouvre que pour un contact encore visible dans la liste
+  // filtrée : une recherche ou un changement d'onglet qui l'écarte ne doit pas
+  // laisser une fiche orpheline à côté d'un tableau qui ne la contient plus.
+  const selected = isCourtierTab ? null : pageRows.find(r => r.id === state.directorySelectedId) || null;
 
   const table = allRows.length === 0
     ? `<div class="empty-state"><p>${emptyMsg}</p></div>`
     : `
-    <div class="directory-table${isCourtierTab ? ' directory-table-courtier' : ''}">
-      <div class="directory-row directory-row-head">${headHtml}</div>
-      ${pageRows.map(directoryRowHtml).join('')}
+    <div class="directory-body ${selected ? 'is-split' : ''}">
+      <div class="directory-table${isCourtierTab ? ' directory-table-courtier' : ''}">
+        <div class="directory-row directory-row-head">${headHtml}</div>
+        ${pageRows.map(directoryRowHtml).join('')}
+      </div>
+      ${selected ? directoryPreviewHtml(selected) : ''}
     </div>
     <div class="directory-pagination">
       <p>${tr(
-        `${allRows.length ? start + 1 : 0}-${Math.min(start + DIRECTORY_PAGE_SIZE, allRows.length)} sur ${allRows.length} résultat${allRows.length > 1 ? 's' : ''}`,
-        `${allRows.length ? start + 1 : 0}-${Math.min(start + DIRECTORY_PAGE_SIZE, allRows.length)} of ${allRows.length} result${allRows.length > 1 ? 's' : ''}`
+        `${allRows.length ? start + 1 : 0}–${Math.min(start + DIRECTORY_PAGE_SIZE, allRows.length)} sur ${allRows.length} résultat${allRows.length > 1 ? 's' : ''}`,
+        `${allRows.length ? start + 1 : 0}–${Math.min(start + DIRECTORY_PAGE_SIZE, allRows.length)} of ${allRows.length} result${allRows.length > 1 ? 's' : ''}`
       )}</p>
       <div class="directory-pagination-controls">
         <button class="pagination-arrow" data-directory-page="${page - 1}" ${page <= 1 ? 'disabled' : ''} aria-label="${tr('Page précédente', 'Previous page')}">${icon('chevronLeft')}</button>
@@ -1859,10 +1988,11 @@ function renderDirectoryScreen() {
   return `
     <div class="page-card">
       <div class="directory-header">
-        <button class="btn btn-primary" id="btn-add-contact">${icon('plus')} ${tr('Nouveau contact', 'New contact')}</button>
+        <button class="btn btn-primary directory-add-btn" id="btn-add-contact">${icon('plus')} ${tr('Ajouter un contact', 'Add contact')}</button>
+        <button class="btn btn-outline directory-add-btn" id="btn-import-contact">${icon('plus')} ${tr('Importer un contact', 'Import contact')}</button>
         <div class="directory-searchbar">
           ${icon('search')}
-          <input type="text" id="directory-search" placeholder="${tr('Rechercher…', 'Search…')}" value="${esc(state.directorySearch)}" aria-label="${tr('Rechercher un contact', 'Search a contact')}">
+          <input type="text" id="directory-search" placeholder="${tr('Rechercher par nom, téléphone ou courriel…', 'Search by name, phone number or email…')}" value="${esc(state.directorySearch)}" aria-label="${tr('Rechercher un contact', 'Search a contact')}">
         </div>
       </div>
       <div class="directory-tabs" role="tablist" aria-label="${tr('Filtrer le répertoire', 'Filter the directory')}">${tabsHtml}</div>
@@ -1886,14 +2016,20 @@ function startTourForContact(c) {
   });
 }
 
+function emptyContactDraft() {
+  return { prenom: '', nom: '', tel: '', email: '', notes: '', photo: null, acheteur: false, vendeur: false, prospect: false, agent: false, sms: false, emailPref: false };
+}
+
 function bindDirectoryEvents() {
+  const resetSelection = () => { state.directorySelectedId = null; };
   document.querySelectorAll('[data-directory-tab]').forEach(btn => {
-    btn.onclick = () => { state.directoryTab = btn.getAttribute('data-directory-tab'); state.directoryPage = 1; render(); };
+    btn.onclick = () => { state.directoryTab = btn.getAttribute('data-directory-tab'); state.directoryPage = 1; resetSelection(); render(); };
   });
   const search = document.getElementById('directory-search');
   if (search) search.oninput = () => {
     state.directorySearch = search.value;
     state.directoryPage = 1;
+    resetSelection();
     render();
     setTimeout(() => {
       const el = document.getElementById('directory-search');
@@ -1901,25 +2037,68 @@ function bindDirectoryEvents() {
     }, 0);
   };
   document.querySelectorAll('[data-directory-page]').forEach(btn => {
-    btn.onclick = () => { state.directoryPage = +btn.getAttribute('data-directory-page'); render(); };
+    btn.onclick = () => { state.directoryPage = +btn.getAttribute('data-directory-page'); resetSelection(); render(); };
   });
+
+  // Toute la ligne ouvre la fiche, pas seulement le nom : la cible est plus
+  // large (Fitts). Le bouton-nom reste là pour le clavier et les lecteurs
+  // d'écran ; les boutons d'action ne déclenchent jamais la sélection.
+  document.querySelectorAll('[data-directory-row]').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('.directory-row-actions')) return;
+      const id = row.getAttribute('data-directory-row');
+      state.directorySelectedId = state.directorySelectedId === id ? null : id;
+      render();
+      if (e.detail === 0) {
+        const again = document.querySelector(`[data-directory-row="${id}"] .directory-name-btn`);
+        if (again) again.focus();
+      }
+    };
+  });
+  const closeBtn = document.querySelector('[data-directory-close]');
+  if (closeBtn) closeBtn.onclick = () => {
+    const id = state.directorySelectedId;
+    resetSelection();
+    render();
+    const again = document.querySelector(`[data-directory-row="${id}"] .directory-name-btn`);
+    if (again) again.focus();
+  };
+
   const addBtn = document.getElementById('btn-add-contact');
   if (addBtn) addBtn.onclick = () => {
-    state.contactFormDraft = { prenom: '', nom: '', tel: '', email: '', acheteur: false, vendeur: false, alerts: false };
+    state.contactFormDraft = emptyContactDraft();
     state.screen = 'contactForm';
     render();
   };
+  const importBtn = document.getElementById('btn-import-contact');
+  if (importBtn) importBtn.onclick = () => showToast(tr('L\'importation de contacts n\'est pas encore disponible dans ce prototype.', 'Importing contacts isn\'t wired up in this prototype yet.'));
+
   document.querySelectorAll('[data-directory-edit]').forEach(btn => {
     btn.onclick = () => {
       const c = state.contacts.find(c => c.id === btn.getAttribute('data-directory-edit'));
       if (!c) return;
-      state.contactFormDraft = { id: c.id, prenom: c.prenom, nom: c.nom, tel: c.tel, email: c.email, acheteur: c.type.acheteur, vendeur: c.type.vendeur, alerts: c.alerts };
+      state.contactFormDraft = {
+        id: c.id, prenom: c.prenom, nom: c.nom, tel: c.tel, email: c.email, notes: noteText(c.notes), photo: c.photo || null,
+        acheteur: !!c.type.acheteur, vendeur: !!c.type.vendeur, prospect: !!c.type.prospect, agent: !!c.type.agent,
+        sms: !!c.comm.sms, emailPref: !!c.comm.email,
+      };
       state.screen = 'contactForm';
       render();
     };
   });
   document.querySelectorAll('[data-directory-delete]').forEach(btn => {
     btn.onclick = () => { state.modal = { type: 'confirmDeleteContact', contactId: btn.getAttribute('data-directory-delete') }; render(); };
+  });
+  document.querySelectorAll('[data-directory-favorite]').forEach(btn => {
+    btn.onclick = () => {
+      const c = state.contacts.find(c => c.id === btn.getAttribute('data-directory-favorite'));
+      if (!c) return;
+      c.favorite = !c.favorite;
+      const id = c.id;
+      render();
+      const again = document.querySelector(`[data-directory-favorite="${id}"]`);
+      if (again) again.focus();
+    };
   });
   document.querySelectorAll('[data-directory-message]').forEach(btn => {
     btn.onclick = () => showToast(tr('L\'envoi de message n\'est pas encore disponible dans ce prototype.', 'Sending a message isn\'t wired up in this prototype yet.'));
@@ -1947,36 +2126,69 @@ function renderContactFormScreen() {
   const editing = !!f.id;
   const valid = contactFormValid(f);
   const reason = tr('Renseignez au moins le prénom et le nom.', 'Fill in at least the first and last name.');
+  const check = (id, checked, label) => `<label class="cf-check-label"><input type="checkbox" class="cf-check" id="${id}" ${checked ? 'checked' : ''}> ${label}</label>`;
+
+  const photoBlock = f.photo
+    ? `<img class="cf-avatar" src="${esc(f.photo)}" alt="${tr('Photo de profil', 'Profile photo')}">`
+    : `<img class="cf-avatar" src="assets/directory/avatar-placeholder.svg" alt="">`;
+  const photoActions = f.photo
+    ? `<button type="button" class="cf-photo-btn" id="cf-photo-edit">${tr('Modifier', 'Edit')}</button>
+       <button type="button" class="cf-photo-btn" id="cf-photo-replace">${tr('Remplacer', 'Replace')}</button>`
+    : `<button type="button" class="cf-photo-btn" id="cf-photo-replace">${tr('Ajouter', 'Add')}</button>`;
 
   return `
     <div class="page-card contact-form-card">
-      <p class="helper-text" style="margin:0;">${tr('Veuillez remplir les informations obligatoires ci-dessous pour enregistrer le contact dans la base de données.', 'Fill in the required information below to save the contact.')}</p>
-      <div class="field">
-        <label class="field-label" for="cf-prenom">${tr('Prénom', 'First name')} <span class="req">*</span></label>
-        <input class="input" id="cf-prenom" value="${esc(f.prenom)}" placeholder="${tr('Ex: Jean', 'E.g. John')}">
+      <div class="cf-header">
+        <p>${tr('Les modifications s\'appliquent à tous les outils connectés.', 'Changes apply across all connected tools.')}</p>
       </div>
-      <div class="field">
-        <label class="field-label" for="cf-nom">${tr('Nom', 'Last name')} <span class="req">*</span></label>
-        <input class="input" id="cf-nom" value="${esc(f.nom)}" placeholder="${tr('Ex: Dupont', 'E.g. Smith')}">
-      </div>
-      <div class="field">
-        <label class="field-label" for="cf-tel">${tr('Numéro de téléphone', 'Phone number')}</label>
-        <div class="input-icon-group">${icon('phone')}<input class="input" id="cf-tel" type="tel" value="${esc(f.tel)}" placeholder="${tr('Ex: +1 (418) 123-4567', 'E.g. +1 (418) 123-4567')}"></div>
-      </div>
-      <div class="field">
-        <label class="field-label" for="cf-email">${tr('Adresse email', 'Email address')}</label>
-        <div class="input-icon-group">${icon('mail')}<input class="input" id="cf-email" type="email" value="${esc(f.email)}" placeholder="${tr('Ex: jean.dupont@gmail.com', 'E.g. jean.dupont@gmail.com')}"></div>
-      </div>
-      <div class="contact-form-prefs">
-        <p class="contact-form-prefs-title">${tr('Type de contact & Permissions', 'Contact type & permissions')}</p>
-        <div class="contact-form-checks">
-          <label class="check-inline"><input type="checkbox" id="cf-acheteur" ${f.acheteur ? 'checked' : ''}> ${tr('Acheteur', 'Buyer')}</label>
-          <label class="check-inline"><input type="checkbox" id="cf-vendeur" ${f.vendeur ? 'checked' : ''}> ${tr('Vendeur', 'Seller')}</label>
-          <label class="check-inline"><input type="checkbox" id="cf-alerts" ${f.alerts ? 'checked' : ''}> ${tr('Autoriser les alertes SMS / Email', 'Allow SMS / email alerts')}</label>
+      <section class="cf-photo" aria-labelledby="cf-photo-title">
+        <h2 class="cf-section-title" id="cf-photo-title">${tr('Photo de profil', 'Profile photo')}</h2>
+        <div class="cf-photo-row">
+          ${photoBlock}
+          <div class="cf-photo-actions">${photoActions}</div>
+          <input type="file" id="cf-photo-input" accept="image/*" hidden>
         </div>
+      </section>
+      <div class="cf-fields">
+        <div class="cf-field">
+          <label class="cf-label" for="cf-prenom">${tr('Prénom', 'First name')} <span class="req">*</span></label>
+          <input class="cf-input" id="cf-prenom" value="${esc(f.prenom)}" placeholder="${tr('Prénom', 'First name')}" autocomplete="given-name">
+        </div>
+        <div class="cf-field">
+          <label class="cf-label" for="cf-nom">${tr('Nom', 'Last name')} <span class="req">*</span></label>
+          <input class="cf-input" id="cf-nom" value="${esc(f.nom)}" placeholder="${tr('Nom', 'Last name')}" autocomplete="family-name">
+        </div>
+        <div class="cf-field">
+          <label class="cf-label" for="cf-tel">${tr('Numéro de téléphone', 'Phone number')}</label>
+          <input class="cf-input" id="cf-tel" type="tel" value="${esc(f.tel)}" placeholder="(XXX) XXX-XXXX" autocomplete="tel">
+        </div>
+        <div class="cf-field">
+          <label class="cf-label" for="cf-email">${tr('Courriel', 'Email')}</label>
+          <input class="cf-input" id="cf-email" type="email" value="${esc(f.email)}" placeholder="${tr('Courriel', 'Email')}" autocomplete="email">
+        </div>
+        <div class="cf-field cf-field-notes">
+          <label class="cf-label" for="cf-notes">${tr('Notes', 'Notes')}</label>
+          <textarea class="cf-notes" id="cf-notes" placeholder="${tr('Ajouter une note…', 'Add a note…')}">${esc(f.notes)}</textarea>
+        </div>
+        <fieldset class="cf-group">
+          <legend class="cf-section-title">${tr('Types de contact :', 'Types of contact:')}</legend>
+          <div class="cf-checks">
+            ${check('cf-acheteur', f.acheteur, tr('Acheteur', 'Buyer'))}
+            ${check('cf-vendeur', f.vendeur, tr('Vendeur', 'Seller'))}
+            ${check('cf-prospect', f.prospect, tr('Prospect', 'Prospect'))}
+            ${check('cf-agent', f.agent, tr('Agent', 'Agent'))}
+          </div>
+        </fieldset>
+        <fieldset class="cf-group">
+          <legend class="cf-section-title">${tr('Méthode de communication préférée :', 'Preferred Communication Method:')}</legend>
+          <div class="cf-checks">
+            ${check('cf-sms', f.sms, 'SMS')}
+            ${check('cf-emailpref', f.emailPref, tr('Courriel', 'Email'))}
+          </div>
+        </fieldset>
       </div>
       <div class="contact-form-actions">
-        <button class="btn btn-primary" id="contact-save" ${valid ? '' : 'disabled'} title="${valid ? '' : reason}" aria-describedby="contact-save-why">${editing ? tr('Enregistrer les modifications', 'Save changes') : tr('Enregistrer le contact', 'Save contact')}</button>
+        <button class="btn btn-primary" id="contact-save" ${valid ? '' : 'disabled'} title="${valid ? '' : reason}" aria-describedby="contact-save-why">${editing ? tr('Enregistrer les modifications', 'Save changes') : tr('Enregistrer', 'Save')}</button>
         <span id="contact-save-why" class="sr-only">${reason}</span>
         <button class="btn btn-outline" id="contact-cancel">${tr('Annuler', 'Cancel')}</button>
       </div>
@@ -2006,10 +2218,27 @@ function bindContactFormEvents() {
   bindField('cf-nom', 'nom', true);
   bindField('cf-tel', 'tel', false);
   bindField('cf-email', 'email', false);
-  [['cf-acheteur', 'acheteur'], ['cf-vendeur', 'vendeur'], ['cf-alerts', 'alerts']].forEach(([id, key]) => {
+  bindField('cf-notes', 'notes', false);
+  [['cf-acheteur', 'acheteur'], ['cf-vendeur', 'vendeur'], ['cf-prospect', 'prospect'], ['cf-agent', 'agent'], ['cf-sms', 'sms'], ['cf-emailpref', 'emailPref']].forEach(([id, key]) => {
     const el = document.getElementById(id);
     if (el) el.onchange = () => { f[key] = el.checked; };
   });
+
+  // Le recadrage n'existe pas dans ce prototype : « Modifier » le dit au lieu
+  // de rouvrir le sélecteur, ce qui ferait la même chose que « Remplacer ».
+  const photoInput = document.getElementById('cf-photo-input');
+  const replaceBtn = document.getElementById('cf-photo-replace');
+  if (replaceBtn && photoInput) replaceBtn.onclick = () => photoInput.click();
+  const editPhotoBtn = document.getElementById('cf-photo-edit');
+  if (editPhotoBtn) editPhotoBtn.onclick = () => showToast(tr('Le recadrage de la photo n\'est pas inclus dans ce prototype.', 'Photo cropping isn\'t included in this prototype.'));
+  if (photoInput) photoInput.onchange = () => {
+    const file = photoInput.files && photoInput.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { showToast(tr('Choisissez un fichier image (JPG, PNG…).', 'Choose an image file (JPG, PNG…).')); return; }
+    const reader = new FileReader();
+    reader.onload = () => { f.photo = reader.result; render(); };
+    reader.readAsDataURL(file);
+  };
 
   const cancelBtn = document.getElementById('contact-cancel');
   if (cancelBtn) cancelBtn.onclick = () => { state.contactFormDraft = null; state.screen = 'directory'; render(); };
@@ -2018,15 +2247,17 @@ function bindContactFormEvents() {
   if (saveBtn) saveBtn.onclick = () => {
     if (!contactFormValid(f)) return;
     const payload = {
-      prenom: f.prenom.trim(), nom: f.nom.trim(), tel: f.tel.trim(), email: f.email.trim(),
-      type: { acheteur: f.acheteur, vendeur: f.vendeur }, alerts: f.alerts,
+      prenom: f.prenom.trim(), nom: f.nom.trim(), tel: f.tel.trim(), email: f.email.trim(), notes: f.notes.trim(),
+      photo: f.photo || null,
+      type: { acheteur: f.acheteur, vendeur: f.vendeur, prospect: f.prospect, agent: f.agent },
+      comm: { sms: f.sms, email: f.emailPref },
     };
     const wasEditing = !!f.id;
     if (wasEditing) {
       const idx = state.contacts.findIndex(c => c.id === f.id);
       if (idx >= 0) state.contacts[idx] = { ...state.contacts[idx], ...payload };
     } else {
-      state.contacts.push({ id: uid(), ...payload });
+      state.contacts.push({ id: uid(), favorite: false, ...payload });
     }
     state.contactFormDraft = null;
     state.screen = 'directory';
@@ -2751,7 +2982,7 @@ function renderStopCard(stop, start, { variant = 'builder', sameSlot = false, is
   const statusChip = arretKind || !stMeta.labelFr ? ''
     : canSim
       ? `<button class="stop-flag tone-${stMeta.tone} is-sim" data-sim-status="${stop.id}"
-          title="${tr('Simuler la réponse du courtier inscripteur — état suivant', 'Simulate the listing broker\'s response — next state')} : ${esc(stopStatusShort(nextSt))}">
+          title="${tr('Simuler la réponse du courtier inscripteur — état suivant', 'Simulate the listing agent\'s response — next state')} : ${esc(stopStatusShort(nextSt))}">
           ${esc(stopStatusLabel(st))}${suffix}${icon('sync')}</button>`
       : `<span class="stop-flag tone-${stMeta.tone}">${esc(stopStatusLabel(st))}${suffix}</span>`;
   // Tant que rien n'est parti, ce que dit le calendrier de disponibilité de la
@@ -2769,7 +3000,7 @@ function renderStopCard(stop, start, { variant = 'builder', sameSlot = false, is
       ? `<span class="stop-flag tone-warn">${icon('star')} ${tr('Compte rendu à envoyer', 'Report to send')}</span>`
       : `<span class="stop-flag tone-ok">${icon('star')} ${tr('Visité', 'Visited')}</span>`;
   const extChip = arretKind || !stop.external ? ''
-    : `<span class="stop-flag tone-muted" title="${tr('Hors catalogue : la demande part par courriel au courtier inscripteur, sans créer de fiche.', 'Off-catalogue: the request goes by email to the listing broker, without creating a listing.')}">${tr('Hors catalogue', 'Off-catalogue')}</span>`;
+    : `<span class="stop-flag tone-muted" title="${tr('Hors catalogue : la demande part par courriel au courtier inscripteur, sans créer de fiche.', 'Off-catalogue: the request goes by email to the listing agent, without creating a listing.')}">${tr('Hors catalogue', 'Off-catalogue')}</span>`;
   // Sur la carte, seul le statut compte : on y réorganise un trajet, pas un
   // compte rendu. Mais le statut, lui, y est indispensable — c'est lui qui dit
   // quelle étape est en train de tomber.
@@ -2815,7 +3046,7 @@ function renderStopCard(stop, start, { variant = 'builder', sameSlot = false, is
         ${st === 'sandbox'
           // Envoyer et rendre compte ne coexistent jamais dans le temps : la
           // troisième place revient à celui des deux qui a un sens ici.
-          ? `<button class="btn-icon send-request" data-send-stop="${stop.id}"${sendBlockedReason ? ` disabled aria-describedby="send-why-${stop.id}"` : ''} title="${sendBlockedReason || `${tr('Envoyer la demande de visite à', 'Send the visit request to')} ${esc(stop.courtier || tr('ce courtier inscripteur', 'this listing broker'))}`}" aria-label="${tr('Envoyer la demande de visite du', 'Send the visit request for')} ${esc(stop.address)} ${tr('à', 'to')} ${esc(stop.courtier || tr('ce courtier inscripteur', 'this listing broker'))}">${icon('send')}</button>${sendBlockedReason ? `<span id="send-why-${stop.id}" class="sr-only">${sendBlockedReason}</span>` : ''}`
+          ? `<button class="btn-icon send-request" data-send-stop="${stop.id}"${sendBlockedReason ? ` disabled aria-describedby="send-why-${stop.id}"` : ''} title="${sendBlockedReason || `${tr('Envoyer la demande de visite à', 'Send the visit request to')} ${esc(stop.courtier || tr('ce courtier inscripteur', 'this listing agent'))}`}" aria-label="${tr('Envoyer la demande de visite du', 'Send the visit request for')} ${esc(stop.address)} ${tr('à', 'to')} ${esc(stop.courtier || tr('ce courtier inscripteur', 'this listing agent'))}">${icon('send')}</button>${sendBlockedReason ? `<span id="send-why-${stop.id}" class="sr-only">${sendBlockedReason}</span>` : ''}`
           : `<button class="btn-icon toggle-visited ${!stop.visited ? '' : reportPending ? 'todo' : 'active'}" data-toggle-visited="${stop.id}" title="${reportTitle}" aria-label="${reportTitle} — ${esc(stop.address)}">${icon('star')}</button>`}
       </div>`}
     </div>`;
@@ -2930,7 +3161,7 @@ function renderBuilderScreen() {
             Ces propriétés sont à ${km} l'une de l'autre. Chaque courtier inscripteur reçoit une demande pour ${hour}
             et ne voit que la sienne — à vous de confirmer que vous tenez les deux.`,
             `<strong>You've placed two visits at ${hour}.</strong>
-            These listings are ${km} apart. Each listing broker gets a request for ${hour}
+            These listings are ${km} apart. Each listing agent gets a request for ${hour}
             and only sees their own — it's on you to confirm you can make both.`
           )}</span>
           <button class="btn-inline" data-ack-slot="${stop.id}">${tr('Je confirme ce créneau', 'I confirm this time slot')}</button>
@@ -2956,7 +3187,7 @@ function renderBuilderScreen() {
         <div class="stop-answer danger">${icon('warning')}
           <span class="banner-text">${tr(
             `Le courtier inscripteur a annulé cette visite${stop.lockedStart ? `, confirmée pour ${stop.lockedStart.replace(':', 'h')}` : ''}.`,
-            `The listing broker cancelled this visit${stop.lockedStart ? `, confirmed for ${stop.lockedStart}` : ''}.`
+            `The listing agent cancelled this visit${stop.lockedStart ? `, confirmed for ${stop.lockedStart}` : ''}.`
           )}</span>
           <button class="btn-inline" data-retry-stop="${stop.id}">${tr('Proposer un autre créneau', 'Propose another time')}</button>
           <button class="btn-inline ghost" data-remove-stop-inline="${stop.id}">${tr('Retirer du tour', 'Remove from the tour')}</button>
@@ -3031,8 +3262,8 @@ function renderBuilderScreen() {
           <p class="field-static">
             <strong>${minutesToLabel(rows[0].start)}</strong>
             <span class="field-static-note">${confirmee
-              ? tr('Heure confirmée par le courtier inscripteur', 'Time confirmed by the listing broker')
-              : tr('Heure demandée au courtier inscripteur', 'Time requested from the listing broker')}</span>
+              ? tr('Heure confirmée par le courtier inscripteur', 'Time confirmed by the listing agent')
+              : tr('Heure demandée au courtier inscripteur', 'Time requested from the listing agent')}</span>
           </p>`;
       })();
 
@@ -3065,8 +3296,8 @@ function renderBuilderScreen() {
           : status === 'confirme'
             ? tr('Toutes les visites sont confirmées. Le tour peut être partagé avec un acheteur.', 'All visits are confirmed. The tour can be shared with a buyer.')
             : tally.toHandle
-              ? tr('Des courtiers ont répondu autre chose qu\'une confirmation. Traitez ces réponses pour débloquer le partage.', 'Some brokers replied with something other than a confirmation. Handle these responses to unlock sharing.')
-              : tr('Demandes envoyées. En attente de la réponse des courtiers inscripteurs.', 'Requests sent. Awaiting a response from the listing brokers.')}</p>
+              ? tr('Des courtiers ont répondu autre chose qu\'une confirmation. Traitez ces réponses pour débloquer le partage.', 'Some agents replied with something other than a confirmation. Handle these responses to unlock sharing.')
+              : tr('Demandes envoyées. En attente de la réponse des courtiers inscripteurs.', 'Requests sent. Awaiting a response from the listing agents.')}</p>
     </div>`;
 
   return `
@@ -3134,7 +3365,7 @@ function renderFooterActions(propertyCount, status, tally) {
   // la sortie normale reste évidente.
   if (status === 'brouillon') {
     const envoiWhy = whenBlocked('btn-send-tour', propertyCount > 0,
-      tr('Ajoutez au moins une propriété : une demande de visite part chez le courtier qui l\'inscrit.', 'Add at least one listing: a visit request goes to the broker who listed it.'));
+      tr('Ajoutez au moins une propriété : une demande de visite part chez le courtier qui l\'inscrit.', 'Add at least one listing: a visit request goes to the agent who listed it.'));
     const gardeWhy = whenBlocked('btn-save-draft', propertyCount > 0,
       tr('Un tour sans propriété n\'a rien à enregistrer.', 'A tour with no listings has nothing to save.'));
     return `
@@ -3196,7 +3427,7 @@ function renderFooterActions(propertyCount, status, tally) {
   const canRelance = state.draft.stops.some(s => s.type === 'property' && s.sentAt && s.status === 'pending');
   return `
     <button class="btn btn-primary" id="btn-share-buyer">${shareLabel}</button>
-    ${canRelance ? `<button class="btn btn-outline" id="btn-relance">${tr('Relancer les courtiers', 'Follow up with the brokers')}</button>` : ''}
+    ${canRelance ? `<button class="btn btn-outline" id="btn-relance">${tr('Relancer les courtiers', 'Follow up with the agents')}</button>` : ''}
     ${del}
   `;
 }
@@ -3217,7 +3448,7 @@ function renderModal() {
     const t = currentTour();
     const wasSent = !!(t && tourSentAt(t));
     const body = wasSent
-      ? tr('Cette action supprimera définitivement ce tour et annulera les demandes de visites déjà envoyées aux courtiers inscripteurs. Cette action est irréversible.', 'This will permanently delete this tour and cancel the visit requests already sent to the listing brokers. This action can\'t be undone.')
+      ? tr('Cette action supprimera définitivement ce tour et annulera les demandes de visites déjà envoyées aux courtiers inscripteurs. Cette action est irréversible.', 'This will permanently delete this tour and cancel the visit requests already sent to the listing agents. This action can\'t be undone.')
       : tr('Cette action supprimera définitivement ce tour de visites. Cette action est irréversible.', 'This will permanently delete this buyer\'s tour. This action can\'t be undone.');
     root.innerHTML = renderConfirmModal(tr('Supprimer le tour', 'Delete the tour'), body, 'btn-confirm-delete-tour');
     return;
@@ -3495,7 +3726,7 @@ function renderNewPropertyModal() {
           </div>
 
           <div class="info-banner">${icon('info')}
-            <span>${tr('Cette propriété n\'est pas créée dans le catalogue : la demande de visite part par courriel au courtier inscripteur que vous choisirez à l\'étape suivante.', 'This listing isn\'t created in the catalogue: the visit request goes by email to the listing broker you\'ll choose in the next step.')}</span>
+            <span>${tr('Cette propriété n\'est pas créée dans le catalogue : la demande de visite part par courriel au courtier inscripteur que vous choisirez à l\'étape suivante.', 'This listing isn\'t created in the catalogue: the visit request goes by email to the listing agent you\'ll choose in the next step.')}</span>
           </div>
           ${missing.length ? `<p class="dest-empty" id="np-error">${tr(`Il manque ${missing.join(', ').replace(/, ([^,]*)$/, ' et $1')}.`, `Missing: ${missing.join(', ').replace(/, ([^,]*)$/, ' and $1')}.`)}</p>` : ''}
         </div>
@@ -3538,7 +3769,7 @@ function renderVisitRequestModal() {
   // Une propriété hors catalogue n'a pas de fiche : sans courtier nommé, la
   // demande n'a personne à qui partir.
   const vrWhy = whenBlocked('vr-save', !(m.external && !courtierEntry(courtier)),
-    tr('Nommez le courtier inscripteur : sans lui, la demande n\'a pas de destinataire.', 'Name the listing broker: without one, the request has no recipient.'));
+    tr('Nommez le courtier inscripteur : sans lui, la demande n\'a pas de destinataire.', 'Name the listing agent: without one, the request has no recipient.'));
   // C'est l'arrêt qui est engagé ou non, pas le tour : dans un tour déjà parti,
   // une propriété ajoutée depuis reste au bac à sable jusqu'à son propre envoi.
   const editedStop = editing ? state.draft.stops.find(s => s.id === m.editStopId) : null;
@@ -3561,14 +3792,14 @@ function renderVisitRequestModal() {
       <span class="vr-broker-avatar">${esc(initialsOf(courtier))}</span>
       <div>
         <p class="vr-broker-name">${esc(courtier)}</p>
-        <p class="vr-broker-agency">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing broker, ${currentBrandName()}`)}</p>
+        <p class="vr-broker-agency">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing agent, ${currentBrandName()}`)}</p>
       </div>
     </div>` : courtier ? `
     <div class="vr-broker">
       <span class="vr-broker-avatar">${esc(initialsOf(courtier))}</span>
       <div>
         <p class="vr-broker-name">${esc(courtier)}</p>
-        <p class="vr-broker-agency">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing broker, ${currentBrandName()}`)}${courtierEntry(courtier) ? ' — ' + esc(courtierEntry(courtier).bureau) : ''}</p>
+        <p class="vr-broker-agency">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing agent, ${currentBrandName()}`)}${courtierEntry(courtier) ? ' — ' + esc(courtierEntry(courtier).bureau) : ''}</p>
       </div>
       <button class="btn-inline ghost" id="vr-courtier-clear">${tr('Changer', 'Change')}</button>
     </div>` : (() => {
@@ -3576,24 +3807,24 @@ function renderVisitRequestModal() {
       const found = searchCourtiers(q);
       return `
     <div class="vr-broker-pick">
-      <label class="field-label" for="vr-courtier-search">${tr('Courtier inscripteur', 'Listing broker')} <span class="req">*</span></label>
+      <label class="field-label" for="vr-courtier-search">${tr('Courtier inscripteur', 'Listing agent')} <span class="req">*</span></label>
       <div class="search-bar" style="margin-bottom:0;">
         <input type="text" class="input" id="vr-courtier-search" autocomplete="off"
-          placeholder="${tr(`Rechercher un courtier ${brandArticleFr()}${currentBrandName()}…`, `Search ${brandArticleEn()} ${currentBrandName()} broker…`)}" value="${esc(q)}">
+          placeholder="${tr(`Rechercher un courtier ${brandArticleFr()}${currentBrandName()}…`, `Search ${brandArticleEn()} ${currentBrandName()} agent…`)}" value="${esc(q)}">
         ${icon('search')}
       </div>
-      ${!q ? `<p class="helper-text" style="margin:8px 0 0;">${tr(`Tapez un nom ou un bureau. Seuls les courtiers inscrits à ${currentBrandName()} peuvent recevoir une demande de visite.`, `Type a name or an office. Only brokers registered with ${currentBrandName()} can receive a visit request.`)}</p>` : found.length ? `
+      ${!q ? `<p class="helper-text" style="margin:8px 0 0;">${tr(`Tapez un nom ou un bureau. Seuls les courtiers inscrits à ${currentBrandName()} peuvent recevoir une demande de visite.`, `Type a name or an office. Only agents registered with ${currentBrandName()} can receive a visit request.`)}</p>` : found.length ? `
         <div class="courtier-results">
           ${found.map(c => `
             <button type="button" class="courtier-row" data-pick-courtier="${esc(c.nom)}">
               <span class="vr-broker-avatar">${esc(initialsOf(c.nom))}</span>
               <span class="courtier-id">
                 <span class="courtier-name">${esc(c.nom)}</span>
-                <span class="courtier-office">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing broker, ${currentBrandName()}`)} — ${esc(c.bureau)}</span>
+                <span class="courtier-office">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing agent, ${currentBrandName()}`)} — ${esc(c.bureau)}</span>
               </span>
             </button>`).join('')}
         </div>` : `
-        <p class="dest-empty">${tr(`Aucun courtier de ce nom à ${currentBrandName()}. Vérifiez l'orthographe : la demande ne peut partir qu'à un courtier inscrit.`, `No broker by that name at ${currentBrandName()}. Check the spelling: the request can only go to a registered broker.`)}</p>`}
+        <p class="dest-empty">${tr(`Aucun courtier de ce nom à ${currentBrandName()}. Vérifiez l'orthographe : la demande ne peut partir qu'à un courtier inscrit.`, `No agent by that name at ${currentBrandName()}. Check the spelling: the request can only go to a registered agent.`)}</p>`}
     </div>`;
     })();
 
@@ -3641,7 +3872,7 @@ function renderVisitRequestModal() {
             <!-- Le texte d'invite ne tenait pas lieu d'étiquette : il disparaît
                  à la première frappe, et le champ n'a alors plus de nom. -->
             <label class="field-label" for="vr-comment">${tr('Commentaires', 'Comments')}</label>
-            <textarea class="input vr-comment" id="vr-comment" placeholder="${tr('Précisions pour le courtier inscripteur', 'Details for the listing broker')}" maxlength="750" rows="3">${esc(m.comment)}</textarea>
+            <textarea class="input vr-comment" id="vr-comment" placeholder="${tr('Précisions pour le courtier inscripteur', 'Details for the listing agent')}" maxlength="750" rows="3">${esc(m.comment)}</textarea>
             <p class="vr-charcount">${tr('Caractères', 'Characters')} : <span id="vr-charcount">${m.comment.length}</span> / 750</p>
           </div>
 
@@ -3654,7 +3885,7 @@ function renderVisitRequestModal() {
           <button class="btn btn-primary${editing ? ' btn-block' : ''}" id="vr-save" ${editing ? '' : 'style="min-width:220px;"'}${vrWhy.a}>${saveLabel}</button>${vrWhy.n}
           ${editing ? `<button class="btn btn-outline btn-block" id="modal-cancel">${tr('Annuler', 'Cancel')}</button>` : ''}
           ${m.external && !courtierEntry(courtier)
-            ? `<p class="helper-text" style="margin:10px 0 0;">${tr('Choisissez le courtier inscripteur : c\'est lui qui recevra la demande de visite.', 'Choose the listing broker: they\'re the one who will receive the visit request.')}</p>`
+            ? `<p class="helper-text" style="margin:10px 0 0;">${tr('Choisissez le courtier inscripteur : c\'est lui qui recevra la demande de visite.', 'Choose the listing agent: they\'re the one who will receive the visit request.')}</p>`
             : ''}
         </div>
       </div>
@@ -3729,13 +3960,13 @@ function renderSendRequestsModal() {
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
         <div class="modal-head"><h2 id="modal-title">${tr('Envoyer les demandes de visites', 'Send the visit requests')}</h2><button class="modal-close" id="modal-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
         <div class="modal-body">
-          <p class="helper-text" style="margin:0 0 14px;">${tr('Chaque courtier inscripteur reçoit la demande de sa propriété, avec le créneau que vous avez retenu. Les propriétés décochées restent au bac à sable.', 'Each listing broker gets the request for their listing, with the time slot you picked. Unchecked listings stay in the sandbox.')}</p>
+          <p class="helper-text" style="margin:0 0 14px;">${tr('Chaque courtier inscripteur reçoit la demande de sa propriété, avec le créneau que vous avez retenu. Les propriétés décochées restent au bac à sable.', 'Each listing agent gets the request for their listing, with the time slot you picked. Unchecked listings stay in the sandbox.')}</p>
           <div class="send-list">${rows}</div>
         </div>
         <div class="modal-footer" style="display:flex;flex-direction:column;gap:10px;">
           ${buyer ? `
-            <button class="btn btn-primary btn-block" id="btn-send-broker-buyer"${choixWhy.a}>${tr(`Envoyer aux courtiers et à ${esc(buyer.prenom)}`, `Send to the brokers and to ${esc(buyer.prenom)}`)}</button>${choixWhy.n}
-            <button class="btn btn-outline btn-block" id="btn-send-broker-only"${seulWhy.a}>${tr('Envoyer aux courtiers seulement', 'Send to the brokers only')}</button>${seulWhy.n}
+            <button class="btn btn-primary btn-block" id="btn-send-broker-buyer"${choixWhy.a}>${tr(`Envoyer aux courtiers et à ${esc(buyer.prenom)}`, `Send to the agents and to ${esc(buyer.prenom)}`)}</button>${choixWhy.n}
+            <button class="btn btn-outline btn-block" id="btn-send-broker-only"${seulWhy.a}>${tr('Envoyer aux courtiers seulement', 'Send to the agents only')}</button>${seulWhy.n}
           ` : `
             <button class="btn btn-primary btn-block" id="btn-send-broker-only" ${n ? '' : 'disabled'}>
               ${n ? tr(`Envoyer ${n} demande${n > 1 ? 's' : ''}`, `Send ${n} request${n > 1 ? 's' : ''}`) : tr('Choisissez au moins une propriété', 'Choose at least one listing')}
@@ -3754,8 +3985,8 @@ function renderConfirmSendUpdateModal() {
         <div class="modal-body" style="padding-top:24px;">
           <h2 id="modal-title" style="font-size:17px;text-align:center;color:var(--bleu-principal);margin:0 0 18px;">${tr('Envoyer la mise à jour à', 'Send the update to')}</h2>
           <div style="display:flex;flex-direction:column;gap:12px;">
-            <button class="btn btn-primary btn-block" id="btn-send-update-broker-buyer">${tr('Courtier et acheteur', 'Broker and buyer')}</button>
-            <button class="btn btn-primary btn-block" id="btn-send-update-broker-only">${tr('Courtier uniquement', 'Broker only')}</button>
+            <button class="btn btn-primary btn-block" id="btn-send-update-broker-buyer">${tr('Courtier et acheteur', 'Agent and buyer')}</button>
+            <button class="btn btn-primary btn-block" id="btn-send-update-broker-only">${tr('Courtier uniquement', 'Agent only')}</button>
           </div>
         </div>
       </div>
@@ -3963,7 +4194,7 @@ function renderDestinationModal() {
   let body = '';
 
   if (tab === 'nom' || tab === 'adresse' || tab === 'mls') {
-    const placeholder = tab === 'mls' ? tr('Entrez le numéro MLS...', 'Enter the MLS number...') : tab === 'adresse' ? tr('Entrez l\'addresse...', 'Enter the address...') : tr('Entrez un nom de courtier...', 'Enter a broker name...');
+    const placeholder = tab === 'mls' ? tr('Entrez le numéro MLS...', 'Enter the MLS number...') : tab === 'adresse' ? tr('Entrez l\'addresse...', 'Enter the address...') : tr('Entrez un nom de courtier...', 'Enter an agent name...');
     let results = [];
     if (q) {
       results = MLS_POOL.filter(p => {
@@ -4205,7 +4436,7 @@ function renderReportScreen() {
       <span class="vr-broker-avatar">${esc(initials)}</span>
       <div>
         <p class="vr-broker-name">${esc(courtier)}</p>
-        <p class="vr-broker-agency">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing broker, ${currentBrandName()}`)}</p>
+        <p class="vr-broker-agency">${tr(`Courtier inscripteur, ${currentBrandName()}`, `Listing agent, ${currentBrandName()}`)}</p>
       </div>
     </div>
     <div class="vr-property">
@@ -4396,6 +4627,13 @@ function bindEvents() {
 
   const flagsBtn = document.getElementById('btn-flags');
   if (flagsBtn) flagsBtn.onclick = () => { state.modal = { type: 'flags' }; render(); };
+
+  const collapseBtn = document.getElementById('sidebar-collapse-btn');
+  if (collapseBtn) collapseBtn.onclick = () => {
+    state.sidebarCollapsed = !state.sidebarCollapsed;
+    saveSidebarCollapsed();
+    render();
+  };
 
   if (state.screen === 'list') bindListEvents();
   if (state.screen === 'contact') bindContactEvents();
@@ -4807,7 +5045,7 @@ function bindBuilderEvents() {
   const relanceBtn = document.getElementById('btn-relance');
   if (relanceBtn) relanceBtn.onclick = () => {
     relanceTour();
-    showToast(tr('Relance envoyée aux courtiers qui n\'ont pas encore répondu.', 'Follow-up sent to the brokers who haven\'t responded yet.'), 'success');
+    showToast(tr('Relance envoyée aux courtiers qui n\'ont pas encore répondu.', 'Follow-up sent to the agents who haven\'t responded yet.'), 'success');
   };
 
   const sendBtn = document.getElementById('btn-send-tour');
@@ -5407,6 +5645,7 @@ function bindModalEvents() {
     const btn = document.getElementById('btn-confirm-delete-contact');
     if (btn) btn.onclick = () => {
       state.contacts = state.contacts.filter(c => c.id !== state.modal.contactId);
+      if (state.directorySelectedId === state.modal.contactId) state.directorySelectedId = null;
       state.modal = null;
       render();
       showToast(tr('Contact supprimé.', 'Contact deleted.'));
