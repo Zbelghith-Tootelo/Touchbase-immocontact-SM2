@@ -237,6 +237,8 @@ CONTACTS.forEach(c => {
   c.photo = CONTACT_PHOTOS[c.id] ? `assets/directory/avatar-${CONTACT_PHOTOS[c.id]}.jpg` : null;
   c.notes = '';
 });
+CONTACTS[0].tel2 = '418 123 8800';
+CONTACTS[0].email2 = 'jean.dupont@example.com';
 CONTACTS[0].notes = { fr: 'Cherche une maison jumelée à Boucherville, pas un condo.', en: 'Looking for a semi-detached home in Boucherville, not a condominium.' };
 
 const COURTIERS_INSCRIPTEURS = ['Marie-Ève Gagnon', 'Patrick Simard', 'Nathalie Côté', 'Éric Bouchard', 'Sylvie Paquette'];
@@ -1535,7 +1537,8 @@ function renderSidebarNav() {
     const hors = WIRED_NAV.has(item.id) ? '' : tr(' — section absente de ce prototype', ' — not wired up in this prototype');
     return `
     <a href="#" class="nav-item ${active ? 'active' : ''}" data-nav="${item.id}"
-      title="${esc(label)}${hors}"
+      data-tip="${esc(label)}${hors ? `\n${esc(tr('Section absente de ce prototype', 'Not wired up in this prototype'))}` : ''}"
+      ${state.sidebarCollapsed ? '' : `title="${esc(label)}${hors}"`}
       ${active ? 'aria-current="page"' : ''}
       aria-label="${esc(label)}${item.badge ? `, ${item.badge} ${tr('en attente', 'pending')}` : ''}${hors}">
       <span class="nav-icon"><img src="${iconSrc}" alt=""></span>
@@ -1595,6 +1598,7 @@ function renderBrand() {
     img.setAttribute('src', p.favicon);
     img.setAttribute('alt', p.brand);
     img.setAttribute('title', p.brand);
+    img.setAttribute('data-tip', p.brand);
   });
   document.title = `${p.brand} — ${tr('Tour de visites', 'Buyer\'s tours')}`;
 }
@@ -1638,7 +1642,53 @@ function syncStaticChrome() {
     collapseBtn.title = label;
     collapseBtn.setAttribute('aria-label', label);
     collapseBtn.setAttribute('aria-expanded', state.sidebarCollapsed ? 'false' : 'true');
+    collapseBtn.setAttribute('data-tip', label);
   }
+  const logoutLink = document.querySelector('.sidebar-bottom [data-nav="logout"]');
+  if (logoutLink) logoutLink.setAttribute('data-tip', staticStr('logout'));
+  const logoMark = document.querySelector('.logo-mark');
+  if (logoMark && !logoMark.getAttribute('data-tip')) logoMark.setAttribute('data-tip', logoMark.getAttribute('alt') || '');
+  // L'infobulle maison remplace celle du navigateur menu réduit : les deux
+  // ensemble s'afficheraient l'une sur l'autre.
+  document.querySelectorAll('.sidebar [data-tip]').forEach(el => {
+    if (state.sidebarCollapsed) el.removeAttribute('title');
+  });
+  hideSidebarTip();
+}
+
+/* ---------------- Infobulles du menu réduit ---------------- */
+// Un seul élément fixe placé à côté de l'icône survolée, pas un pseudo-élément :
+// la liste de navigation défile (overflow), ce qui rognerait une infobulle
+// positionnée dans le flux. Seulement menu réduit — déplié, le libellé est déjà là.
+let sidebarTipEl = null;
+function hideSidebarTip() {
+  if (sidebarTipEl) sidebarTipEl.classList.remove('visible');
+}
+function showSidebarTip(target) {
+  if (!state.sidebarCollapsed) return;
+  const text = target.getAttribute('data-tip');
+  if (!text) return;
+  if (!sidebarTipEl) {
+    sidebarTipEl = document.createElement('div');
+    sidebarTipEl.className = 'sidebar-tip';
+    sidebarTipEl.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(sidebarTipEl);
+  }
+  sidebarTipEl.textContent = text;
+  const r = target.getBoundingClientRect();
+  sidebarTipEl.style.left = `${Math.round(r.right + 12)}px`;
+  sidebarTipEl.style.top = `${Math.round(r.top + r.height / 2)}px`;
+  sidebarTipEl.classList.add('visible');
+}
+function initSidebarTips() {
+  const side = document.querySelector('.sidebar');
+  if (!side) return;
+  side.addEventListener('mouseover', e => { const t = e.target.closest('[data-tip]'); if (t) showSidebarTip(t); });
+  side.addEventListener('mouseout', e => { if (e.target.closest('[data-tip]')) hideSidebarTip(); });
+  side.addEventListener('focusin', e => { const t = e.target.closest('[data-tip]'); if (t && e.target.matches(':focus-visible')) showSidebarTip(t); });
+  side.addEventListener('focusout', hideSidebarTip);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideSidebarTip(); });
+  side.addEventListener('scroll', hideSidebarTip, true);
 }
 
 function setTopbarTitle(title) {
@@ -1790,7 +1840,7 @@ function filteredDirectoryRows() {
   const q = normalizeText(state.directorySearch).trim();
   const rows = directoryRows();
   if (!q) return rows;
-  return rows.filter(r => normalizeText(`${r.prenom} ${r.nom} ${r.email || ''} ${r.tel || ''} ${r.bureau || ''}`).includes(q));
+  return rows.filter(r => normalizeText(`${r.prenom} ${r.nom} ${r.email || ''} ${r.email2 || ''} ${r.tel || ''} ${r.tel2 || ''} ${r.bureau || ''}`).includes(q));
 }
 
 // 1, 2, 3 … dernière : le même schéma que la maquette, sans énumérer 50 pages
@@ -1908,8 +1958,10 @@ function directoryPreviewHtml(c) {
             <p class="directory-preview-type">${esc(contactTypeLabel(c))}</p>
           </div>
         </div>
-        <div class="directory-preview-field"><p class="directory-preview-label">${tr('Numéro de téléphone', 'Phone number')}</p><p class="directory-preview-value">${c.tel ? esc(c.tel) : '—'}</p></div>
+        <div class="directory-preview-field"><p class="directory-preview-label">${tr('Numéro de mobile', 'Mobile number')}</p><p class="directory-preview-value">${c.tel ? esc(c.tel) : '—'}</p></div>
+        ${c.tel2 ? `<div class="directory-preview-field"><p class="directory-preview-label">${tr('Autre numéro de téléphone', 'Other phone number')}</p><p class="directory-preview-value">${esc(c.tel2)}</p></div>` : ''}
         <div class="directory-preview-field"><p class="directory-preview-label">${tr('Courriel', 'Email')}</p><p class="directory-preview-value">${c.email ? esc(c.email) : '—'}</p></div>
+        ${c.email2 ? `<div class="directory-preview-field"><p class="directory-preview-label">${tr('Courriel additionnel', 'Additional email')}</p><p class="directory-preview-value">${esc(c.email2)}</p></div>` : ''}
         <div class="directory-preview-field"><p class="directory-preview-label">${tr('Notes', 'Notes')}</p><p class="directory-preview-notes">${notes ? esc(notes) : `<span class="directory-preview-empty">${tr('Aucune note.', 'No notes.')}</span>`}</p></div>
       </div>
       <div class="directory-preview-actions">${actions}</div>
@@ -2017,7 +2069,7 @@ function startTourForContact(c) {
 }
 
 function emptyContactDraft() {
-  return { prenom: '', nom: '', tel: '', email: '', notes: '', photo: null, acheteur: false, vendeur: false, prospect: false, agent: false, sms: false, emailPref: false };
+  return { prenom: '', nom: '', tel: '', tel2: '', email: '', email2: '', notes: '', photo: null, acheteur: false, vendeur: false, prospect: false, agent: false, sms: false, emailPref: false };
 }
 
 function bindDirectoryEvents() {
@@ -2078,7 +2130,7 @@ function bindDirectoryEvents() {
       const c = state.contacts.find(c => c.id === btn.getAttribute('data-directory-edit'));
       if (!c) return;
       state.contactFormDraft = {
-        id: c.id, prenom: c.prenom, nom: c.nom, tel: c.tel, email: c.email, notes: noteText(c.notes), photo: c.photo || null,
+        id: c.id, prenom: c.prenom, nom: c.nom, tel: c.tel, tel2: c.tel2 || '', email: c.email, email2: c.email2 || '', notes: noteText(c.notes), photo: c.photo || null,
         acheteur: !!c.type.acheteur, vendeur: !!c.type.vendeur, prospect: !!c.type.prospect, agent: !!c.type.agent,
         sms: !!c.comm.sms, emailPref: !!c.comm.email,
       };
@@ -2134,12 +2186,12 @@ function renderContactFormScreen() {
   const photoActions = f.photo
     ? `<button type="button" class="cf-photo-btn" id="cf-photo-edit">${tr('Modifier', 'Edit')}</button>
        <button type="button" class="cf-photo-btn" id="cf-photo-replace">${tr('Remplacer', 'Replace')}</button>`
-    : `<button type="button" class="cf-photo-btn" id="cf-photo-replace">${tr('Ajouter', 'Add')}</button>`;
+    : `<button type="button" class="cf-photo-btn" id="cf-photo-replace">${tr('Ajouter une photo', 'Add photo')}</button>`;
 
   return `
     <div class="page-card contact-form-card">
       <div class="cf-header">
-        <p>${tr('Les modifications s\'appliquent à tous les outils connectés.', 'Changes apply across all connected tools.')}</p>
+        <p>${tr('Ce contact sera disponible dans tous les outils connectés.', 'This contact will be available across all connected tools.')}</p>
       </div>
       <section class="cf-photo" aria-labelledby="cf-photo-title">
         <h2 class="cf-section-title" id="cf-photo-title">${tr('Photo de profil', 'Profile photo')}</h2>
@@ -2158,20 +2210,32 @@ function renderContactFormScreen() {
           <label class="cf-label" for="cf-nom">${tr('Nom', 'Last name')} <span class="req">*</span></label>
           <input class="cf-input" id="cf-nom" value="${esc(f.nom)}" placeholder="${tr('Nom', 'Last name')}" autocomplete="family-name">
         </div>
-        <div class="cf-field">
-          <label class="cf-label" for="cf-tel">${tr('Numéro de téléphone', 'Phone number')}</label>
-          <input class="cf-input" id="cf-tel" type="tel" value="${esc(f.tel)}" placeholder="(XXX) XXX-XXXX" autocomplete="tel">
+        <div class="cf-row">
+          <div class="cf-field">
+            <label class="cf-label" for="cf-tel">${tr('Numéro de mobile', 'Mobile number')}</label>
+            <input class="cf-input" id="cf-tel" type="tel" value="${esc(f.tel)}" placeholder="(XXX) XXX-XXXX" autocomplete="tel">
+          </div>
+          <div class="cf-field">
+            <label class="cf-label" for="cf-tel2">${tr('Autre numéro de téléphone', 'Other phone number')}</label>
+            <input class="cf-input" id="cf-tel2" type="tel" value="${esc(f.tel2)}" placeholder="(XXX) XXX-XXXX">
+          </div>
         </div>
-        <div class="cf-field">
-          <label class="cf-label" for="cf-email">${tr('Courriel', 'Email')}</label>
-          <input class="cf-input" id="cf-email" type="email" value="${esc(f.email)}" placeholder="${tr('Courriel', 'Email')}" autocomplete="email">
+        <div class="cf-row">
+          <div class="cf-field">
+            <label class="cf-label" for="cf-email">${tr('Courriel', 'Email')}</label>
+            <input class="cf-input" id="cf-email" type="email" value="${esc(f.email)}" placeholder="${tr('nom@exemple.com', 'name@example.com')}" autocomplete="email">
+          </div>
+          <div class="cf-field">
+            <label class="cf-label" for="cf-email2">${tr('Courriel additionnel', 'Additional email')}</label>
+            <input class="cf-input" id="cf-email2" type="email" value="${esc(f.email2)}" placeholder="${tr('nom@exemple.com', 'name@example.com')}">
+          </div>
         </div>
         <div class="cf-field cf-field-notes">
           <label class="cf-label" for="cf-notes">${tr('Notes', 'Notes')}</label>
           <textarea class="cf-notes" id="cf-notes" placeholder="${tr('Ajouter une note…', 'Add a note…')}">${esc(f.notes)}</textarea>
         </div>
         <fieldset class="cf-group">
-          <legend class="cf-section-title">${tr('Types de contact :', 'Types of contact:')}</legend>
+          <legend class="cf-section-title">${tr('Types de contact', 'Contact types')}</legend>
           <div class="cf-checks">
             ${check('cf-acheteur', f.acheteur, tr('Acheteur', 'Buyer'))}
             ${check('cf-vendeur', f.vendeur, tr('Vendeur', 'Seller'))}
@@ -2180,7 +2244,7 @@ function renderContactFormScreen() {
           </div>
         </fieldset>
         <fieldset class="cf-group">
-          <legend class="cf-section-title">${tr('Méthode de communication préférée :', 'Preferred Communication Method:')}</legend>
+          <legend class="cf-section-title">${tr('Modes de communication préférés', 'Preferred communication methods')}</legend>
           <div class="cf-checks">
             ${check('cf-sms', f.sms, 'SMS')}
             ${check('cf-emailpref', f.emailPref, tr('Courriel', 'Email'))}
@@ -2188,7 +2252,7 @@ function renderContactFormScreen() {
         </fieldset>
       </div>
       <div class="contact-form-actions">
-        <button class="btn btn-primary" id="contact-save" ${valid ? '' : 'disabled'} title="${valid ? '' : reason}" aria-describedby="contact-save-why">${editing ? tr('Enregistrer les modifications', 'Save changes') : tr('Enregistrer', 'Save')}</button>
+        <button class="btn btn-primary" id="contact-save" ${valid ? '' : 'disabled'} title="${valid ? '' : reason}" aria-describedby="contact-save-why">${editing ? tr('Enregistrer les modifications', 'Save changes') : tr('Enregistrer le contact', 'Save contact')}</button>
         <span id="contact-save-why" class="sr-only">${reason}</span>
         <button class="btn btn-outline" id="contact-cancel">${tr('Annuler', 'Cancel')}</button>
       </div>
@@ -2217,7 +2281,9 @@ function bindContactFormEvents() {
   bindField('cf-prenom', 'prenom', true);
   bindField('cf-nom', 'nom', true);
   bindField('cf-tel', 'tel', false);
+  bindField('cf-tel2', 'tel2', false);
   bindField('cf-email', 'email', false);
+  bindField('cf-email2', 'email2', false);
   bindField('cf-notes', 'notes', false);
   [['cf-acheteur', 'acheteur'], ['cf-vendeur', 'vendeur'], ['cf-prospect', 'prospect'], ['cf-agent', 'agent'], ['cf-sms', 'sms'], ['cf-emailpref', 'emailPref']].forEach(([id, key]) => {
     const el = document.getElementById(id);
@@ -2247,7 +2313,7 @@ function bindContactFormEvents() {
   if (saveBtn) saveBtn.onclick = () => {
     if (!contactFormValid(f)) return;
     const payload = {
-      prenom: f.prenom.trim(), nom: f.nom.trim(), tel: f.tel.trim(), email: f.email.trim(), notes: f.notes.trim(),
+      prenom: f.prenom.trim(), nom: f.nom.trim(), tel: f.tel.trim(), tel2: f.tel2.trim(), email: f.email.trim(), email2: f.email2.trim(), notes: f.notes.trim(),
       photo: f.photo || null,
       type: { acheteur: f.acheteur, vendeur: f.vendeur, prospect: f.prospect, agent: f.agent },
       comm: { sms: f.sms, email: f.emailPref },
@@ -6086,4 +6152,5 @@ function bindDestinationModalEvents() {
 
 /* ---------------- Init ---------------- */
 
+initSidebarTips();
 render();
