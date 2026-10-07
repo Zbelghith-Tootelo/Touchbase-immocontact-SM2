@@ -130,7 +130,7 @@ a { color: inherit; text-decoration: none; }
 .nav-item:hover { background: rgba(33, 49, 99, 0.06); }
 
 .nav-item.active {
-  background: var(--bleu-principal);
+  background: var(--bleu-secondaire);
   color: var(--blanc);
 }
 
@@ -153,7 +153,6 @@ a { color: inherit; text-decoration: none; }
   justify-content: center;
 }
 
-.nav-item.active .nav-badge { background: var(--blanc); color: var(--bleu-principal); }
 
 .sidebar-bottom { display: flex; flex-direction: column; gap: 16px; }
 
@@ -177,7 +176,7 @@ a { color: inherit; text-decoration: none; }
   cursor: pointer;
 }
 .lang-toggle button + button { border-left: 1px solid var(--bordures); }
-.lang-toggle button.active { background: var(--bleu-principal); color: var(--blanc); }
+.lang-toggle button.active { background: var(--bleu-secondaire); color: var(--blanc); }
 
 .sidebar-flag {
   display: flex;
@@ -1425,7 +1424,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   font-size: 14px; font-weight: 400; cursor: pointer;
 }
 .property-tabs button + button { border-left: 1px solid var(--bordures); }
-.property-tabs button.active { background: var(--bleu-principal); color: var(--blanc); border-left-color: var(--bleu-principal); }
+.property-tabs button.active { background: var(--bleu-secondaire); color: var(--blanc); border-left-color: var(--bleu-secondaire); }
 
 .property-list { border-top: 1px solid var(--bordures); }
 .property-row {
@@ -1587,7 +1586,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   min-width: 32px; height: 32px; padding: 0 10px; border-radius: 50px; border: 1px solid var(--bordures);
   background: var(--blanc); color: var(--bleu-principal); font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit;
 }
-.pagination-num.active { background: var(--bleu-principal); border-color: var(--bleu-principal); color: var(--blanc); }
+.pagination-num.active { background: var(--bleu-secondaire); border-color: var(--bleu-secondaire); color: var(--blanc); }
 .pagination-ellipsis { color: var(--bleu-principal); font-size: 14px; padding: 0 4px; }
 
 /* Carte mobile d'un contact : cachée par défaut, elle prend le relais du
@@ -1677,7 +1676,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   width: 20px; height: 20px; border: 1px solid var(--bleu-principal); border-radius: 4px; background: var(--blanc); cursor: pointer;
 }
 .cf-check:checked {
-  background: var(--bleu-principal) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 6.3l2.4 2.4 4.6-5' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px no-repeat;
+  background: var(--bleu-secondaire) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 6.3l2.4 2.4 4.6-5' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px no-repeat;
 }
 .cf-check:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 
@@ -1749,7 +1748,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   width: 20px; height: 20px; border: 1px solid var(--bleu-principal); border-radius: 4px; background: var(--blanc); color: var(--blanc);
 }
-.team-check.on { background: var(--bleu-principal); }
+.team-check.on { background: var(--bleu-secondaire); }
 .team-check svg { width: 12px; height: 12px; }
 .team-pill--select.active .team-check { border-color: var(--blanc); background: transparent; }
 
@@ -1925,13 +1924,13 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
 .avail-minical-cell { border: none; background: none; padding: 6px 0; font-size: 13px; border-radius: 999px; cursor: pointer; color: var(--texte-principal); }
 .avail-minical-cell:hover { background: var(--lumiere-principale); }
 .avail-minical-cell.is-today { font-weight: 700; color: var(--bleu-principal); }
-.avail-minical-cell.is-selected { background: var(--bleu-principal); color: var(--blanc); }
+.avail-minical-cell.is-selected { background: var(--bleu-secondaire); color: var(--blanc); }
 .avail-minical-cell.is-empty { cursor: default; }
 
 .avail-view-toggle { display: flex; border: 1px solid var(--bordures); border-radius: var(--radius-xl); overflow: hidden; }
 .avail-view-toggle button { padding: 8px 18px; border: none; background: var(--blanc); color: var(--bleu-principal); font-weight: 500; cursor: pointer; }
 .avail-view-toggle button + button { border-left: 1px solid var(--bordures); }
-.avail-view-toggle button.active { background: var(--bleu-principal); color: var(--blanc); }
+.avail-view-toggle button.active { background: var(--bleu-secondaire); color: var(--blanc); }
 
 /* En-tête et grille partagent un seul conteneur défilant : deux conteneurs
    indépendants (chacun avec sa propre largeur naturelle) désynchronisaient
@@ -1987,7 +1986,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   border: 1.5px solid var(--bordures); border-radius: 999px; padding: 7px 14px; background: var(--blanc);
   font-size: 13px; font-weight: 600; color: var(--texte-principal); cursor: pointer;
 }
-.avail-day-pill.active, .avail-recur-pill.active { border-color: var(--bleu-principal); background: var(--bleu-principal); color: var(--blanc); }
+.avail-day-pill.active, .avail-recur-pill.active { border-color: var(--bleu-secondaire); background: var(--bleu-secondaire); color: var(--blanc); }
 
 /* ---------- Mobile chrome (hidden on desktop) ---------- */
 
@@ -2160,7 +2159,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   background: var(--blanc); color: var(--bleu-principal); font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
 }
 .inbox-tabs button:first-child { border-left: none; }
-.inbox-tabs button.active { background: var(--bleu-principal); color: var(--blanc); font-weight: 700; }
+.inbox-tabs button.active { background: var(--bleu-secondaire); color: var(--blanc); font-weight: 700; }
 .inbox-tabs button:focus-visible { outline: var(--focus-ring); outline-offset: -3px; }
 
 .inbox-chips { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -2169,7 +2168,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   border: 1px solid var(--bordures); background: var(--blanc); color: var(--bleu-principal);
   font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
 }
-.inbox-chip.active { background: var(--bleu-principal); border-color: var(--bleu-principal); color: var(--blanc); }
+.inbox-chip.active { background: var(--bleu-secondaire); border-color: var(--bleu-secondaire); color: var(--blanc); }
 .inbox-chip:focus-visible, .inbox-type-select:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .inbox-chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .inbox-chip-count { opacity: 0.8; }
@@ -2221,7 +2220,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   border-radius: 4px; background: var(--blanc) center / 14px no-repeat; cursor: pointer;
 }
 .inbox-check input:checked {
-  background-color: var(--bleu-principal);
+  background-color: var(--bleu-secondaire); border-color: var(--bleu-secondaire);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none'%3E%3Cpath d='M2.5 7.5l3 3 6-6.5' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 .inbox-check input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
@@ -2254,7 +2253,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   .inbox-table.is-selecting .inbox-card-who > .directory-avatar:first-child { display: none; }
   .inbox-card.is-selected { border-color: var(--bleu-secondaire); }
   .inbox-card.is-selected .inbox-card-mark {
-    background-color: var(--bleu-principal);
+    background-color: var(--bleu-secondaire);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none'%3E%3Cpath d='M2.5 7.5l3 3 6-6.5' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
   /* Barre de sélection : une ligne pour l'état (compte, tout sélectionner,
@@ -2281,10 +2280,11 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   .inbox-card-prop .inbox-status-icon { width: 24px; height: 20px; }
   .inbox-card-date { margin: 0; padding-left: 30px; font-size: 13px; font-weight: 700; color: var(--bleu-principal); }
   .inbox-card:not(.is-unread) .inbox-card-who, .inbox-card:not(.is-unread) .inbox-open, .inbox-card:not(.is-unread) .inbox-card-prop, .inbox-card:not(.is-unread) .inbox-card-date { font-weight: 500; }
-  .inbox-tabs { flex-wrap: wrap; }
-  .inbox-tabs button { flex: 1 1 50%; border-top: 1px solid var(--bordures); }
-  .inbox-tabs button:nth-child(-n+2) { border-top: none; }
-  .inbox-tabs button:nth-child(3) { border-left: none; }
+  /* Les quatre onglets tiennent sur une seule ligne : le plus long (« Programmés /
+     Brouillons ») reçoit plus de largeur et passe sur deux lignes plutôt que de
+     faire déborder ou replier la rangée. */
+  .inbox-tabs button { flex: 1 1 0; height: 48px; padding: 0 4px; font-size: 13px; line-height: 1.15; }
+  .inbox-tabs button:nth-child(3) { flex-grow: 1.7; }
   /* Bouton flottant : toujours sous le pouce, en bas à droite. On réserve de la
      place sous la liste pour que la dernière carte reste accessible, et on le
      retire pendant une sélection, où les actions sont en haut. */
@@ -2295,3 +2295,27 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   }
   .inbox-page:has(.inbox-table.is-selecting) .inbox-new-btn { display: none; }
 }
+
+
+/* Bouton « Nouveau message » en tête du menu : l'action principale, en bleu foncé
+   comme tous les CTA, alors que la section courante se marque en bleu plus clair. */
+.sidebar-new-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0;
+  height: 42px; padding: 0 12px; border: none; border-radius: 10px; cursor: pointer;
+  background: var(--bleu-principal); color: var(--blanc);
+  font-family: inherit; font-size: 16px; font-weight: 600; white-space: nowrap;
+  box-shadow: var(--shadow-sm); transition: background 0.15s ease;
+}
+.sidebar-new-btn:hover { background: var(--bleu-principal-dark); }
+.sidebar-new-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.sidebar-new-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+body.sidebar-collapsed .sidebar-new-btn { width: 42px; padding: 0; }
+body.sidebar-collapsed .sidebar-new-btn span { display: none; }
+
+/* Toutes les barres de recherche : 42 px de haut, partout. Le champ de la liste
+   des tours, de la recherche d'acheteur et des destinations (.search-bar), le
+   répertoire et la messagerie (.directory-searchbar) et l'équipe (.team-search)
+   partageaient trois hauteurs différentes. */
+.search-bar .input,
+.directory-searchbar,
+.team-search { height: 42px; min-height: 42px; box-sizing: border-box; flex-shrink: 0; }

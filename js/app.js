@@ -1506,8 +1506,6 @@ function tourStartIsFixed(draft) {
 // prototype, absents de cette maquette, suivent ce même registre.
 const NAV_ITEMS = [
   { id: 'inbox', labelFr: 'Messagerie', labelEn: 'Messages', img: 'assets/menu/inbox.svg', get badge() { return inboxUnreadCount(); } },
-  { id: 'sendmsg', labelFr: 'Envoi de message', labelEn: 'Send message', img: 'assets/menu/send.svg' },
-  { id: 'waiting', labelFr: 'Attente de réponse', labelEn: 'Pending responses', img: 'assets/menu/wait.svg', badge: 3 },
   { id: 'tours', labelFr: 'Tour de visites', labelEn: 'Buyer\'s tours', img: 'assets/menu/tour.svg' },
   { id: 'properties', labelFr: 'Mes propriétés', labelEn: 'My listings', img: 'assets/menu/properties.svg' },
   { id: 'directory', labelFr: 'Répertoire', labelEn: 'Directory', img: 'assets/menu/directory.svg' },
@@ -1544,7 +1542,12 @@ const NAV_ACTIVE_ICONS = { inbox: 'assets/menu/inbox-white.svg', tours: 'assets/
 function renderSidebarNav() {
   const el = document.getElementById('sidebar-nav');
   const activeId = navActiveId();
-  el.innerHTML = NAV_ITEMS.map(item => {
+  // L'action principale ouvre le menu, avant les sections : un CTA, pas une rubrique.
+  const newMsg = `
+    <button class="sidebar-new-btn" id="btn-sidebar-new-message" data-tip="${esc(tr('Nouveau message', 'New message'))}" ${state.sidebarCollapsed ? '' : `title="${esc(tr('Nouveau message', 'New message'))}"`} aria-label="${esc(tr('Nouveau message', 'New message'))}">
+      ${icon('plus')}<span>${tr('Nouveau message', 'New message')}</span>
+    </button>`;
+  el.innerHTML = newMsg + NAV_ITEMS.map(item => {
     const active = item.id === activeId;
     const iconSrc = active ? (NAV_ACTIVE_ICONS[item.id] || item.img) : item.img;
     const label = navItemLabel(item);
@@ -5401,6 +5404,9 @@ function bindEvents() {
       showToast(tr('Cette section n\'est pas incluse dans ce prototype.', 'This section isn\'t included in this prototype.'));
     };
   });
+
+  const newMessageBtn = document.getElementById('btn-sidebar-new-message');
+  if (newMessageBtn) newMessageBtn.onclick = () => showToast(tr('L\'envoi de message n\'est pas encore disponible dans ce prototype.', 'Sending a message isn\'t wired up in this prototype yet.'));
 
   const menuBtn = document.getElementById('mobile-menu-btn');
   if (menuBtn) menuBtn.onclick = () => leaveTour(() => { state.screen = 'menu'; state.draft = null; });
