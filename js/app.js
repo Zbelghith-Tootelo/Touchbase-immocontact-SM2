@@ -1108,7 +1108,7 @@ const state = {
   inbox: seedInbox(),        // messages de la messagerie
   inboxTab: 'recus',         // recus | envoyes | programmes | archives
   inboxSearch: '',
-  inboxFilter: 'tous',       // tous | nouveau | attente | annulation
+  inboxFilter: 'tous',       // tous | nouveau | attente
   inboxType: '',             // '' ou une clé de INBOX_STATUSES
   inboxSelected: [],         // ids cochés
   directoryTab: 'tous',      // tous | acheteurs | vendeurs | prospects | courtiers | favoris
@@ -2263,7 +2263,6 @@ function inboxVisibleRows() {
   return inboxTabRows().filter(x => {
     if (state.inboxFilter === 'nouveau' && !x.unread) return false;
     if (state.inboxFilter === 'attente' && !INBOX_WAITING.includes(x.status)) return false;
-    if (state.inboxFilter === 'annulation' && x.status !== 'annulation') return false;
     if (state.inboxType && x.status !== state.inboxType) return false;
     if (!q) return true;
     return `${x.courtier} ${x.client || ''} ${x.property}`.toLowerCase().includes(q);
@@ -2325,11 +2324,10 @@ function renderInboxScreen() {
   const counts = {
     nouveau: base.filter(x => x.unread).length,
     attente: base.filter(x => INBOX_WAITING.includes(x.status)).length,
-    annulation: base.filter(x => x.status === 'annulation').length,
   };
-  const chip = (id, label, dot) => `
+  const chip = (id, label) => `
     <button class="inbox-chip ${state.inboxFilter === id ? 'active' : ''}" data-inbox-filter="${id}" aria-pressed="${state.inboxFilter === id}">
-      ${dot ? `<span class="inbox-chip-dot" style="background:${dot}"></span>` : ''}${label}${id !== 'tous' ? ` <span class="inbox-chip-count">· ${counts[id]}</span>` : ''}
+      ${label}${id !== 'tous' ? ` <span class="inbox-chip-count">· ${counts[id]}</span>` : ''}
     </button>`;
   const tabsHtml = INBOX_TABS.map(t => `
     <button class="${state.inboxTab === t.id ? 'active' : ''}" data-inbox-tab="${t.id}" aria-pressed="${state.inboxTab === t.id}">${tr(t.labelFr, t.labelEn)}</button>`).join('');
@@ -2379,9 +2377,8 @@ function renderInboxScreen() {
       </div>
       <div class="inbox-chips">
         ${chip('tous', tr('Tous', 'All'))}
-        ${chip('nouveau', tr('Nouveau', 'New'), '#28A745')}
-        ${chip('attente', tr('En attente', 'Waiting'), '#F59E0B')}
-        ${chip('annulation', tr('Annulation', 'Cancellation'), '#E8590C')}
+        ${chip('nouveau', tr('Nouveau', 'New'))}
+        ${chip('attente', tr('En attente', 'Waiting'))}
         <label class="inbox-type">
           <span class="visually-hidden">${tr('Type de message', 'Message type')}</span>
           <select id="inbox-type" class="inbox-type-select">

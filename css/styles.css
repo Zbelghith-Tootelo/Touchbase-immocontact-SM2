@@ -2170,7 +2170,6 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
 }
 .inbox-chip.active { background: var(--bleu-secondaire); border-color: var(--bleu-secondaire); color: var(--blanc); }
 .inbox-chip:focus-visible, .inbox-type-select:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
-.inbox-chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .inbox-chip-count { opacity: 0.8; }
 .inbox-type-select {
   height: 32px; padding: 0 30px 0 14px; border-radius: 50px; border: 1px solid var(--bordures); background-color: var(--blanc);
