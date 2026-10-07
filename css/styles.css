@@ -2203,6 +2203,8 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
 .inbox-cell-property, .inbox-cell-date { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inbox-status-icon { width: 30px; height: 25px; flex-shrink: 0; display: block; }
 .inbox-card { display: none; }
+.inbox-bulk-all { display: none; }
+.inbox-bulk-actions { display: contents; }
 .inbox-open { display: block; min-width: 0; padding: 0; border: none; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .inbox-open:focus-visible { outline: var(--focus-ring); outline-offset: 3px; border-radius: var(--radius-sm); }
 .inbox-cell-time { justify-content: flex-end; gap: 10px; font-size: 12px; font-weight: 500; }
@@ -2210,7 +2212,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
   background: var(--bleu-nav-10); color: var(--bleu-principal); font-size: 12px; font-weight: 600;
 }
-.inbox-row.is-unread .inbox-count { background: var(--bleu-secondaire); color: var(--blanc); }
+.inbox-row.is-unread .inbox-count, .inbox-card.is-unread .inbox-count { background: var(--bleu-secondaire); color: var(--blanc); }
 
 
 .inbox-check { display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -2243,7 +2245,29 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
     background: var(--blanc); border: 1px solid var(--bordures); border-radius: var(--radius-2xl);
   }
   .inbox-card.is-selected { background: var(--lumiere-principale); }
-  .inbox-card .inbox-check { width: 24px; height: 24px; flex-shrink: 0; }
+  /* Pas de case à cocher sur mobile : l'appui long commence la sélection, et le
+     rond de coche n'apparaît qu'une fois la sélection commencée. */
+  .inbox-card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; cursor: pointer; }
+  .inbox-card-mark { display: none; width: 22px; height: 22px; flex-shrink: 0; border: 1.5px solid var(--bleu-principal); border-radius: 50%; background: var(--blanc) center / 14px no-repeat; }
+  .inbox-table.is-selecting .inbox-card-mark { display: block; }
+  /* Le rond de coche prend la place de l'avatar du courtier : la ligne garde sa largeur. */
+  .inbox-table.is-selecting .inbox-card-who > .directory-avatar:first-child { display: none; }
+  .inbox-card.is-selected { border-color: var(--bleu-secondaire); }
+  .inbox-card.is-selected .inbox-card-mark {
+    background-color: var(--bleu-principal);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none'%3E%3Cpath d='M2.5 7.5l3 3 6-6.5' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  /* Barre de sélection : une ligne pour l'état (compte, tout sélectionner,
+     annuler), une pour les actions. Elle reste collée en haut pendant le défilement. */
+  .inbox-bulk { position: sticky; top: 0; z-index: 5; box-shadow: var(--shadow-sm); gap: 8px; padding: 10px 12px; }
+  .inbox-bulk > span:first-child { order: 1; flex: 1; margin-right: 0; }
+  .inbox-bulk [data-inbox-bulk="clear"] { order: 2; }
+  .inbox-bulk-actions { order: 3; flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+  .inbox-bulk .btn-inline { padding: 6px 10px; font-size: 13px; white-space: nowrap; }
+  .inbox-card-who .inbox-open { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+  .inbox-card-who .inbox-open > span { display: block; }
+  .inbox-card-client { flex: 1 1 0; }
+  .inbox-bulk-all { display: inline-flex; }
   .inbox-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
   .inbox-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .inbox-card-who { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; font-weight: 700; }
@@ -2251,15 +2275,23 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
   .inbox-card-who .inbox-open { font-weight: 700; flex-shrink: 1; }
   .inbox-card-sep { flex-shrink: 0; }
   .inbox-card-client { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .inbox-card-time { display: flex; align-items: center; gap: 8px; flex-shrink: 0; font-size: 14px; font-weight: 500; color: var(--bleu-secondaire); }
+  .inbox-card-time { display: flex; align-items: center; gap: 8px; flex-shrink: 0; font-size: 14px; font-weight: 500; color: var(--texte-principal); }
+  .inbox-card.is-unread .inbox-card-time { color: var(--bleu-secondaire); font-weight: 600; }
   .inbox-card-prop { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; line-height: 1.3; }
   .inbox-card-prop .inbox-status-icon { width: 24px; height: 20px; }
   .inbox-card-date { margin: 0; padding-left: 30px; font-size: 13px; font-weight: 700; color: var(--bleu-principal); }
   .inbox-card:not(.is-unread) .inbox-card-who, .inbox-card:not(.is-unread) .inbox-open, .inbox-card:not(.is-unread) .inbox-card-prop, .inbox-card:not(.is-unread) .inbox-card-date { font-weight: 500; }
-  .inbox-card .inbox-count { background: var(--bleu-secondaire); color: var(--blanc); }
   .inbox-tabs { flex-wrap: wrap; }
   .inbox-tabs button { flex: 1 1 50%; border-top: 1px solid var(--bordures); }
   .inbox-tabs button:nth-child(-n+2) { border-top: none; }
   .inbox-tabs button:nth-child(3) { border-left: none; }
-  .inbox-new-btn { width: 100%; justify-content: center; }
+  /* Bouton flottant : toujours sous le pouce, en bas à droite. On réserve de la
+     place sous la liste pour que la dernière carte reste accessible, et on le
+     retire pendant une sélection, où les actions sont en haut. */
+  .inbox-page { padding-bottom: 88px; }
+  .inbox-new-btn {
+    position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 20;
+    width: auto; min-height: 48px; padding: 12px 20px; border-radius: 999px; box-shadow: var(--shadow-md);
+  }
+  .inbox-page:has(.inbox-table.is-selecting) .inbox-new-btn { display: none; }
 }

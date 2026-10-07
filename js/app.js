@@ -2301,8 +2301,8 @@ function inboxRowHtml(x) {
       <span class="inbox-cell inbox-cell-date">${esc(inboxDateLabel(x))}</span>
       <span class="inbox-cell inbox-cell-time"><span>${esc(x.time)}</span><span class="inbox-count">${x.count}</span></span>
     </div>
-    <div class="inbox-card ${cls}" data-inbox-row="${x.id}">
-      ${check}
+    <div class="inbox-card ${cls}" data-inbox-row="${x.id}" aria-selected="${checked}">
+      <span class="inbox-card-mark" aria-hidden="true"></span>
       <div class="inbox-card-body">
         <div class="inbox-card-top">
           <span class="inbox-card-who">
@@ -2336,9 +2336,12 @@ function renderInboxScreen() {
   const bulk = !sel.length ? '' : `
     <div class="inbox-bulk" role="status">
       <span>${tr(`${sel.length} message${sel.length > 1 ? 's' : ''} sélectionné${sel.length > 1 ? 's' : ''}`, `${sel.length} message${sel.length > 1 ? 's' : ''} selected`)}</span>
-      <button class="btn-inline" data-inbox-bulk="read">${tr('Marquer comme lu', 'Mark as read')}</button>
-      <button class="btn-inline" data-inbox-bulk="unread">${tr('Marquer comme non lu', 'Mark as unread')}</button>
-      ${state.inboxTab !== 'archives' ? `<button class="btn-inline" data-inbox-bulk="archive">${tr('Archiver', 'Archive')}</button>` : ''}
+      <span class="inbox-bulk-actions">
+        ${allChecked ? '' : `<button class="btn-inline inbox-bulk-all" data-inbox-bulk="all">${tr('Tout sélectionner', 'Select all')}</button>`}
+        <button class="btn-inline" data-inbox-bulk="read">${tr('Marquer comme lu', 'Mark as read')}</button>
+        <button class="btn-inline" data-inbox-bulk="unread">${tr('Marquer comme non lu', 'Mark as unread')}</button>
+        ${state.inboxTab !== 'archives' ? `<button class="btn-inline" data-inbox-bulk="archive">${tr('Archiver', 'Archive')}</button>` : ''}
+      </span>
       <button class="btn-inline ghost" data-inbox-bulk="clear">${tr('Tout désélectionner', 'Clear selection')}</button>
     </div>`;
 
@@ -2352,7 +2355,7 @@ function renderInboxScreen() {
   const table = rows.length === 0
     ? `<div class="empty-state"><p>${empty}</p></div>`
     : `
-    <div class="inbox-table">
+    <div class="inbox-table${sel.length ? ' is-selecting' : ''}">
       <div class="inbox-row inbox-row-head">
         <label class="inbox-check"><input type="checkbox" id="inbox-check-all" ${allChecked ? 'checked' : ''} aria-label="${tr('Tout sélectionner', 'Select all')}"></label>
         <span class="inbox-cell">${tr('Courtier', 'Agent')}</span>
@@ -2390,6 +2393,13 @@ function renderInboxScreen() {
     </div>`;
 }
 
+// Après un appui long, le relâchement produit un clic que la carte ne doit pas
+// traiter. Le rendu remplace la carte pendant l'appui : un drapeau posé sur
+// l'élément serait perdu, d'où ce drapeau global levé au relâchement.
+let inboxSuppressClick = false;
+document.addEventListener('pointerup', () => { if (inboxSuppressClick) setTimeout(() => { inboxSuppressClick = false; }, 60); }, true);
+document.addEventListener('pointercancel', () => { inboxSuppressClick = false; }, true);
+
 function bindInboxEvents() {
   document.querySelectorAll('[data-inbox-tab]').forEach(b => {
     b.onclick = () => { state.inboxTab = b.getAttribute('data-inbox-tab'); state.inboxSelected = []; render(); };
@@ -2424,12 +2434,22 @@ function bindInboxEvents() {
     if (again) again.focus();
   };
 
+  const toggleSelect = (id) => {
+    state.inboxSelected = state.inboxSelected.includes(id) ? state.inboxSelected.filter(i => i !== id) : [...state.inboxSelected, id];
+    render();
+  };
+
   // Ouvrir un message le marque comme lu ; la conversation elle-même n'existe
   // pas dans ce prototype, et le toast le dit plutôt que de ne rien faire.
+  // Sur mobile, dès qu'un message est sélectionné, un appui bref bascule la
+  // sélection au lieu d'ouvrir : c'est le mode sélection des messageries.
   document.querySelectorAll('[data-inbox-row]').forEach(row => {
     row.onclick = (e) => {
       if (e.target.closest('[data-inbox-stop]')) return;
-      const x = state.inbox.find(m => m.id === row.getAttribute('data-inbox-row'));
+      if (inboxSuppressClick) return;
+      const id = row.getAttribute('data-inbox-row');
+      if (row.classList.contains('inbox-card') && state.inboxSelected.length) { toggleSelect(id); return; }
+      const x = state.inbox.find(m => m.id === id);
       if (!x) return;
       x.unread = false;
       render();
@@ -2437,9 +2457,35 @@ function bindInboxEvents() {
     };
   });
 
+  // Appui long (500 ms) sur une carte : commence la sélection. Le geste est
+  // annulé dès que le doigt bouge (défilement) ou se relève avant le délai.
+  document.querySelectorAll('.inbox-card').forEach(card => {
+    let timer = null, sx = 0, sy = 0;
+    const cancel = () => { clearTimeout(timer); timer = null; };
+    card.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      sx = e.clientX; sy = e.clientY;
+      cancel();
+      timer = setTimeout(() => {
+        timer = null;
+        inboxSuppressClick = true;
+        if (navigator.vibrate) navigator.vibrate(15);
+        toggleSelect(card.getAttribute('data-inbox-row'));
+      }, 500);
+    });
+    card.addEventListener('pointermove', (e) => { if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel(); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => card.addEventListener(t, cancel));
+    card.addEventListener('contextmenu', (e) => e.preventDefault());
+  });
+
   document.querySelectorAll('[data-inbox-bulk]').forEach(b => {
     b.onclick = () => {
       const kind = b.getAttribute('data-inbox-bulk');
+      if (kind === 'all') {
+        state.inboxSelected = [...new Set([...state.inboxSelected, ...inboxVisibleRows().map(x => x.id)])];
+        render();
+        return;
+      }
       const picked = state.inbox.filter(x => state.inboxSelected.includes(x.id));
       if (kind === 'read') picked.forEach(x => { x.unread = false; });
       if (kind === 'unread') picked.forEach(x => { x.unread = true; });
