@@ -53,7 +53,8 @@ const icon = (name, cls = '') => {
 const TOUR_ICON_HOUSES = `<path d="M14.0661 23.9069C13.7741 24.1079 13.4601 24.1575 13.1076 24.141C13.1048 25.5925 13.1186 27.0138 13.0993 28.4598C13.0855 29.231 12.4272 29.8783 11.656 29.8921C10.8848 29.9058 10.1108 29.8976 9.33686 29.8948C9.08897 29.8948 8.92371 29.7158 8.92371 29.4514C8.92096 28.7986 8.92371 28.1458 8.92096 27.493C8.92096 27.0634 8.92096 26.6309 8.92096 26.2012C8.9182 25.7578 8.64001 25.4741 8.19105 25.4686C7.76964 25.4631 7.34822 25.4631 6.92681 25.4686C6.48887 25.4741 6.20792 25.7605 6.20792 26.1985C6.20517 27.2644 6.20517 28.3276 6.20517 29.3935C6.20517 29.7488 6.05643 29.8976 5.69837 29.8976C4.99876 29.8976 4.29916 29.8976 3.59955 29.8976C2.67685 29.8948 2.02131 29.2503 2.0158 28.3248C2.0103 26.9311 2.01305 25.5347 2.01305 24.141C0.735032 24.2622 -0.00864168 22.8244 0.905802 21.8962C2.79528 20.0067 4.68477 18.1172 6.57701 16.2305C6.69544 16.1066 6.83316 16.0046 6.98465 15.922C7.42534 15.7017 8.11118 15.7705 8.52984 16.2002C9.59026 17.2882 10.6727 18.3541 11.7469 19.4283C12.5705 20.2546 13.3885 21.0864 14.2258 21.9017C14.7767 22.4388 14.7244 23.4689 14.0661 23.9069Z" stroke="#213163"/><path d="M14.0661 8.60688C13.7741 8.80795 13.4601 8.85753 13.1076 8.841C13.1048 10.2925 13.1186 11.7138 13.0993 13.1598C13.0855 13.931 12.4272 14.5783 11.656 14.5921C10.8848 14.6059 10.1108 14.5976 9.33686 14.5948C9.08897 14.5948 8.92371 14.4158 8.92371 14.1514C8.92096 13.4986 8.92371 12.8458 8.92096 12.193C8.92096 11.7634 8.92096 11.3309 8.92096 10.9013C8.9182 10.4578 8.64001 10.1741 8.19105 10.1686C7.76964 10.1631 7.34822 10.1631 6.92681 10.1686C6.48887 10.1741 6.20792 10.4606 6.20792 10.8985C6.20517 11.9644 6.20517 13.0276 6.20517 14.0935C6.20517 14.4489 6.05643 14.5976 5.69837 14.5976C4.99876 14.5976 4.29916 14.5976 3.59955 14.5976C2.67685 14.5948 2.02131 13.9503 2.0158 13.0249C2.0103 11.6312 2.01305 10.2347 2.01305 8.841C0.735032 8.96219 -0.00864168 7.52442 0.905802 6.59621C2.79528 4.70673 4.68477 2.81724 6.57701 0.930514C6.69544 0.806568 6.83316 0.704658 6.98465 0.622027C7.42534 0.401679 8.11118 0.470538 8.52984 0.900216C9.59026 1.98818 10.6727 3.05412 11.7469 4.12831C12.5705 4.95462 13.3885 5.78643 14.2258 6.60172C14.7767 7.13882 14.7244 8.16894 14.0661 8.60688Z" stroke="#213163"/><path d="M29.9661 8.60688C29.6741 8.80795 29.3601 8.85753 29.0076 8.841C29.0048 10.2925 29.0186 11.7138 28.9993 13.1598C28.9855 13.931 28.3272 14.5783 27.556 14.5921C26.7848 14.6059 26.0108 14.5976 25.2369 14.5948C24.989 14.5948 24.8237 14.4158 24.8237 14.1514C24.8209 13.4986 24.8237 12.8458 24.8209 12.193C24.8209 11.7634 24.8209 11.3309 24.8209 10.9013C24.8182 10.4578 24.54 10.1741 24.091 10.1686C23.6696 10.1631 23.2482 10.1631 22.8268 10.1686C22.3889 10.1741 22.1079 10.4606 22.1079 10.8985C22.1052 11.9644 22.1052 13.0276 22.1052 14.0935C22.1052 14.4489 21.9564 14.5976 21.5984 14.5976C20.8988 14.5976 20.1992 14.5976 19.4995 14.5976C18.5768 14.5948 17.9213 13.9503 17.9158 13.0249C17.9103 11.6312 17.913 10.2347 17.913 8.841C16.635 8.96219 15.8914 7.52442 16.8058 6.59621C18.6953 4.70673 20.5848 2.81724 22.477 0.930514C22.5954 0.806568 22.7332 0.704658 22.8846 0.622027C23.3253 0.401679 24.0112 0.470538 24.4298 0.900216C25.4903 1.98818 26.5727 3.05412 27.6469 4.12831C28.4705 4.95462 29.2885 5.78643 30.1258 6.60172C30.6767 7.13882 30.6244 8.16894 29.9661 8.60688Z" stroke="#213163"/>`;
 const TOUR_BADGE_WARNING = `<path d="M23.4528 30.4998C25.3226 30.4998 27.1158 29.757 28.4379 28.4349C29.7601 27.1128 30.5028 25.3196 30.5028 23.4498C30.5028 21.58 29.7601 19.7868 28.4379 18.4647C27.1158 17.1426 25.3226 16.3998 23.4528 16.3998C21.5831 16.3998 19.7899 17.1426 18.4677 18.4647C17.1456 19.7868 16.4028 21.58 16.4028 23.4498C16.4028 25.3196 17.1456 27.1128 18.4677 28.4349C19.7899 29.757 21.5831 30.4998 23.4528 30.4998ZM21.079 20.952C21.2965 20.3379 21.8804 19.9248 22.533 19.9248H24.1386C25.0997 19.9248 25.8763 20.7042 25.8763 21.6625C25.8763 22.2849 25.543 22.8605 25.0033 23.1717L24.1138 23.6811C24.1083 24.0391 23.8136 24.3311 23.4528 24.3311C23.0866 24.3311 22.7919 24.0364 22.7919 23.6701V23.2983C22.7919 23.0615 22.9186 22.844 23.1251 22.7255L24.3451 22.026C24.4745 21.9517 24.5544 21.814 24.5544 21.6653C24.5544 21.434 24.3671 21.2494 24.1386 21.2494H22.533C22.4394 21.2494 22.3568 21.3073 22.3265 21.3954L22.3155 21.4284C22.1943 21.7727 21.8143 21.9517 21.4728 21.8305C21.1313 21.7093 20.9495 21.3293 21.0707 20.9878L21.0817 20.9548L21.079 20.952ZM22.5716 26.0936C22.5716 25.8598 22.6644 25.6357 22.8297 25.4704C22.995 25.3052 23.2191 25.2123 23.4528 25.2123C23.6866 25.2123 23.9107 25.3052 24.076 25.4704C24.2412 25.6357 24.3341 25.8598 24.3341 26.0936C24.3341 26.3273 24.2412 26.5514 24.076 26.7167C23.9107 26.882 23.6866 26.9748 23.4528 26.9748C23.2191 26.9748 22.995 26.882 22.8297 26.7167C22.6644 26.5514 22.5716 26.3273 22.5716 26.0936Z" fill="#FFC90E"/>`;
 const TOUR_BADGE_CONFIRMED = `<path d="M23.4528 30.4998C25.3226 30.4998 27.1158 29.757 28.4379 28.4349C29.7601 27.1128 30.5028 25.3196 30.5028 23.4498C30.5028 21.58 29.7601 19.7868 28.4379 18.4647C27.1158 17.1426 25.3226 16.3998 23.4528 16.3998C21.5831 16.3998 19.7899 17.1426 18.4677 18.4647C17.1456 19.7868 16.4028 21.58 16.4028 23.4498C16.4028 25.3196 17.1456 27.1128 18.4677 28.4349C19.7899 29.757 21.5831 30.4998 23.4528 30.4998Z" fill="#28A745"/><path d="M20.4 23.6L22.6 25.8L26.6 21.3" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
-const tourIconSvg = (status) => `<svg class="tour-card-glyph" viewBox="0 0 31 31" fill="none">${TOUR_ICON_HOUSES}${status === 'confirmed' ? TOUR_BADGE_CONFIRMED : TOUR_BADGE_WARNING}</svg>`;
+const TOUR_BADGE_CANCELED = `<path d="M23.4528 30.4998C25.3226 30.4998 27.1158 29.757 28.4379 28.4349C29.7601 27.1128 30.5028 25.3196 30.5028 23.4498C30.5028 21.58 29.7601 19.7868 28.4379 18.4647C27.1158 17.1426 25.3226 16.3998 23.4528 16.3998C21.5831 16.3998 19.7899 17.1426 18.4677 18.4647C17.1456 19.7868 16.4028 21.58 16.4028 23.4498C16.4028 25.3196 17.1456 27.1128 18.4677 28.4349C19.7899 29.757 21.5831 30.4998 23.4528 30.4998Z" fill="#C8102E"/><path d="M20.9 20.9L26 26M26 20.9L20.9 26" stroke="white" stroke-width="1.6" stroke-linecap="round" fill="none"/>`;
+const tourIconSvg = (status) => `<svg class="tour-card-glyph" viewBox="0 0 31 31" fill="none">${TOUR_ICON_HOUSES}${status === 'confirmed' ? TOUR_BADGE_CONFIRMED : status === 'canceled' ? TOUR_BADGE_CANCELED : TOUR_BADGE_WARNING}</svg>`;
 
 /* Stop card glyph for confirmed visits: single house with a fused green-check badge (provided design asset). */
 const STOP_ICON_CONFIRMED_SVG = `<svg class="stop-glyph-confirmed" viewBox="0 0 31 25" fill="none">
@@ -1104,6 +1105,12 @@ const state = {
   teamOpen: false,           // liste de suggestions dépliée ou non
   teamActive: 0,             // suggestion en surbrillance (clavier)
   settingsLangOpen: false,   // accordéon « Langue » des Paramètres
+  inbox: seedInbox(),        // messages de la messagerie
+  inboxTab: 'recus',         // recus | envoyes | programmes | archives
+  inboxSearch: '',
+  inboxFilter: 'tous',       // tous | nouveau | attente | annulation
+  inboxType: '',             // '' ou une clé de INBOX_STATUSES
+  inboxSelected: [],         // ids cochés
   directoryTab: 'tous',      // tous | acheteurs | vendeurs | prospects | courtiers | favoris
   directorySearch: '',
   directoryPage: 1,
@@ -1498,7 +1505,7 @@ function tourStartIsFixed(draft) {
 // (Active inbox, Buyer's tours, My listings…) — les autres écrans du
 // prototype, absents de cette maquette, suivent ce même registre.
 const NAV_ITEMS = [
-  { id: 'inbox', labelFr: 'Boîte de réception', labelEn: 'Active inbox', img: 'assets/menu/inbox.svg', badge: 7 },
+  { id: 'inbox', labelFr: 'Messagerie', labelEn: 'Messages', img: 'assets/menu/inbox.svg', get badge() { return inboxUnreadCount(); } },
   { id: 'sendmsg', labelFr: 'Envoi de message', labelEn: 'Send message', img: 'assets/menu/send.svg' },
   { id: 'waiting', labelFr: 'Attente de réponse', labelEn: 'Pending responses', img: 'assets/menu/wait.svg', badge: 3 },
   { id: 'tours', labelFr: 'Tour de visites', labelEn: 'Buyer\'s tours', img: 'assets/menu/tour.svg' },
@@ -1515,7 +1522,7 @@ function navItemLabel(item) { return tr(item.labelFr, item.labelEn); }
 // Sections câblées dans ce prototype, au-delà du tour de visites. Une section
 // câblée n'affiche plus la réserve « absente de ce prototype », qu'elle soit
 // ou non l'écran courant.
-const WIRED_NAV = new Set(['tours', 'properties', 'directory', 'settings']);
+const WIRED_NAV = new Set(['inbox', 'tours', 'properties', 'directory', 'settings']);
 
 // Une seule section à la fois se dit « courante » : le tour de visites tant
 // qu'on y est (liste, composition, envoi...), Mes propriétés dès qu'on y entre,
@@ -1525,13 +1532,14 @@ function navActiveId() {
   const inDirectory = state.screen === 'directory' || state.screen === 'contactForm';
   if (inProperties) return 'properties';
   if (inDirectory) return 'directory';
+  if (state.screen === 'inbox') return 'inbox';
   if (state.screen === 'settings' || state.screen === 'team' || state.screen === 'teamAdd') return 'settings';
   return 'tours';
 }
 
 // Glyphe blanc dédié par section active, comme le veut la maquette Figma : le
 // reste des icônes n'a qu'une seule teinte, pensée pour le fond clair.
-const NAV_ACTIVE_ICONS = { tours: 'assets/menu/tour-white.svg', properties: 'assets/menu/properties-white.svg', directory: 'assets/menu/directory-white.svg', settings: 'assets/menu/settings-white.svg' };
+const NAV_ACTIVE_ICONS = { inbox: 'assets/menu/inbox-white.svg', tours: 'assets/menu/tour-white.svg', properties: 'assets/menu/properties-white.svg', directory: 'assets/menu/directory-white.svg', settings: 'assets/menu/settings-white.svg' };
 
 function renderSidebarNav() {
   const el = document.getElementById('sidebar-nav');
@@ -1728,6 +1736,7 @@ function render() {
   else if (state.screen === 'teamAdd') { setTopbarTitle(tr('Ajouter une personne', 'Add a person')); main.innerHTML = renderTeamAddScreen(); }
   else if (state.screen === 'settings') { setTopbarTitle(tr('Paramètres', 'Settings')); main.innerHTML = renderSettingsScreen(); }
   else if (state.screen === 'directory') { setTopbarTitle(tr('Répertoire', 'Directory')); main.innerHTML = renderDirectoryScreen(); }
+  else if (state.screen === 'inbox') { setTopbarTitle(tr('Messagerie', 'Messages')); main.innerHTML = renderInboxScreen(); }
   else if (state.screen === 'contactForm') { setTopbarTitle(state.contactFormDraft && state.contactFormDraft.id ? tr('Modifier le contact', 'Edit contact') : tr('Créer un contact', 'Create contact')); main.innerHTML = renderContactFormScreen(); }
   document.body.dataset.screen = state.screen;
   document.body.classList.toggle('sidebar-collapsed', state.sidebarCollapsed);
@@ -2176,6 +2185,274 @@ function bindDirectoryEvents() {
       if (c) startTourForContact(c);
     };
   });
+}
+
+/* ----- Screen: messagerie (boîte de réception) ----- */
+
+// Les quatre statuts de la maquette. `glyph` dit quel badge porte la maison :
+// le courtier lit l'état du message avant d'avoir lu une seule ligne.
+const INBOX_STATUSES = {
+  confirmation: { labelFr: 'Confirmation', labelEn: 'Confirmation', tone: 'ok', glyph: 'confirmed' },
+  demande: { labelFr: 'Demande', labelEn: 'Request', tone: 'pending', glyph: 'pending' },
+  annulation: { labelFr: 'Annulation', labelEn: 'Cancellation', tone: 'cancel', glyph: 'canceled' },
+  repondre: { labelFr: 'À répondre', labelEn: 'To answer', tone: 'cancel', glyph: 'pending' },
+};
+// « En attente » regroupe ce qui attend une action ou une réponse.
+const INBOX_WAITING = ['demande', 'repondre'];
+
+const INBOX_TABS = [
+  { id: 'recus', labelFr: 'Reçus', labelEn: 'Received' },
+  { id: 'envoyes', labelFr: 'Envoyés', labelEn: 'Sent' },
+  { id: 'programmes', labelFr: 'Programmés / Brouillons', labelEn: 'Scheduled / Drafts' },
+  { id: 'archives', labelFr: 'Archives', labelEn: 'Archives' },
+];
+
+function seedInbox() {
+  const D = 'assets/directory/', T = 'assets/team/';
+  const m = (id, unread, courtier, photo, client, clientPhoto, property, start, end, status, time, count) =>
+    ({ id, tab: 'recus', unread, courtier, photo, client, clientPhoto, property, date: '2026-09-30', start, end, status, time, count });
+  return [
+    m('m1', true, 'John Smith', D + 'avatar-marc-lefebvre.jpg', null, null, '1429 Soucy St, Longueuil, Quebec', '11:15', '11:30', 'demande', '10:33', 3),
+    m('m2', true, 'Sophia Miller', D + 'avatar-sophie-martin.jpg', 'Peter Brown', T + 'noah-brown.jpg', '1429 Soucy St, Longueuil, Quebec', '11:15', '11:30', 'confirmation', '10:33', 4),
+    m('m3', false, 'Mark Wilson', D + 'avatar-jean-dupont.jpg', 'Claire Anderson', T + 'olivia-davis.jpg', '57 Maple Avenue, Montreal, Quebec', '11:15', '11:30', 'annulation', '10:33', 3),
+    m('m4', false, 'Emma Roy', D + 'avatar-juliette-sophie.jpg', null, null, '89 Pine Street, Laval, Quebec', '11:15', '11:30', 'repondre', '10:33', 2),
+    m('m5', false, 'Clara Leroux', D + 'avatar-clara-leroux.jpg', null, null, '23 Elm Drive, Gatineau, Quebec', '11:15', '11:30', 'confirmation', '10:33', 1),
+    m('m6', false, 'Élodie Roy', D + 'avatar-elodie-dufresne.jpg', 'Ellie Harris', T + 'sophia-williams.jpg', '34 Oak Lane, Quebec City, Quebec', '11:15', '11:30', 'annulation', '10:33', 5),
+    m('m7', false, 'Chloé Gagnon', D + 'avatar-chloe-gagnon.jpg', 'Chloe Parker', T + 'emma-thompson-v2.jpg', '76 Birch Road, Trois-Rivières, Quebec', '11:15', '11:30', 'confirmation', '10:33', 2),
+    m('m8', false, 'Léa Benoît', D + 'avatar-margaux-benoit.jpg', 'Emma Bennett', T + 'emma-laurent-v2.jpg', '12 Cedar Way, Sherbrooke, Quebec', '11:15', '11:30', 'demande', '10:33', 1),
+    m('m9', false, 'Julie Martin', D + 'avatar-camille-durand.jpg', null, null, '45 Willow Crescent, Saguenay, Quebec', '11:15', '11:30', 'repondre', '10:33', 4),
+  ];
+}
+
+function inboxUnreadCount() {
+  return state.inbox.filter(x => x.tab === 'recus' && x.unread).length;
+}
+
+// La maison seule, avec son badge, porte le statut : c'est la seule marque
+// d'état du message, donc elle se lit sans couleur (✓, ?, ✕) et s'annonce
+// aux lecteurs d'écran.
+const INBOX_HOUSE = 'M14.0661 23.9069C13.7741 24.1079 13.4601 24.1575 13.1076 24.141C13.1048 25.5925 13.1186 27.0138 13.0993 28.4598C13.0855 29.231 12.4272 29.8783 11.656 29.8921C10.8848 29.9058 10.1108 29.8976 9.33686 29.8948C9.08897 29.8948 8.92371 29.7158 8.92371 29.4514C8.92096 28.7986 8.92371 28.1458 8.92096 27.493C8.92096 27.0634 8.92096 26.6309 8.92096 26.2012C8.9182 25.7578 8.64001 25.4741 8.19105 25.4686C7.76964 25.4631 7.34822 25.4631 6.92681 25.4686C6.48887 25.4741 6.20792 25.7605 6.20792 26.1985C6.20517 27.2644 6.20517 28.3276 6.20517 29.3935C6.20517 29.7488 6.05643 29.8976 5.69837 29.8976C4.99876 29.8976 4.29916 29.8976 3.59955 29.8976C2.67685 29.8948 2.02131 29.2503 2.0158 28.3248C2.0103 26.9311 2.01305 25.5347 2.01305 24.141C0.735032 24.2622 -0.00864168 22.8244 0.905802 21.8962C2.79528 20.0067 4.68477 18.1172 6.57701 16.2305C6.69544 16.1066 6.83316 16.0046 6.98465 15.922C7.42534 15.7017 8.11118 15.7705 8.52984 16.2002C9.59026 17.2882 10.6727 18.3541 11.7469 19.4283C12.5705 20.2546 13.3885 21.0864 14.2258 21.9017C14.7767 22.4388 14.7244 23.4689 14.0661 23.9069Z';
+function inboxStatusIcon(key) {
+  const st = INBOX_STATUSES[key];
+  const label = inboxStatusLabel(key);
+  const mark = st.glyph === 'confirmed'
+    ? '<circle cx="14.6" cy="26.6" r="5.2" fill="#28A745"/><path d="M12.2 26.7l1.6 1.6 3-3.3" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
+    : st.glyph === 'canceled'
+      ? '<circle cx="14.6" cy="26.6" r="5.2" fill="#C8102E"/><path d="M12.6 24.6l4 4M16.6 24.6l-4 4" stroke="#fff" stroke-width="1.3" stroke-linecap="round" fill="none"/>'
+      : '<circle cx="14.6" cy="26.6" r="5.2" fill="#FFC90E"/><text x="14.6" y="29.4" text-anchor="middle" font-size="8" font-weight="700" font-family="Inter,Arial,sans-serif" fill="#fff">?</text>';
+  return `<svg class="inbox-status-icon" viewBox="-1 14.5 20.5 17" fill="none" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title><path d="${INBOX_HOUSE}" stroke="#213163" stroke-linejoin="round"/>${mark}</svg>`;
+}
+
+function inboxStatusLabel(key) { const s = INBOX_STATUSES[key]; return tr(s.labelFr, s.labelEn); }
+
+function inboxDateLabel(x) {
+  const d = new Date(`${x.date}T00:00:00`);
+  const day = d.toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'short', day: 'numeric', month: 'short' });
+  return `${day}, ${x.start} - ${x.end}`;
+}
+
+// Les pastilles se comptent sur l'onglet courant, avant le filtre qu'elles
+// posent elles-mêmes : un compteur qui change en le cliquant ne dit plus rien.
+function inboxTabRows() { return state.inbox.filter(x => x.tab === state.inboxTab); }
+
+function inboxVisibleRows() {
+  const q = state.inboxSearch.trim().toLowerCase();
+  return inboxTabRows().filter(x => {
+    if (state.inboxFilter === 'nouveau' && !x.unread) return false;
+    if (state.inboxFilter === 'attente' && !INBOX_WAITING.includes(x.status)) return false;
+    if (state.inboxFilter === 'annulation' && x.status !== 'annulation') return false;
+    if (state.inboxType && x.status !== state.inboxType) return false;
+    if (!q) return true;
+    return `${x.courtier} ${x.client || ''} ${x.property}`.toLowerCase().includes(q);
+  });
+}
+
+function inboxAvatar(name, photo) {
+  const parts = name.split(' ');
+  return directoryAvatar({ prenom: parts[0], nom: parts.slice(1).join(' '), photo }, 'sm');
+}
+
+function inboxRowHtml(x) {
+  const checked = state.inboxSelected.includes(x.id);
+  // Sans nom de client, la maquette garde une pastille générique « Client » :
+  // le message vient d'un courtier qui n'a pas encore associé d'acheteur.
+  const clientAvatar = x.client
+    ? inboxAvatar(x.client, x.clientPhoto)
+    : `<img class="directory-avatar directory-avatar-sm" src="assets/directory/avatar-placeholder.svg" alt="">`;
+  const clientName = x.client ? esc(x.client) : tr('Client', 'Client');
+  const check = `
+      <label class="inbox-check" data-inbox-stop>
+        <input type="checkbox" data-inbox-check="${x.id}" ${checked ? 'checked' : ''} aria-label="${tr('Sélectionner le message de', 'Select the message from')} ${esc(x.courtier)}">
+      </label>`;
+  const cls = `${x.unread ? 'is-unread' : ''} ${checked ? 'is-selected' : ''}`;
+  // Deux mises en page pour un même message : le tableau (bureau) et la carte
+  // de la maquette mobile. L'une est masquée par CSS, donc retirée de l'arbre
+  // d'accessibilité — un lecteur d'écran ne lit jamais le message deux fois.
+  return `
+    <div class="inbox-row ${cls}" data-inbox-row="${x.id}">
+      ${check}
+      <span class="inbox-cell inbox-cell-courtier">
+        ${inboxStatusIcon(x.status)}
+        ${inboxAvatar(x.courtier, x.photo)}
+        <button class="inbox-open" data-inbox-open="${x.id}"><span>${esc(x.courtier)}</span></button>
+      </span>
+      <span class="inbox-cell inbox-cell-client">${clientAvatar}<span>${clientName}</span></span>
+      <span class="inbox-cell inbox-cell-property">${esc(x.property)}</span>
+      <span class="inbox-cell inbox-cell-date">${esc(inboxDateLabel(x))}</span>
+      <span class="inbox-cell inbox-cell-time"><span>${esc(x.time)}</span><span class="inbox-count">${x.count}</span></span>
+    </div>
+    <div class="inbox-card ${cls}" data-inbox-row="${x.id}">
+      ${check}
+      <div class="inbox-card-body">
+        <div class="inbox-card-top">
+          <span class="inbox-card-who">
+            ${inboxAvatar(x.courtier, x.photo)}<button class="inbox-open" data-inbox-open="${x.id}"><span>${esc(x.courtier)}</span></button><span class="inbox-card-sep" aria-hidden="true">-</span>${clientAvatar}<span class="inbox-card-client">${clientName}</span>
+          </span>
+          <span class="inbox-card-time"><span>${esc(x.time)}</span><span class="inbox-count">${x.count}</span></span>
+        </div>
+        <p class="inbox-card-prop">${inboxStatusIcon(x.status)}<span>${esc(x.property)}</span></p>
+        <p class="inbox-card-date">${esc(inboxDateLabel(x))}</p>
+      </div>
+    </div>`;
+}
+
+function renderInboxScreen() {
+  const rows = inboxVisibleRows();
+  const base = inboxTabRows();
+  const counts = {
+    nouveau: base.filter(x => x.unread).length,
+    attente: base.filter(x => INBOX_WAITING.includes(x.status)).length,
+    annulation: base.filter(x => x.status === 'annulation').length,
+  };
+  const chip = (id, label, dot) => `
+    <button class="inbox-chip ${state.inboxFilter === id ? 'active' : ''}" data-inbox-filter="${id}" aria-pressed="${state.inboxFilter === id}">
+      ${dot ? `<span class="inbox-chip-dot" style="background:${dot}"></span>` : ''}${label}${id !== 'tous' ? ` <span class="inbox-chip-count">· ${counts[id]}</span>` : ''}
+    </button>`;
+  const tabsHtml = INBOX_TABS.map(t => `
+    <button class="${state.inboxTab === t.id ? 'active' : ''}" data-inbox-tab="${t.id}" aria-pressed="${state.inboxTab === t.id}">${tr(t.labelFr, t.labelEn)}</button>`).join('');
+
+  const allChecked = rows.length > 0 && rows.every(x => state.inboxSelected.includes(x.id));
+  const sel = state.inboxSelected.filter(id => base.some(x => x.id === id));
+  const bulk = !sel.length ? '' : `
+    <div class="inbox-bulk" role="status">
+      <span>${tr(`${sel.length} message${sel.length > 1 ? 's' : ''} sélectionné${sel.length > 1 ? 's' : ''}`, `${sel.length} message${sel.length > 1 ? 's' : ''} selected`)}</span>
+      <button class="btn-inline" data-inbox-bulk="read">${tr('Marquer comme lu', 'Mark as read')}</button>
+      <button class="btn-inline" data-inbox-bulk="unread">${tr('Marquer comme non lu', 'Mark as unread')}</button>
+      ${state.inboxTab !== 'archives' ? `<button class="btn-inline" data-inbox-bulk="archive">${tr('Archiver', 'Archive')}</button>` : ''}
+      <button class="btn-inline ghost" data-inbox-bulk="clear">${tr('Tout désélectionner', 'Clear selection')}</button>
+    </div>`;
+
+  const empty = state.inboxSearch.trim() || state.inboxFilter !== 'tous' || state.inboxType
+    ? tr('Aucun message ne correspond à ces filtres.', 'No message matches these filters.')
+    : state.inboxTab === 'recus' ? tr('Aucun message reçu.', 'No message received.')
+    : state.inboxTab === 'envoyes' ? tr('Aucun message envoyé pour le moment.', 'No message sent yet.')
+    : state.inboxTab === 'programmes' ? tr('Aucun message programmé ni brouillon.', 'No scheduled message or draft.')
+    : tr('Aucun message archivé.', 'No archived message.');
+
+  const table = rows.length === 0
+    ? `<div class="empty-state"><p>${empty}</p></div>`
+    : `
+    <div class="inbox-table">
+      <div class="inbox-row inbox-row-head">
+        <label class="inbox-check"><input type="checkbox" id="inbox-check-all" ${allChecked ? 'checked' : ''} aria-label="${tr('Tout sélectionner', 'Select all')}"></label>
+        <span class="inbox-cell">${tr('Courtier', 'Agent')}</span>
+        <span class="inbox-cell">${tr('Client', 'Client')}</span>
+        <span class="inbox-cell">${tr('Propriété', 'Property')}</span>
+        <span class="inbox-cell inbox-cell-date">${tr('Date de visite', 'Visit date')}</span>
+        <span class="inbox-cell"></span>
+      </div>
+      ${rows.map(inboxRowHtml).join('')}
+    </div>`;
+
+  return `
+    <div class="page-card inbox-page">
+      <div class="inbox-tabs" role="group" aria-label="${tr('Dossiers de la messagerie', 'Message folders')}">${tabsHtml}</div>
+      <div class="directory-searchbar">
+        ${icon('search')}
+        <input type="text" id="inbox-search" placeholder="${tr('Rechercher…', 'Search…')}" value="${esc(state.inboxSearch)}" aria-label="${tr('Rechercher un message', 'Search messages')}">
+      </div>
+      <div class="inbox-chips">
+        ${chip('tous', tr('Tous', 'All'))}
+        ${chip('nouveau', tr('Nouveau', 'New'), '#28A745')}
+        ${chip('attente', tr('En attente', 'Waiting'), '#F59E0B')}
+        ${chip('annulation', tr('Annulation', 'Cancellation'), '#E8590C')}
+        <label class="inbox-type">
+          <span class="visually-hidden">${tr('Type de message', 'Message type')}</span>
+          <select id="inbox-type" class="inbox-type-select">
+            <option value="">${tr('Type', 'Type')}</option>
+            ${Object.keys(INBOX_STATUSES).map(k => `<option value="${k}" ${state.inboxType === k ? 'selected' : ''}>${esc(inboxStatusLabel(k))}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      ${bulk}
+      ${table}
+      <button class="btn btn-primary inbox-new-btn" id="btn-inbox-new">${icon('plus')} ${tr('Nouveau message', 'New message')}</button>
+    </div>`;
+}
+
+function bindInboxEvents() {
+  document.querySelectorAll('[data-inbox-tab]').forEach(b => {
+    b.onclick = () => { state.inboxTab = b.getAttribute('data-inbox-tab'); state.inboxSelected = []; render(); };
+  });
+  const search = document.getElementById('inbox-search');
+  if (search) search.oninput = () => {
+    state.inboxSearch = search.value;
+    render();
+    setTimeout(() => { const el = document.getElementById('inbox-search'); if (el) { el.focus(); el.selectionStart = el.selectionEnd = el.value.length; } }, 0);
+  };
+  document.querySelectorAll('[data-inbox-filter]').forEach(b => {
+    b.onclick = () => { state.inboxFilter = b.getAttribute('data-inbox-filter'); render(); };
+  });
+  const type = document.getElementById('inbox-type');
+  if (type) type.onchange = () => { state.inboxType = type.value; render(); };
+
+  document.querySelectorAll('[data-inbox-check]').forEach(c => {
+    c.onchange = () => {
+      const id = c.getAttribute('data-inbox-check');
+      state.inboxSelected = c.checked ? [...state.inboxSelected, id] : state.inboxSelected.filter(x => x !== id);
+      render();
+      const again = document.querySelector(`[data-inbox-check="${id}"]`);
+      if (again) again.focus();
+    };
+  });
+  const all = document.getElementById('inbox-check-all');
+  if (all) all.onchange = () => {
+    const ids = inboxVisibleRows().map(x => x.id);
+    state.inboxSelected = all.checked ? [...new Set([...state.inboxSelected, ...ids])] : state.inboxSelected.filter(id => !ids.includes(id));
+    render();
+    const again = document.getElementById('inbox-check-all');
+    if (again) again.focus();
+  };
+
+  // Ouvrir un message le marque comme lu ; la conversation elle-même n'existe
+  // pas dans ce prototype, et le toast le dit plutôt que de ne rien faire.
+  document.querySelectorAll('[data-inbox-row]').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('[data-inbox-stop]')) return;
+      const x = state.inbox.find(m => m.id === row.getAttribute('data-inbox-row'));
+      if (!x) return;
+      x.unread = false;
+      render();
+      showToast(tr('L\'affichage d\'un message n\'est pas encore disponible dans ce prototype.', 'Opening a message isn\'t wired up in this prototype yet.'));
+    };
+  });
+
+  document.querySelectorAll('[data-inbox-bulk]').forEach(b => {
+    b.onclick = () => {
+      const kind = b.getAttribute('data-inbox-bulk');
+      const picked = state.inbox.filter(x => state.inboxSelected.includes(x.id));
+      if (kind === 'read') picked.forEach(x => { x.unread = false; });
+      if (kind === 'unread') picked.forEach(x => { x.unread = true; });
+      if (kind === 'archive') {
+        picked.forEach(x => { x.tab = 'archives'; });
+        showToast(tr(`${picked.length} message${picked.length > 1 ? 's archivés' : ' archivé'}.`, `${picked.length} message${picked.length > 1 ? 's' : ''} archived.`), 'success');
+      }
+      state.inboxSelected = [];
+      render();
+    };
+  });
+  const newBtn = document.getElementById('btn-inbox-new');
+  if (newBtn) newBtn.onclick = () => showToast(tr('L\'envoi de message n\'est pas encore disponible dans ce prototype.', 'Sending a message isn\'t wired up in this prototype yet.'));
 }
 
 /* ----- Screen: fiche contact (ajout / modification) ----- */
@@ -5069,6 +5346,7 @@ function bindEvents() {
     el.onclick = (e) => {
       e.preventDefault();
       const id = el.getAttribute('data-nav');
+      if (id === 'inbox') { leaveTour(() => { state.screen = 'inbox'; state.draft = null; }); return; }
       if (id === 'tours') { leaveTour(() => { state.screen = 'list'; state.draft = null; }); return; }
       if (id === 'properties') { leaveTour(() => { state.screen = 'properties'; state.draft = null; }); return; }
       if (id === 'settings') { leaveTour(() => { state.screen = 'settings'; state.draft = null; }); return; }
@@ -5123,6 +5401,7 @@ function bindEvents() {
   if (state.screen === 'team') bindTeamEvents();
   if (state.screen === 'teamAdd') bindTeamAddEvents();
   if (state.screen === 'directory') bindDirectoryEvents();
+  if (state.screen === 'inbox') bindInboxEvents();
   if (state.screen === 'contactForm') bindContactFormEvents();
   bindModalEvents();
 }
