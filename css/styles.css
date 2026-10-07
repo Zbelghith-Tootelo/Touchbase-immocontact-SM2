@@ -1900,7 +1900,7 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
 }
 .avail-nav-btn:hover { background: var(--lumiere-principale); }
 .avail-nav-btn svg { width: 16px; height: 16px; }
-.avail-today-btn { background: var(--succes); border-radius: 999px; padding: 8px 22px; }
+.avail-today-btn { background: var(--succes); color: var(--blanc); border-radius: 999px; padding: 8px 22px; }
 .avail-today-btn:hover { background: #1f8a3d; }
 
 .avail-date-picker { position: relative; }
@@ -2205,7 +2205,10 @@ body[data-screen="teamAdd"] .topbar-back { display: inline-flex; }
 .inbox-bulk-actions { display: contents; }
 .inbox-open { display: block; min-width: 0; padding: 0; border: none; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .inbox-open:focus-visible { outline: var(--focus-ring); outline-offset: 3px; border-radius: var(--radius-sm); }
-.inbox-cell-time { justify-content: flex-end; gap: 10px; font-size: 12px; font-weight: 500; }
+/* Compteur au-dessus, jour ou heure de réception dessous, alignés à droite : gras
+   tant que le message n'est pas lu. */
+.inbox-cell-time { flex-direction: column; align-items: flex-end; justify-content: center; gap: 4px; font-size: 12px; font-weight: 400; }
+.inbox-received { line-height: 1.2; white-space: nowrap; }
 .inbox-count {
   min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
   background: var(--bleu-nav-10); color: var(--bleu-principal); font-size: 12px; font-weight: 600;
@@ -2318,3 +2321,80 @@ body.sidebar-collapsed .sidebar-new-btn span { display: none; }
 .search-bar .input,
 .directory-searchbar,
 .team-search { height: 42px; min-height: 42px; box-sizing: border-box; flex-shrink: 0; }
+
+
+/* ---------------- Aide ---------------- */
+.help-page { gap: 20px; }
+.help-title { margin: 0; text-align: center; font-size: 22px; font-weight: 700; line-height: 1.2; color: var(--texte-principal); }
+.help-fields { margin-top: 0; }
+.help-select {
+  appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 40px;
+  background: var(--blanc) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23213163' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 16px center;
+}
+.help-message { min-height: 150px; }
+.help-count { margin: 0; text-align: right; font-size: 12px; color: var(--texte-secondaire); }
+.help-send { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.help-send .btn { min-width: 160px; min-height: 42px; }
+.help-send .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.help-reason { margin: 0; font-size: 13px; color: var(--texte-secondaire); }
+.help-reason[hidden] { display: none; }
+.help-other { margin: 8px 0 -8px; font-size: 14px; font-weight: 500; color: var(--texte-secondaire); }
+@media (min-width: 769px) { .help-page { max-width: 760px; } }
+
+
+/* ---------------- À propos ---------------- */
+.about-page { display: flex; flex-direction: column; gap: 24px; }
+.about-card { background: var(--blanc); border: 1px solid var(--bordures); border-radius: 24px; padding: 32px; }
+.about-support { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 48px; align-items: center; }
+.about-brand { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+.about-logo { display: block; height: 46px; width: auto; max-width: 100%; }
+.about-reserved { margin: 0; padding-top: 12px; border-top: 3px solid var(--rouge-principal); max-width: 280px; font-size: 13px; line-height: 1.4; color: var(--texte-secondaire); }
+.about-brand .about-reserved { border-top-width: 0; padding-top: 0; }
+.about-brand::after { content: none; }
+.about-heading { margin: 0; font-size: 16px; font-weight: 700; color: var(--bleu-principal); }
+.about-contact { display: flex; flex-direction: column; gap: 16px; }
+.about-contact-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.about-contact-list li { display: flex; align-items: flex-start; gap: 12px; }
+.about-contact-icon { width: 20px; height: 20px; color: var(--bleu-principal); flex-shrink: 0; margin-top: 2px; }
+.about-contact-icon svg { width: 20px; height: 20px; display: block; }
+.about-contact-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.about-label { font-size: 12px; color: var(--texte-secondaire); }
+.about-contact-text a { font-size: 15px; font-weight: 500; color: var(--bleu-secondaire); text-decoration: underline; overflow-wrap: anywhere; }
+.about-contact-text a:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-radius: var(--radius-sm); }
+.about-hours { background: var(--lumiere-principale); border-radius: var(--radius-xl); padding: 12px 16px; display: grid; gap: 2px; font-size: 13px; color: var(--texte-principal); }
+.about-hours p { margin: 0; }
+.about-hours-title { font-size: 12px; font-weight: 700; color: var(--texte-secondaire); }
+.about-hours-time { font-size: 18px; font-weight: 600; color: var(--bleu-principal); }
+.about-hours-tz { font-size: 12px; color: var(--texte-secondaire); }
+.about-app { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 56px; }
+.about-app .about-heading, .about-versions dt { white-space: nowrap; }
+.about-app .about-refresh { margin-left: auto; }
+.about-versions { margin: 0; display: flex; gap: 64px; }
+.about-versions div { display: flex; flex-direction: column; gap: 4px; }
+.about-versions dt { font-size: 12px; color: var(--texte-secondaire); }
+.about-versions dd { margin: 0; font-size: 15px; font-weight: 600; color: var(--texte-principal); }
+.about-refresh { min-height: 42px; min-width: 140px; }
+@media (min-width: 769px) { .about-page { max-width: 1000px; } }
+@media (max-width: 768px) {
+  /* Mobile (maquette) : une colonne sans cartes, séparée par des filets. Les heures
+     passent avant les liens de contact, le titre de section est celui de la barre du haut. */
+  .about-page { gap: 0; }
+  .about-card { border: none; border-radius: 0; padding: 16px 0; }
+  .about-support { display: flex; flex-direction: column; gap: 16px; align-items: stretch; }
+  .about-brand { align-items: center; text-align: center; }
+  .about-reserved { max-width: none; }
+  .about-contact { gap: 0; }
+  .about-contact > .about-heading { display: none; }
+  .about-hours { order: -1; background: none; border-bottom: 1px solid var(--bordures); border-radius: 0; text-align: center; padding: 16px 0; margin-bottom: 0; justify-items: center; }
+  .about-hours-time { font-size: 13px; font-weight: 400; color: var(--texte-principal); }
+  .about-hours-title { font-size: 14px; color: var(--texte-principal); }
+  .about-contact-list { padding: 16px 0; border-bottom: 1px solid var(--bordures); align-items: center; }
+  .about-contact-icon, .about-label { display: none; }
+  .about-contact-text a { font-size: 14px; font-weight: 400; }
+  .about-app { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding-top: 0; }
+  .about-app .about-heading { display: none; }
+  .about-versions { flex-direction: column; gap: 0; }
+  .about-versions div { flex-direction: row; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--bordures); }
+  .about-versions dd { font-weight: 400; color: var(--texte-secondaire); font-size: 13px; }
+  .about-app .about-refresh { width: 100%; margin: 16px 0 0; }
+}

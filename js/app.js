@@ -1105,6 +1105,7 @@ const state = {
   teamOpen: false,           // liste de suggestions dépliée ou non
   teamActive: 0,             // suggestion en surbrillance (clavier)
   settingsLangOpen: false,   // accordéon « Langue » des Paramètres
+  helpDraft: { email: 'emma.lucky@exemple.com', phone: '(514) 555-0142', type: 'general', message: '' },
   inbox: seedInbox(),        // messages de la messagerie
   inboxTab: 'recus',         // recus | envoyes | programmes | archives
   inboxSearch: '',
@@ -1520,7 +1521,7 @@ function navItemLabel(item) { return tr(item.labelFr, item.labelEn); }
 // Sections câblées dans ce prototype, au-delà du tour de visites. Une section
 // câblée n'affiche plus la réserve « absente de ce prototype », qu'elle soit
 // ou non l'écran courant.
-const WIRED_NAV = new Set(['inbox', 'tours', 'properties', 'directory', 'settings']);
+const WIRED_NAV = new Set(['inbox', 'help', 'tours', 'properties', 'directory', 'settings']);
 
 // Une seule section à la fois se dit « courante » : le tour de visites tant
 // qu'on y est (liste, composition, envoi...), Mes propriétés dès qu'on y entre,
@@ -1531,13 +1532,14 @@ function navActiveId() {
   if (inProperties) return 'properties';
   if (inDirectory) return 'directory';
   if (state.screen === 'inbox') return 'inbox';
+  if (state.screen === 'help' || state.screen === 'about') return 'help';
   if (state.screen === 'settings' || state.screen === 'team' || state.screen === 'teamAdd') return 'settings';
   return 'tours';
 }
 
 // Glyphe blanc dédié par section active, comme le veut la maquette Figma : le
 // reste des icônes n'a qu'une seule teinte, pensée pour le fond clair.
-const NAV_ACTIVE_ICONS = { inbox: 'assets/menu/inbox-white.svg', tours: 'assets/menu/tour-white.svg', properties: 'assets/menu/properties-white.svg', directory: 'assets/menu/directory-white.svg', settings: 'assets/menu/settings-white.svg' };
+const NAV_ACTIVE_ICONS = { help: 'assets/menu/help-white.svg', inbox: 'assets/menu/inbox-white.svg', tours: 'assets/menu/tour-white.svg', properties: 'assets/menu/properties-white.svg', directory: 'assets/menu/directory-white.svg', settings: 'assets/menu/settings-white.svg' };
 
 function renderSidebarNav() {
   const el = document.getElementById('sidebar-nav');
@@ -1739,6 +1741,8 @@ function render() {
   else if (state.screen === 'teamAdd') { setTopbarTitle(tr('Ajouter une personne', 'Add a person')); main.innerHTML = renderTeamAddScreen(); }
   else if (state.screen === 'settings') { setTopbarTitle(tr('Paramètres', 'Settings')); main.innerHTML = renderSettingsScreen(); }
   else if (state.screen === 'directory') { setTopbarTitle(tr('Répertoire', 'Directory')); main.innerHTML = renderDirectoryScreen(); }
+  else if (state.screen === 'about') { setTopbarTitle(tr('À propos', 'About')); main.innerHTML = renderAboutScreen(); }
+  else if (state.screen === 'help') { setTopbarTitle(tr('Aide', 'Help')); main.innerHTML = renderHelpScreen(); }
   else if (state.screen === 'inbox') { setTopbarTitle(tr('Messagerie', 'Messages')); main.innerHTML = renderInboxScreen(); }
   else if (state.screen === 'contactForm') { setTopbarTitle(state.contactFormDraft && state.contactFormDraft.id ? tr('Modifier le contact', 'Edit contact') : tr('Créer un contact', 'Create contact')); main.innerHTML = renderContactFormScreen(); }
   document.body.dataset.screen = state.screen;
@@ -2214,6 +2218,7 @@ function seedInbox() {
   const D = 'assets/directory/', T = 'assets/team/';
   const m = (id, unread, courtier, photo, client, clientPhoto, property, start, end, status, time, count) =>
     ({ id, tab: 'recus', unread, courtier, photo, client, clientPhoto, property, date: '2026-09-30', start, end, status, time, count });
+  const ago = [0, 0, 1, 2, 2, 3, 5, 5, 6];
   return [
     m('m1', true, 'John Smith', D + 'avatar-marc-lefebvre.jpg', null, null, '1429 Soucy St, Longueuil, Quebec', '11:15', '11:30', 'demande', '10:33', 3),
     m('m2', true, 'Sophia Miller', D + 'avatar-sophie-martin.jpg', 'Peter Brown', T + 'noah-brown.jpg', '1429 Soucy St, Longueuil, Quebec', '11:15', '11:30', 'confirmation', '10:33', 4),
@@ -2224,7 +2229,7 @@ function seedInbox() {
     m('m7', false, 'Chloé Gagnon', D + 'avatar-chloe-gagnon.jpg', 'Chloe Parker', T + 'emma-thompson-v2.jpg', '76 Birch Road, Trois-Rivières, Quebec', '11:15', '11:30', 'confirmation', '10:33', 2),
     m('m8', false, 'Léa Benoît', D + 'avatar-margaux-benoit.jpg', 'Emma Bennett', T + 'emma-laurent-v2.jpg', '12 Cedar Way, Sherbrooke, Quebec', '11:15', '11:30', 'demande', '10:33', 1),
     m('m9', false, 'Julie Martin', D + 'avatar-camille-durand.jpg', null, null, '45 Willow Crescent, Saguenay, Quebec', '11:15', '11:30', 'repondre', '10:33', 4),
-  ];
+  ].map((x, i) => ({ ...x, daysAgo: ago[i] }));
 }
 
 function inboxUnreadCount() {
@@ -2244,6 +2249,20 @@ function inboxStatusIcon(key) {
       ? '<circle cx="14.6" cy="26.6" r="5.2" fill="#C8102E"/><path d="M12.6 24.6l4 4M16.6 24.6l-4 4" stroke="#fff" stroke-width="1.3" stroke-linecap="round" fill="none"/>'
       : '<circle cx="14.6" cy="26.6" r="5.2" fill="#FFC90E"/><text x="14.6" y="29.4" text-anchor="middle" font-size="8" font-weight="700" font-family="Inter,Arial,sans-serif" fill="#fff">?</text>';
   return `<svg class="inbox-status-icon" viewBox="-1 14.5 20.5 17" fill="none" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title><path d="${INBOX_HOUSE}" stroke="#213163" stroke-linejoin="round"/>${mark}</svg>`;
+}
+
+// Reçu aujourd'hui : l'heure. Plus ancien : le jour (« jeu. 01 »). C'est la règle des
+// messageries, et elle évite de répéter « 10:33 » sur une semaine entière.
+function inboxReceivedLabel(x) {
+  if (!x.daysAgo) return x.time;
+  const d = new Date();
+  d.setDate(d.getDate() - x.daysAgo);
+  return d.toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'short', day: '2-digit' });
+}
+function inboxReceivedTitle(x) {
+  const d = new Date();
+  d.setDate(d.getDate() - (x.daysAgo || 0));
+  return `${d.toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })}, ${x.time}`;
 }
 
 function inboxStatusLabel(key) { const s = INBOX_STATUSES[key]; return tr(s.labelFr, s.labelEn); }
@@ -2301,7 +2320,7 @@ function inboxRowHtml(x) {
       <span class="inbox-cell inbox-cell-client">${clientAvatar}<span>${clientName}</span></span>
       <span class="inbox-cell inbox-cell-property">${esc(x.property)}</span>
       <span class="inbox-cell inbox-cell-date">${esc(inboxDateLabel(x))}</span>
-      <span class="inbox-cell inbox-cell-time"><span>${esc(x.time)}</span><span class="inbox-count">${x.count}</span></span>
+      <span class="inbox-cell inbox-cell-time" title="${esc(inboxReceivedTitle(x))}"><span class="inbox-count">${x.count}</span><span class="inbox-received">${esc(inboxReceivedLabel(x))}</span></span>
     </div>
     <div class="inbox-card ${cls}" data-inbox-row="${x.id}" aria-selected="${checked}">
       <span class="inbox-card-mark" aria-hidden="true"></span>
@@ -2310,7 +2329,7 @@ function inboxRowHtml(x) {
           <span class="inbox-card-who">
             ${inboxAvatar(x.courtier, x.photo)}<button class="inbox-open" data-inbox-open="${x.id}"><span>${esc(x.courtier)}</span></button><span class="inbox-card-sep" aria-hidden="true">-</span>${clientAvatar}<span class="inbox-card-client">${clientName}</span>
           </span>
-          <span class="inbox-card-time"><span>${esc(x.time)}</span><span class="inbox-count">${x.count}</span></span>
+          <span class="inbox-card-time" title="${esc(inboxReceivedTitle(x))}"><span>${esc(inboxReceivedLabel(x))}</span><span class="inbox-count">${x.count}</span></span>
         </div>
         <p class="inbox-card-prop">${inboxStatusIcon(x.status)}<span>${esc(x.property)}</span></p>
         <p class="inbox-card-date">${esc(inboxDateLabel(x))}</p>
@@ -2736,6 +2755,150 @@ function bindSettingsEvents() {
       if (again) again.focus();
     };
   });
+}
+
+/* ----- Screen: aide ----- */
+
+const HELP_MAX = 250;
+const HELP_TYPES = [
+  { id: 'general', labelFr: 'Questions générales', labelEn: 'General questions' },
+  { id: 'feedback', labelFr: 'Commentaires', labelEn: 'Feedback' },
+  { id: 'other', labelFr: 'Autre', labelEn: 'Other' },
+];
+const HELP_LINKS = [
+  { id: 'about', labelFr: 'À propos', labelEn: 'About' },
+  { id: 'terms', labelFr: 'Conditions d\'utilisation', labelEn: 'Terms and conditions' },
+  { id: 'privacy', labelFr: 'Politique de confidentialité', labelEn: 'Privacy policy' },
+];
+
+// L'envoi demande un courriel pour répondre et un message ; le bouton dit
+// pourquoi il est inactif plutôt que de rester grisé sans explication.
+function helpProblem() {
+  const d = state.helpDraft;
+  if (!/^\S+@\S+\.\S+$/.test(d.email.trim())) return tr('Entrez un courriel valide pour recevoir la réponse.', 'Enter a valid email to receive the reply.');
+  if (!d.message.trim()) return tr('Écrivez votre message pour pouvoir l\'envoyer.', 'Write your message to be able to send it.');
+  return '';
+}
+
+function renderHelpScreen() {
+  const d = state.helpDraft;
+  const problem = helpProblem();
+  return `
+    <div class="page-card help-page">
+      <h2 class="help-title">${tr('Demande d\'aide', 'Help request')}</h2>
+      <div class="cf-fields help-fields">
+        <div class="cf-field">
+          <label class="cf-label" for="help-email">${tr('Courriel', 'Email')} <span class="req">*</span></label>
+          <input class="cf-input" id="help-email" type="email" value="${esc(d.email)}" autocomplete="email" placeholder="${tr('nom@exemple.com', 'name@example.com')}">
+        </div>
+        <div class="cf-field">
+          <label class="cf-label" for="help-phone">${tr('Téléphone', 'Phone')}</label>
+          <input class="cf-input" id="help-phone" type="tel" value="${esc(d.phone)}" autocomplete="tel" placeholder="(XXX) XXX-XXXX">
+        </div>
+        <div class="cf-field">
+          <label class="cf-label" for="help-type">${tr('Type de demande', 'Type of request')}</label>
+          <select class="cf-input help-select" id="help-type">
+            ${HELP_TYPES.map(t => `<option value="${t.id}" ${d.type === t.id ? 'selected' : ''}>${esc(tr(t.labelFr, t.labelEn))}</option>`).join('')}
+          </select>
+        </div>
+        <div class="cf-field cf-field-notes">
+          <label class="cf-label" for="help-message">${tr('Message', 'Message')} <span class="req">*</span></label>
+          <textarea class="cf-notes help-message" id="help-message" maxlength="${HELP_MAX}" placeholder="${tr('Écrivez votre message', 'Write a message')}" aria-describedby="help-count">${esc(d.message)}</textarea>
+          <p class="help-count" id="help-count">${tr('Caractères', 'Characters')} : ${d.message.length} / ${HELP_MAX}</p>
+        </div>
+      </div>
+      <div class="help-send">
+        <button class="btn btn-primary" id="help-send" ${problem ? 'disabled aria-describedby="help-reason"' : ''}>${tr('Envoyer', 'Send')}</button>
+        <p class="help-reason" id="help-reason" ${problem ? '' : 'hidden'}>${problem}</p>
+      </div>
+      <h3 class="help-other">${tr('Autre', 'Other')}</h3>
+      <div class="settings-options">
+        ${HELP_LINKS.map(l => `
+        <button class="settings-option" data-help-link="${l.id}">
+          <span>${esc(tr(l.labelFr, l.labelEn))}</span>
+          <img src="assets/badge-chevron.svg" alt="" width="9" height="15">
+        </button>`).join('')}
+      </div>
+    </div>`;
+}
+
+function bindHelpEvents() {
+  const d = state.helpDraft;
+  // La saisie ne re-rend pas la page : on perdrait le focus à chaque touche.
+  const refresh = () => {
+    const problem = helpProblem();
+    const btn = document.getElementById('help-send');
+    const reason = document.getElementById('help-reason');
+    const count = document.getElementById('help-count');
+    btn.disabled = !!problem;
+    if (problem) btn.setAttribute('aria-describedby', 'help-reason'); else btn.removeAttribute('aria-describedby');
+    reason.textContent = problem;
+    reason.hidden = !problem;
+    count.textContent = `${tr('Caractères', 'Characters')} : ${d.message.length} / ${HELP_MAX}`;
+  };
+  const bind = (id, key) => { const el = document.getElementById(id); if (el) el.oninput = () => { d[key] = el.value; refresh(); }; };
+  bind('help-email', 'email'); bind('help-phone', 'phone'); bind('help-message', 'message');
+  const type = document.getElementById('help-type');
+  if (type) type.onchange = () => { d.type = type.value; };
+  const send = document.getElementById('help-send');
+  if (send) send.onclick = () => {
+    if (helpProblem()) return;
+    d.message = '';
+    d.type = 'general';
+    render();
+    showToast(tr('Demande envoyée. Nous vous répondrons par courriel.', 'Request sent. We\'ll reply by email.'), 'success');
+  };
+  document.querySelectorAll('[data-help-link]').forEach(b => {
+    b.onclick = () => {
+      if (b.getAttribute('data-help-link') === 'about') { state.screen = 'about'; render(); window.scrollTo(0, 0); return; }
+      showToast(tr('Cette page n\'est pas encore disponible dans ce prototype.', 'This page isn\'t wired up in this prototype yet.'));
+    };
+  });
+}
+
+/* ----- Screen: à propos ----- */
+
+const APP_VERSION = { front: '20281005.1', back: '20281005.1' };
+const SUPPORT = { email: 'support@touchbaserealestate.com', phone: '1 (800) 499-1994', phoneHref: '+18004991994' };
+
+function renderAboutScreen() {
+  const p = PLATFORMS.find(p => p.id === state.brandPlatform) || PLATFORMS[0];
+  const org = p.id === 'touchbase' ? 'Touchbase Real Estate®' : `${p.brand}®`;
+  return `
+    <div class="about-page">
+      <section class="about-card about-support" aria-labelledby="about-support-title">
+        <div class="about-brand">
+          <img class="about-logo" src="${p.logo}" alt="${esc(p.brand)}" height="46">
+          <p class="about-reserved">${tr(`Cette application est réservée aux utilisateurs de ${esc(org)}.`, `This application is reserved for ${esc(org)} users.`)}</p>
+        </div>
+        <div class="about-contact">
+          <h2 class="about-heading" id="about-support-title">${tr('Soutien et contact', 'Support & contact')}</h2>
+          <ul class="about-contact-list">
+            <li><span class="about-contact-icon">${icon('mail')}</span><span class="about-contact-text"><span class="about-label">${tr('Courriel', 'Email')}</span><a href="mailto:${SUPPORT.email}">${SUPPORT.email}</a></span></li>
+            <li><span class="about-contact-icon">${icon('phone')}</span><span class="about-contact-text"><span class="about-label">${tr('Téléphone', 'Phone')}</span><a href="tel:${SUPPORT.phoneHref}">${SUPPORT.phone}</a></span></li>
+          </ul>
+          <div class="about-hours">
+            <p class="about-hours-title">${tr('Heures d\'ouverture', 'Opening hours')}</p>
+            <p>${tr('Du lundi au vendredi', 'Monday to Friday')}</p>
+            <p class="about-hours-time">${tr('8 h à 18 h', '8 a.m. to 6 p.m.')}</p>
+            <p class="about-hours-tz">${tr('Heure normale de l\'Est', 'Eastern Standard Time')}</p>
+          </div>
+        </div>
+      </section>
+      <section class="about-card about-app" aria-labelledby="about-app-title">
+        <h2 class="about-heading" id="about-app-title">${tr('Informations sur l\'application', 'Application information')}</h2>
+        <dl class="about-versions">
+          <div><dt>${tr('Version front-end', 'Front-end version')}</dt><dd>${APP_VERSION.front}</dd></div>
+          <div><dt>${tr('Version back-end', 'Back-end version')}</dt><dd>${APP_VERSION.back}</dd></div>
+        </dl>
+        <button class="btn btn-primary about-refresh" id="about-refresh">${tr('Actualiser', 'Refresh')}</button>
+      </section>
+    </div>`;
+}
+
+function bindAboutEvents() {
+  const r = document.getElementById('about-refresh');
+  if (r) r.onclick = () => showToast(tr(`Application à jour. Version ${APP_VERSION.front}.`, `Application up to date. Version ${APP_VERSION.front}.`), 'success');
 }
 
 /* ----- Screens: mon équipe (liste) et ajouter une personne -----
@@ -5392,6 +5555,7 @@ function bindEvents() {
     el.onclick = (e) => {
       e.preventDefault();
       const id = el.getAttribute('data-nav');
+      if (id === 'help') { leaveTour(() => { state.screen = 'help'; state.draft = null; }); return; }
       if (id === 'inbox') { leaveTour(() => { state.screen = 'inbox'; state.draft = null; }); return; }
       if (id === 'tours') { leaveTour(() => { state.screen = 'list'; state.draft = null; }); return; }
       if (id === 'properties') { leaveTour(() => { state.screen = 'properties'; state.draft = null; }); return; }
@@ -5414,6 +5578,7 @@ function bindEvents() {
     if (state.screen === 'report') { state.screen = 'builder'; state.reportStopId = null; state.reportDraft = null; render(); return; }
     if (state.screen === 'contact' && state.contactPurpose !== 'create') { state.contactPurpose = 'create'; state.screen = 'builder'; render(); return; }
     // Sans lien avec un tour en cours : pas de leaveTour, retour direct à la liste.
+    if (state.screen === 'about') { state.screen = 'help'; render(); return; }
     if (state.screen === 'propertyAvailability') { state.screen = 'propertyDetail'; state.availMiniCalOpen = false; render(); return; }
     if (state.screen === 'propertyDetail') { state.screen = 'properties'; state.propertyDetailMls = null; render(); return; }
     if (state.screen === 'teamAdd') { state.screen = 'team'; state.teamCart = []; render(); return; }
@@ -5451,6 +5616,8 @@ function bindEvents() {
   if (state.screen === 'teamAdd') bindTeamAddEvents();
   if (state.screen === 'directory') bindDirectoryEvents();
   if (state.screen === 'inbox') bindInboxEvents();
+  if (state.screen === 'help') bindHelpEvents();
+  if (state.screen === 'about') bindAboutEvents();
   if (state.screen === 'contactForm') bindContactFormEvents();
   bindModalEvents();
 }
