@@ -1105,6 +1105,7 @@ const state = {
   teamOpen: false,           // liste de suggestions dépliée ou non
   teamActive: 0,             // suggestion en surbrillance (clavier)
   settingsLangOpen: false,   // accordéon « Langue » des Paramètres
+  messageFrom: 'inbox',      // écran à retrouver en quittant « Nouveau message »
   helpDraft: { email: 'emma.lucky@exemple.com', phone: '(514) 555-0142', type: 'general', message: '' },
   inbox: seedInbox(),        // messages de la messagerie
   inboxTab: 'recus',         // recus | envoyes | programmes | archives
@@ -1533,6 +1534,7 @@ function navActiveId() {
   if (inDirectory) return 'directory';
   if (state.screen === 'inbox') return 'inbox';
   if (state.screen === 'help' || state.screen === 'about') return 'help';
+  if (state.screen === 'newMessage') return 'inbox';
   if (state.screen === 'settings' || state.screen === 'team' || state.screen === 'teamAdd') return 'settings';
   return 'tours';
 }
@@ -1741,6 +1743,7 @@ function render() {
   else if (state.screen === 'teamAdd') { setTopbarTitle(tr('Ajouter une personne', 'Add a person')); main.innerHTML = renderTeamAddScreen(); }
   else if (state.screen === 'settings') { setTopbarTitle(tr('Paramètres', 'Settings')); main.innerHTML = renderSettingsScreen(); }
   else if (state.screen === 'directory') { setTopbarTitle(tr('Répertoire', 'Directory')); main.innerHTML = renderDirectoryScreen(); }
+  else if (state.screen === 'newMessage') { setTopbarTitle(tr('Nouveau message', 'New message')); main.innerHTML = renderNewMessageScreen(); }
   else if (state.screen === 'about') { setTopbarTitle(tr('À propos', 'About')); main.innerHTML = renderAboutScreen(); }
   else if (state.screen === 'help') { setTopbarTitle(tr('Aide', 'Help')); main.innerHTML = renderHelpScreen(); }
   else if (state.screen === 'inbox') { setTopbarTitle(tr('Messagerie', 'Messages')); main.innerHTML = renderInboxScreen(); }
@@ -2240,15 +2243,21 @@ function inboxUnreadCount() {
 // d'état du message, donc elle se lit sans couleur (✓, ?, ✕) et s'annonce
 // aux lecteurs d'écran.
 const INBOX_HOUSE = 'M14.0661 23.9069C13.7741 24.1079 13.4601 24.1575 13.1076 24.141C13.1048 25.5925 13.1186 27.0138 13.0993 28.4598C13.0855 29.231 12.4272 29.8783 11.656 29.8921C10.8848 29.9058 10.1108 29.8976 9.33686 29.8948C9.08897 29.8948 8.92371 29.7158 8.92371 29.4514C8.92096 28.7986 8.92371 28.1458 8.92096 27.493C8.92096 27.0634 8.92096 26.6309 8.92096 26.2012C8.9182 25.7578 8.64001 25.4741 8.19105 25.4686C7.76964 25.4631 7.34822 25.4631 6.92681 25.4686C6.48887 25.4741 6.20792 25.7605 6.20792 26.1985C6.20517 27.2644 6.20517 28.3276 6.20517 29.3935C6.20517 29.7488 6.05643 29.8976 5.69837 29.8976C4.99876 29.8976 4.29916 29.8976 3.59955 29.8976C2.67685 29.8948 2.02131 29.2503 2.0158 28.3248C2.0103 26.9311 2.01305 25.5347 2.01305 24.141C0.735032 24.2622 -0.00864168 22.8244 0.905802 21.8962C2.79528 20.0067 4.68477 18.1172 6.57701 16.2305C6.69544 16.1066 6.83316 16.0046 6.98465 15.922C7.42534 15.7017 8.11118 15.7705 8.52984 16.2002C9.59026 17.2882 10.6727 18.3541 11.7469 19.4283C12.5705 20.2546 13.3885 21.0864 14.2258 21.9017C14.7767 22.4388 14.7244 23.4689 14.0661 23.9069Z';
+// Badge rond posé sur le coin d'une maison ou d'une étoile : ✓ vert, ✕ rouge, ? jaune, i bleu marine.
+function houseBadgeMark(glyph) {
+  return glyph === 'confirmed'
+    ? '<circle cx="14.6" cy="26.6" r="5.2" fill="#28A745"/><path d="M12.2 26.7l1.6 1.6 3-3.3" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
+    : glyph === 'canceled'
+      ? '<circle cx="14.6" cy="26.6" r="5.2" fill="#C8102E"/><path d="M12.6 24.6l4 4M16.6 24.6l-4 4" stroke="#fff" stroke-width="1.3" stroke-linecap="round" fill="none"/>'
+      : glyph === 'info'
+        ? '<circle cx="14.6" cy="26.6" r="5.2" fill="#213163"/><text x="14.6" y="29.3" text-anchor="middle" font-size="7.5" font-weight="700" font-family="Inter,Arial,sans-serif" fill="#fff">i</text>'
+        : '<circle cx="14.6" cy="26.6" r="5.2" fill="#FFC90E"/><text x="14.6" y="29.4" text-anchor="middle" font-size="8" font-weight="700" font-family="Inter,Arial,sans-serif" fill="#fff">?</text>';
+}
+
 function inboxStatusIcon(key) {
   const st = INBOX_STATUSES[key];
   const label = inboxStatusLabel(key);
-  const mark = st.glyph === 'confirmed'
-    ? '<circle cx="14.6" cy="26.6" r="5.2" fill="#28A745"/><path d="M12.2 26.7l1.6 1.6 3-3.3" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'
-    : st.glyph === 'canceled'
-      ? '<circle cx="14.6" cy="26.6" r="5.2" fill="#C8102E"/><path d="M12.6 24.6l4 4M16.6 24.6l-4 4" stroke="#fff" stroke-width="1.3" stroke-linecap="round" fill="none"/>'
-      : '<circle cx="14.6" cy="26.6" r="5.2" fill="#FFC90E"/><text x="14.6" y="29.4" text-anchor="middle" font-size="8" font-weight="700" font-family="Inter,Arial,sans-serif" fill="#fff">?</text>';
-  return `<svg class="inbox-status-icon" viewBox="-1 14.5 20.5 17" fill="none" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title><path d="${INBOX_HOUSE}" stroke="#213163" stroke-linejoin="round"/>${mark}</svg>`;
+  return `<svg class="inbox-status-icon" viewBox="-1 14.5 20.5 17" fill="none" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title><path d="${INBOX_HOUSE}" stroke="#213163" stroke-linejoin="round"/>${houseBadgeMark(st.glyph)}</svg>`;
 }
 
 // Reçu aujourd'hui : l'heure. Plus ancien : le jour (« jeu. 01 »). C'est la règle des
@@ -2517,7 +2526,7 @@ function bindInboxEvents() {
     };
   });
   const newBtn = document.getElementById('btn-inbox-new');
-  if (newBtn) newBtn.onclick = () => showToast(tr('L\'envoi de message n\'est pas encore disponible dans ce prototype.', 'Sending a message isn\'t wired up in this prototype yet.'));
+  if (newBtn) newBtn.onclick = openNewMessage;
 }
 
 /* ----- Screen: fiche contact (ajout / modification) ----- */
@@ -2754,6 +2763,53 @@ function bindSettingsEvents() {
       const again = document.querySelector(`[data-settings-lang="${lang}"]`);
       if (again) again.focus();
     };
+  });
+}
+
+/* ----- Screen: nouveau message (choix du type) ----- */
+
+// Les sept types de message. Les cinq premiers portent la maison-statut de la
+// messagerie, pour que le type choisi ressemble au message qu'il produira.
+const MESSAGE_TYPES = [
+  { id: 'multi', labelFr: 'Multi-visites', labelEn: 'Multiple visits' },
+  { id: 'request', labelFr: 'Demande de visite', labelEn: 'Visit request', glyph: 'pending' },
+  { id: 'confirmation', labelFr: 'Confirmation de visite', labelEn: 'Visit confirmation', glyph: 'confirmed' },
+  { id: 'cancel', labelFr: 'Annulation de visite', labelEn: 'Visit cancellation', glyph: 'canceled' },
+  { id: 'report', labelFr: 'Compte rendu', labelEn: 'Visit report' },
+  { id: 'info', labelFr: 'Info sur propriété', labelEn: 'Property info', glyph: 'info' },
+  { id: 'other', labelFr: 'Autre message', labelEn: 'Other message' },
+];
+
+function messageTypeIcon(t) {
+  const house = `<path d="${INBOX_HOUSE}" stroke="#213163" stroke-linejoin="round"/>`;
+  if (t.id === 'multi') return tourIconSvg('pending').replace('class="tour-card-glyph"', 'class="msgtype-icon" aria-hidden="true"');
+  if (t.id === 'report') return `<svg class="msgtype-icon" viewBox="0 0 31 28" fill="none" aria-hidden="true"><g transform="translate(0 1.5) scale(0.95)" style="color:#213163">${ICONS.star.content}</g><circle cx="23" cy="21" r="5.2" fill="#28A745"/><path d="M20.6 21.1l1.6 1.6 3-3.3" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
+  if (t.id === 'other') return `<svg class="msgtype-icon" viewBox="-1 -1 36.8333 31.8333" fill="none" aria-hidden="true"><path d="M0.750004 4.91669L12.2717 11.445C16.5193 13.8517 18.314 13.8517 22.5616 11.445L34.0833 4.91669" stroke="#213163" stroke-linejoin="round"/><path d="M0.776276 17.376C0.885235 22.4853 0.939714 25.0399 2.82493 26.9323C4.71014 28.8246 7.33389 28.8906 12.5814 29.0224C15.8155 29.1037 19.0178 29.1037 22.252 29.0224C27.4995 28.8906 30.1232 28.8246 32.0084 26.9323C33.8936 25.0399 33.9481 22.4853 34.0571 17.376C34.0921 15.7332 34.0921 14.1001 34.0571 12.4573C33.9481 7.3481 33.8936 4.79349 32.0084 2.9011C30.1232 1.00872 27.4995 0.942795 22.252 0.810948C19.0178 0.729688 15.8155 0.729684 12.5814 0.810937C7.33388 0.942773 4.71014 1.00869 2.82492 2.90108C0.939705 4.79347 0.885228 7.34808 0.776274 12.4573C0.741241 14.1001 0.741242 15.7332 0.776276 17.376Z" stroke="#213163" stroke-linejoin="round"/></svg>`;
+  return `<svg class="msgtype-icon" viewBox="-1 14.5 20.5 17" fill="none" aria-hidden="true">${house}${houseBadgeMark(t.glyph)}</svg>`;
+}
+
+function renderNewMessageScreen() {
+  return `
+    <div class="page-card msgtype-page">
+      <p class="msgtype-intro">${tr('Quel type de message voulez-vous envoyer ?', 'Which type of message do you want to send?')}</p>
+      <ul class="msgtype-list">
+        ${MESSAGE_TYPES.map(t => `
+        <li><button class="msgtype-option" data-msgtype="${t.id}">
+          <span class="msgtype-icon-wrap">${messageTypeIcon(t)}</span>
+          <span class="msgtype-label">${esc(tr(t.labelFr, t.labelEn))}</span>
+          <img src="assets/badge-chevron.svg" alt="" width="9" height="15">
+        </button></li>`).join('')}
+      </ul>
+    </div>`;
+}
+
+function openNewMessage() {
+  leaveTour(() => { state.messageFrom = state.screen === 'newMessage' ? state.messageFrom : state.screen; state.screen = 'newMessage'; state.draft = null; });
+}
+
+function bindNewMessageEvents() {
+  document.querySelectorAll('[data-msgtype]').forEach(b => {
+    b.onclick = () => showToast(tr('La suite de la rédaction n\'est pas encore disponible dans ce prototype.', 'The next steps of composing aren\'t wired up in this prototype yet.'));
   });
 }
 
@@ -5567,7 +5623,7 @@ function bindEvents() {
   });
 
   const newMessageBtn = document.getElementById('btn-sidebar-new-message');
-  if (newMessageBtn) newMessageBtn.onclick = () => showToast(tr('L\'envoi de message n\'est pas encore disponible dans ce prototype.', 'Sending a message isn\'t wired up in this prototype yet.'));
+  if (newMessageBtn) newMessageBtn.onclick = openNewMessage;
 
   const menuBtn = document.getElementById('mobile-menu-btn');
   if (menuBtn) menuBtn.onclick = () => leaveTour(() => { state.screen = 'menu'; state.draft = null; });
@@ -5579,6 +5635,7 @@ function bindEvents() {
     if (state.screen === 'contact' && state.contactPurpose !== 'create') { state.contactPurpose = 'create'; state.screen = 'builder'; render(); return; }
     // Sans lien avec un tour en cours : pas de leaveTour, retour direct à la liste.
     if (state.screen === 'about') { state.screen = 'help'; render(); return; }
+    if (state.screen === 'newMessage') { state.screen = state.messageFrom && state.messageFrom !== 'newMessage' ? state.messageFrom : 'inbox'; render(); return; }
     if (state.screen === 'propertyAvailability') { state.screen = 'propertyDetail'; state.availMiniCalOpen = false; render(); return; }
     if (state.screen === 'propertyDetail') { state.screen = 'properties'; state.propertyDetailMls = null; render(); return; }
     if (state.screen === 'teamAdd') { state.screen = 'team'; state.teamCart = []; render(); return; }
@@ -5618,6 +5675,7 @@ function bindEvents() {
   if (state.screen === 'inbox') bindInboxEvents();
   if (state.screen === 'help') bindHelpEvents();
   if (state.screen === 'about') bindAboutEvents();
+  if (state.screen === 'newMessage') bindNewMessageEvents();
   if (state.screen === 'contactForm') bindContactFormEvents();
   bindModalEvents();
 }
