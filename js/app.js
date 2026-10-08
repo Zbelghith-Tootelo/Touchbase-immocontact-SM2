@@ -1113,6 +1113,8 @@ const state = {
   inboxFilter: 'tous',       // tous | nouveau | attente
   inboxType: '',             // '' ou une clé de INBOX_STATUSES
   inboxSelected: [],         // ids cochés
+  compose: null,             // message en cours de composition (voir newCompose)
+  openMessageId: null,       // message ouvert dans son détail
   directoryTab: 'tous',      // tous | acheteurs | vendeurs | prospects | courtiers | favoris
   directorySearch: '',
   directoryPage: 1,
@@ -1534,7 +1536,7 @@ function navActiveId() {
   if (inDirectory) return 'directory';
   if (state.screen === 'inbox') return 'inbox';
   if (state.screen === 'help' || state.screen === 'about') return 'help';
-  if (state.screen === 'newMessage') return 'inbox';
+  if (state.screen === 'newMessage' || state.screen === 'compose' || state.screen === 'messageDetail') return 'inbox';
   if (state.screen === 'settings' || state.screen === 'team' || state.screen === 'teamAdd') return 'settings';
   return 'tours';
 }
@@ -1744,6 +1746,8 @@ function render() {
   else if (state.screen === 'settings') { setTopbarTitle(tr('Paramètres', 'Settings')); main.innerHTML = renderSettingsScreen(); }
   else if (state.screen === 'directory') { setTopbarTitle(tr('Répertoire', 'Directory')); main.innerHTML = renderDirectoryScreen(); }
   else if (state.screen === 'newMessage') { setTopbarTitle(tr('Nouveau message', 'New message')); main.innerHTML = renderNewMessageScreen(); }
+  else if (state.screen === 'compose') { setTopbarTitle(tr('Nouveau message', 'New message')); main.innerHTML = renderComposeScreen(); }
+  else if (state.screen === 'messageDetail') { setTopbarTitle(tr('Message', 'Message')); main.innerHTML = renderMessageDetailScreen(); }
   else if (state.screen === 'about') { setTopbarTitle(tr('À propos', 'About')); main.innerHTML = renderAboutScreen(); }
   else if (state.screen === 'help') { setTopbarTitle(tr('Aide', 'Help')); main.innerHTML = renderHelpScreen(); }
   else if (state.screen === 'inbox') { setTopbarTitle(tr('Messagerie', 'Messages')); main.innerHTML = renderInboxScreen(); }
@@ -2263,12 +2267,14 @@ function inboxStatusIcon(key) {
 // Reçu aujourd'hui : l'heure. Plus ancien : le jour (« jeu. 01 »). C'est la règle des
 // messageries, et elle évite de répéter « 10:33 » sur une semaine entière.
 function inboxReceivedLabel(x) {
+  if (x.sched) return `${new Date(`${x.sched.date}T00:00:00`).toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'short', day: '2-digit' })} ${x.sched.time}`;
   if (!x.daysAgo) return x.time;
   const d = new Date();
   d.setDate(d.getDate() - x.daysAgo);
   return d.toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'short', day: '2-digit' });
 }
 function inboxReceivedTitle(x) {
+  if (x.sched) return `${tr('Envoi prévu', 'Scheduled for')} ${new Date(`${x.sched.date}T00:00:00`).toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })}, ${x.sched.time}`;
   const d = new Date();
   d.setDate(d.getDate() - (x.daysAgo || 0));
   return `${d.toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })}, ${x.time}`;
@@ -2277,6 +2283,7 @@ function inboxReceivedTitle(x) {
 function inboxStatusLabel(key) { const s = INBOX_STATUSES[key]; return tr(s.labelFr, s.labelEn); }
 
 function inboxDateLabel(x) {
+  if (!x.date) return '';
   const d = new Date(`${x.date}T00:00:00`);
   const day = d.toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'short', day: 'numeric', month: 'short' });
   return `${day}, ${x.start} - ${x.end}`;
@@ -2329,7 +2336,7 @@ function inboxRowHtml(x) {
       <span class="inbox-cell inbox-cell-client">${clientAvatar}<span>${clientName}</span></span>
       <span class="inbox-cell inbox-cell-property">${esc(x.property)}</span>
       <span class="inbox-cell inbox-cell-date">${esc(inboxDateLabel(x))}</span>
-      <span class="inbox-cell inbox-cell-time" title="${esc(inboxReceivedTitle(x))}"><span class="inbox-count">${x.count}</span><span class="inbox-received">${esc(inboxReceivedLabel(x))}</span></span>
+      <span class="inbox-cell inbox-cell-time" title="${esc(inboxReceivedTitle(x))}">${x.count ? `<span class="inbox-count">${x.count}</span>` : ''}<span class="inbox-received">${esc(inboxReceivedLabel(x))}</span></span>
     </div>
     <div class="inbox-card ${cls}" data-inbox-row="${x.id}" aria-selected="${checked}">
       <span class="inbox-card-mark" aria-hidden="true"></span>
@@ -2338,7 +2345,7 @@ function inboxRowHtml(x) {
           <span class="inbox-card-who">
             ${inboxAvatar(x.courtier, x.photo)}<button class="inbox-open" data-inbox-open="${x.id}"><span>${esc(x.courtier)}</span></button><span class="inbox-card-sep" aria-hidden="true">-</span>${clientAvatar}<span class="inbox-card-client">${clientName}</span>
           </span>
-          <span class="inbox-card-time" title="${esc(inboxReceivedTitle(x))}"><span>${esc(inboxReceivedLabel(x))}</span><span class="inbox-count">${x.count}</span></span>
+          <span class="inbox-card-time" title="${esc(inboxReceivedTitle(x))}"><span>${esc(inboxReceivedLabel(x))}</span>${x.count ? `<span class="inbox-count">${x.count}</span>` : ''}</span>
         </div>
         <p class="inbox-card-prop">${inboxStatusIcon(x.status)}<span>${esc(x.property)}</span></p>
         <p class="inbox-card-date">${esc(inboxDateLabel(x))}</p>
@@ -2479,9 +2486,11 @@ function bindInboxEvents() {
       if (row.classList.contains('inbox-card') && state.inboxSelected.length) { toggleSelect(id); return; }
       const x = state.inbox.find(m => m.id === id);
       if (!x) return;
+      if (x.draft) { composeOpenDraft(x); return; }
       x.unread = false;
+      state.openMessageId = x.id;
+      state.screen = 'messageDetail';
       render();
-      showToast(tr('L\'affichage d\'un message n\'est pas encore disponible dans ce prototype.', 'Opening a message isn\'t wired up in this prototype yet.'));
     };
   });
 
@@ -2804,12 +2813,666 @@ function renderNewMessageScreen() {
 }
 
 function openNewMessage() {
-  leaveTour(() => { state.messageFrom = state.screen === 'newMessage' ? state.messageFrom : state.screen; state.screen = 'newMessage'; state.draft = null; });
+  leaveTour(() => { state.messageFrom = state.screen === 'newMessage' ? state.messageFrom : state.screen; state.screen = 'newMessage'; state.draft = null; state.compose = null; });
 }
 
 function bindNewMessageEvents() {
   document.querySelectorAll('[data-msgtype]').forEach(b => {
-    b.onclick = () => showToast(tr('La suite de la rédaction n\'est pas encore disponible dans ce prototype.', 'The next steps of composing aren\'t wired up in this prototype yet.'));
+    b.onclick = () => {
+      state.compose = newCompose(COMPOSE_KIND_OF[b.getAttribute('data-msgtype')] || 'showing');
+      state.screen = 'compose';
+      render();
+    };
+  });
+}
+
+/* ----- Screen: composer un message ----- */
+
+// Les sept types du premier écran se replient sur trois façons de composer :
+// une demande de visite (avec date et heure), une demande d'information ou un
+// message libre (une propriété, sans heure).
+const COMPOSE_KINDS = [
+  { id: 'showing', typeId: 'request', labelFr: 'Demande de visite', labelEn: 'Showing request' },
+  { id: 'info', typeId: 'info', labelFr: 'Info sur propriété', labelEn: 'Property information' },
+  { id: 'other', typeId: 'other', labelFr: 'Autre message', labelEn: 'Other message' },
+];
+const COMPOSE_KIND_OF = { multi: 'showing', request: 'showing', confirmation: 'showing', cancel: 'showing', report: 'showing', info: 'info', other: 'other' };
+
+const pad2 = (n) => String(n).padStart(2, '0');
+function composeISO(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function composeTomorrowISO() { const d = new Date(); d.setDate(d.getDate() + 1); return composeISO(d); }
+
+function newCompose(kind) {
+  return {
+    id: null,            // id du brouillon repris, sinon null
+    kind,                // showing | info | other
+    dests: [],           // { mls, address, courtier, date, from, to, client, comment, callback }
+    message: '',
+    popup: null,         // null | search | form | later
+    tab: 'address',      // address | mls | cart
+    search: '',
+    form: null,
+    laterDate: composeTomorrowISO(),
+    laterTime: '09:00',
+  };
+}
+
+// Prochain quart d'heure, borné aux heures que le sélecteur propose ; passé
+// 19 h, la proposition glisse à demain 9 h plutôt qu'à une plage impossible.
+function composeDefaultSlot() {
+  const now = new Date();
+  const mins = ceilToSlot(now.getHours() * 60 + now.getMinutes() + 15);
+  if (mins > 19 * 60) return { date: composeTomorrowISO(), from: '09:00', to: '09:30' };
+  const from = Math.max(mins, 7 * 60);
+  return { date: composeISO(now), from: minutesToHHMM(from), to: minutesToHHMM(from + 30) };
+}
+
+// Les plages publiées dans « Disponibilités pour visites » de la fiche, à venir.
+function composeUpcomingAvailability(mls) {
+  const now = new Date(), today = composeISO(now), nowMin = now.getHours() * 60 + now.getMinutes();
+  return propertyAvailability(mls).filter(ev => ev.date > today || (ev.date === today && ev.endMinutes > nowMin + 15)).sort((a, b) => `${a.date} ${a.startMinutes}`.localeCompare(`${b.date} ${b.startMinutes}`));
+}
+// Début de la plage, ou le prochain quart d'heure si elle est déjà entamée.
+function composeSlotIn(ev) {
+  const now = new Date();
+  const earliest = ev.date === composeISO(now) ? ceilToSlot(now.getHours() * 60 + now.getMinutes() + 15) : 0;
+  const start = Math.max(ev.startMinutes, earliest);
+  return { date: ev.date, from: minutesToHHMM(start), to: minutesToHHMM(Math.min(start + 30, ev.endMinutes)) };
+}
+function composeAvailableSlots(mls) { return composeUpcomingAvailability(mls).filter(ev => ev.type !== 'impossible'); }
+
+function composeAvailabilityHtml(f) {
+  const evs = composeUpcomingAvailability(f.mls);
+  const loc = state.lang === 'en' ? 'en-CA' : 'fr-CA';
+  if (!evs.length) return `<p class="helper-text cmp-avail-empty">${tr('Aucune disponibilité publiée : le courtier doit approuver chaque visite.', 'No availability published: the agent must approve each showing.')}</p>`;
+  return `<ul class="cmp-avail">${evs.map(ev => {
+    const tag = AVAILABILITY_TAGS[ev.type];
+    const label = `${new Date(`${ev.date}T00:00:00`).toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'short' })}, ${composeTime(minutesToHHMM(ev.startMinutes))} - ${composeTime(minutesToHHMM(ev.endMinutes))}`;
+    const on = ev.type !== 'impossible' && f.date === ev.date && timeToMinutes(f.from) >= ev.startMinutes && timeToMinutes(f.to) <= ev.endMinutes;
+    return ev.type === 'impossible'
+      ? `<li class="cmp-avail-item is-blocked"><span>${esc(label)}</span><em>${esc(tr('Indisponible', 'Unavailable'))}</em></li>`
+      : `<li><button type="button" class="cmp-avail-item ${on ? 'is-on' : ''}" data-cmp-slot="${ev.id}" aria-pressed="${on}"><span>${esc(label)}</span><em>${esc(availabilityTagLabel(tag))}</em></button></li>`;
+  }).join('')}</ul>`;
+}
+
+function composeTag(d) {
+  return availabilityTagFor({ mls: d.mls, duration: timeToMinutes(d.to) - timeToMinutes(d.from) }, timeToMinutes(d.from), d.date);
+}
+function composeTagOk(tag) { return tag.id === 'visite-libre' || tag.id === 'pre-approuve'; }
+
+function composeTime(t) { return state.lang === 'en' ? t : t.replace(':', 'h'); }
+function composeDateLabel(d) {
+  const day = new Date(`${d.date}T00:00:00`).toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'short', day: 'numeric', month: 'short' });
+  return `${day}, ${composeTime(d.from)} - ${composeTime(d.to)}`;
+}
+
+// Un client commun à toutes les propriétés fait un tour ; sinon, plusieurs
+// propriétés font une demande de visites multiples. Lecture seule : la règle
+// décrit ce qui part, elle ne se règle pas.
+function composeKindNote(c) {
+  if (c.kind !== 'showing' || !c.dests.length) return '';
+  if (c.dests.length === 1) return tr('Une propriété : une demande de visite simple.', 'One property: a single showing request.');
+  const first = c.dests[0].client;
+  if (first && c.dests.every(d => d.client && d.client.name === first.name)) return tr(`Même client (${first.name}) sur toutes les propriétés : un tour de visites.`, `Same client (${first.name}) on every property: a showing tour.`);
+  return tr('Plusieurs propriétés : une demande de visites multiples.', 'Several properties: a multiple-showing request.');
+}
+
+function composeProblem(c) {
+  if (!c.dests.length) return c.kind === 'showing' ? tr('Ajoutez au moins une propriété pour envoyer la demande.', 'Add at least one property to send the request.') : tr('Choisissez la propriété concernée.', 'Choose the property this is about.');
+  if (c.kind !== 'showing' && !c.message.trim()) return tr('Écrivez votre message pour pouvoir l\'envoyer.', 'Write your message to send it.');
+  return '';
+}
+
+function composeSlotTagHtml(d) {
+  const ok = composeTagOk(composeTag(d));
+  return `<span class="compose-tag ${ok ? 'is-ok' : 'is-wait'}">${ok ? tr('Confirmée automatiquement', 'Auto-confirmed') : tr('En attente de confirmation', 'Awaiting confirmation')}</span>`;
+}
+
+function composeDestHtml(d, i, c) {
+  const body = c.kind === 'showing'
+    ? `<button type="button" class="compose-dest-body" data-cmp-edit="${i}" aria-label="${tr('Modifier la visite de', 'Edit the showing for')} ${esc(d.address)}">
+         <strong>${esc(d.address)}</strong>
+         <span class="compose-dest-meta"><span>${esc(composeDateLabel(d))}</span>${composeSlotTagHtml(d)}${d.client ? `<span>${esc(d.client.name)}</span>` : ''}</span>
+       </button>`
+    : `<div class="compose-dest-body"><strong>${esc(d.address)}</strong><span class="compose-dest-meta"><span>${tr('Courtier inscripteur', 'Listing agent')} : ${esc(d.courtier)}</span></span></div>`;
+  return `
+    <li class="compose-dest">
+      <img class="result-thumb" src="${thumbFor(d.mls, d.address)}" alt="">
+      ${body}
+      <button type="button" class="compose-dest-remove" data-cmp-remove="${i}" aria-label="${tr('Retirer', 'Remove')} ${esc(d.address)}">${TEAM_ICONS.removeCircle}</button>
+    </li>`;
+}
+
+function renderComposeScreen() {
+  const c = state.compose;
+  if (!c) return '';
+  const problem = composeProblem(c);
+  const canAdd = c.kind === 'showing' || !c.dests.length;
+  const kinds = COMPOSE_KINDS.map(k => `
+      <label class="compose-kind ${c.kind === k.id ? 'is-active' : ''}">
+        <input type="radio" name="compose-kind" value="${k.id}" ${c.kind === k.id ? 'checked' : ''}>
+        ${messageTypeIcon(MESSAGE_TYPES.find(t => t.id === k.typeId))}
+        <span>${esc(tr(k.labelFr, k.labelEn))}</span>
+      </label>`).join('');
+  const note = composeKindNote(c);
+  return `
+    <div class="page-card compose-page">
+      <fieldset class="compose-kinds">
+        <legend>${tr('Choisissez un type de message', 'Select a message type')}</legend>
+        <div class="compose-kinds-row">${kinds}</div>
+      </fieldset>
+      ${c.dests.length ? `<ul class="compose-dests">${c.dests.map((d, i) => composeDestHtml(d, i, c)).join('')}</ul>` : ''}
+      ${note ? `<p class="compose-note">${icon('info')} <span>${esc(note)}</span></p>` : ''}
+      ${c.kind !== 'showing' ? `
+      <div class="field compose-message">
+        <label class="field-label" for="cmp-message">${tr('Message', 'Message')}</label>
+        <textarea class="input" id="cmp-message" rows="4" placeholder="${c.kind === 'info' ? tr('Quelle information souhaitez-vous obtenir ?', 'What would you like to know?') : tr('Écrivez votre message…', 'Write your message…')}">${esc(c.message)}</textarea>
+      </div>` : ''}
+      <div class="compose-actions">
+        <button class="btn btn-primary" id="cmp-send" ${problem ? 'disabled' : ''}>${tr('Envoyer', 'Send')}</button>
+        <button class="btn btn-outline" id="cmp-later" ${problem ? 'disabled' : ''}>${tr('Envoyer plus tard…', 'Send later…')}</button>
+        ${canAdd ? `<button class="btn btn-outline" id="cmp-add">${icon('plus')} ${tr('Ajouter une destination', 'Add destination')}</button>` : ''}
+      </div>
+      <p class="helper-text compose-why" id="cmp-why" role="status">${esc(problem)}</p>
+      ${renderComposePopup(c)}
+    </div>`;
+}
+
+function composeResultRow(p, c) {
+  const added = c.dests.some(d => d.mls === p.mls);
+  if (p.inactive) {
+    return `
+      <div class="result-row is-inactive" title="${tr('Cette inscription n\'est plus active.', 'This listing is no longer active.')}">
+        <img class="result-thumb" src="${thumbFor(p.mls, p.address)}" alt="">
+        <div class="result-address">${esc(p.address)} <span class="result-inactive-tag">(${tr('inactive', 'inactive')})</span></div>
+      </div>`;
+  }
+  return `
+    <button type="button" class="result-row ${added ? 'is-added' : ''}" data-cmp-pick="${p.mls}" ${added ? 'disabled' : ''}>
+      <img class="result-thumb" src="${thumbFor(p.mls, p.address)}" alt="">
+      <div class="result-address">${esc(p.address)}</div>
+      <span class="result-add-btn ${added ? 'added' : ''}">${icon(added ? 'check' : 'plus')}</span>
+    </button>`;
+}
+
+function composeCartItems(c) { return mlsCartItems().filter(p => !c.dests.some(d => d.mls === p.mls)); }
+
+function renderComposePopup(c) {
+  if (!c.popup) return '';
+  if (c.popup === 'search') {
+    const q = normalizeText(c.search).trim();
+    const tabs = [
+      { id: 'address', label: tr('Adresse', 'Address'), glyph: icon('pin') },
+      { id: 'mls', label: 'MLS', glyph: '<span class="compose-hash" aria-hidden="true">#</span>' },
+      { id: 'cart', label: tr('Panier', 'Cart'), glyph: icon('cart'), badge: composeCartItems(c).length },
+    ];
+    let list;
+    if (c.tab === 'cart') {
+      list = mlsCartItems().map(p => composeResultRow(p, c)).join('') || `<p class="helper-text">${tr('Votre panier est vide.', 'Your cart is empty.')}</p>`;
+    } else if (!q) {
+      list = '';
+    } else {
+      const found = MLS_POOL.filter(p => c.tab === 'mls' ? p.mls.includes(q) : normalizeText(p.address).includes(q)).slice(0, 8);
+      list = found.map(p => composeResultRow(p, c)).join('') || `<p class="dest-empty">${tr('Aucun résultat. Vérifiez votre saisie.', 'No results. Check what you typed.')}</p>`;
+    }
+    return `
+    <div class="modal-overlay" id="cmp-overlay">
+      <div class="modal compose-modal" role="dialog" aria-modal="true" aria-labelledby="cmp-popup-title" tabindex="-1">
+        <div class="modal-head"><h2 id="cmp-popup-title">${tr('Rechercher par :', 'Search by:')}</h2><button class="modal-close" id="cmp-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
+        <div class="modal-body">
+          <div class="dest-tabs" role="tablist">
+            ${tabs.map(t => `<button type="button" role="tab" class="dest-tab ${c.tab === t.id ? 'active' : ''}" aria-selected="${c.tab === t.id}" data-cmp-tab="${t.id}">${t.glyph} ${t.label}${t.badge ? `<span class="tab-badge" aria-label="${t.badge}">${t.badge}</span>` : ''}</button>`).join('')}
+          </div>
+          ${c.tab === 'cart' ? '' : `
+          <div class="search-bar" style="margin-bottom:14px;">
+            <input type="text" class="input" id="cmp-search" autocomplete="off" placeholder="${c.tab === 'mls' ? tr('Entrez le numéro MLS…', 'Enter the MLS number…') : tr('Entrez une adresse…', 'Enter an address…')}" value="${esc(c.search)}" aria-label="${c.tab === 'mls' ? tr('Numéro MLS', 'MLS number') : tr('Adresse', 'Address')}">
+            ${icon('search')}
+          </div>`}
+          <div class="info-banner">${icon('info')} <span>${c.kind === 'showing' ? tr('Sélectionnez un résultat pour l\'ajouter à la demande de visite.', 'Select a result to add it to the showing request.') : tr('Sélectionnez la propriété concernée par votre message.', 'Select the property your message is about.')}</span></div>
+          <div class="compose-results">${list}</div>
+        </div>
+        <div class="modal-footer compose-popup-footer"><button class="btn btn-outline" id="cmp-cancel">${tr('Annuler', 'Cancel')}</button></div>
+      </div>
+    </div>`;
+  }
+  if (c.popup === 'later') {
+    const past = new Date(`${c.laterDate}T${c.laterTime}`) <= new Date();
+    return `
+    <div class="modal-overlay" id="cmp-overlay">
+      <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="cmp-popup-title" tabindex="-1">
+        <div class="modal-head"><h2 id="cmp-popup-title">${tr('Envoyer plus tard', 'Send later')}</h2><button class="modal-close" id="cmp-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
+        <div class="modal-body">
+          <p class="helper-text" style="margin:0 0 14px;">${tr('Le message est enregistré dans vos brouillons et part à la date choisie. Vous pouvez le modifier avant.', 'The message is saved in your drafts and goes out at the chosen time. You can edit it before then.')}</p>
+          <div class="field-row">
+            <div class="field"><label class="field-label" for="cmp-later-date">${tr('Date d\'envoi', 'Send date')}</label><input type="date" class="input" id="cmp-later-date" value="${esc(c.laterDate)}" min="${composeISO(new Date())}"></div>
+            <div class="field"><label class="field-label" for="cmp-later-time">${tr('Heure', 'Time')}</label><input type="time" class="input" id="cmp-later-time" value="${esc(c.laterTime)}"></div>
+          </div>
+          <p class="compose-later-why" id="cmp-later-why" role="status">${past ? tr('Choisissez une date et une heure à venir.', 'Choose a future date and time.') : ''}</p>
+        </div>
+        <div class="modal-footer compose-popup-footer">
+          <button class="btn btn-primary" id="cmp-later-save" ${past ? 'disabled' : ''}>${tr('Programmer l\'envoi', 'Schedule sending')}</button>
+          <button class="btn btn-outline" id="cmp-cancel">${tr('Annuler', 'Cancel')}</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  return renderComposeForm(c);
+}
+
+function composeFormClientHtml(f) {
+  if (f.client) {
+    return `<div class="cmp-client-chip">${directoryAvatar({ prenom: f.client.name.split(' ')[0], nom: f.client.name.split(' ').slice(1).join(' '), photo: f.client.photo }, 'sm')}<span>${esc(f.client.name)}</span><button type="button" id="cmp-client-clear" aria-label="${tr('Retirer le client', 'Remove the client')}">${TEAM_ICONS.removeCircle}</button></div>`;
+  }
+  const q = normalizeText(f.clientQuery).trim();
+  const found = q ? state.contacts.filter(x => x.type && x.type.acheteur && normalizeText(`${x.prenom} ${x.nom}`).includes(q)).slice(0, 5) : [];
+  const exact = found.some(x => normalizeText(`${x.prenom} ${x.nom}`) === q);
+  return `
+    <div class="search-bar" style="margin-bottom:6px;">
+      <input type="text" class="input" id="cmp-client" autocomplete="off" placeholder="${tr('Entrez le nom du client', 'Enter the client\'s name')}" value="${esc(f.clientQuery)}">
+      ${icon('search')}
+    </div>
+    ${q ? `<div class="cmp-client-results">
+      ${found.map(x => `<button type="button" class="cmp-client-row" data-cmp-client="${x.id}">${directoryAvatar(x, 'sm')}<span>${esc(`${x.prenom} ${x.nom}`)}</span></button>`).join('')}
+      ${exact ? '' : `<button type="button" class="cmp-client-row" data-cmp-client-free="1">${icon('plus')}<span>${tr('Utiliser', 'Use')} « ${esc(f.clientQuery.trim())} »</span></button>`}
+    </div>` : ''}`;
+}
+
+function composeFormBannerHtml(f) {
+  const tag = composeTag(f);
+  if (tag.id === 'impossible') return `<div class="compose-banner is-danger">${icon('warning')} <span>${esc(availabilityTagLabel(tag))} — ${tr('changez l\'heure avant d\'enregistrer.', 'change the time before saving.')}</span></div>`;
+  if (composeTagOk(tag)) return `<div class="compose-banner is-ok">${TEAM_ICONS.checkCircle} <span>${esc(availabilityTagLabel(tag))} — ${tr('confirmée automatiquement à l\'envoi.', 'confirmed automatically when sent.')}</span></div>`;
+  return `<div class="compose-banner">${icon('warning')} <span>${tr('Confirmation requise : le courtier doit approuver cette plage horaire.', 'Confirmation needed: the agent must approve this time.')}</span></div>`;
+}
+
+function composeFormProblem(f) {
+  if (!f.date || f.date < composeISO(new Date())) return tr('Choisissez une date à venir.', 'Choose a future date.');
+  const now = new Date();
+  if (f.date === composeISO(now) && timeToMinutes(f.from) <= now.getHours() * 60 + now.getMinutes()) return tr('Cette heure est déjà passée.', 'This time has already passed.');
+  if (timeToMinutes(f.to) <= timeToMinutes(f.from)) return tr('L\'heure de fin doit suivre l\'heure de début.', 'The end time must be after the start time.');
+  if (composeTag(f).id === 'impossible') return tr('Cette plage n\'est pas disponible : changez l\'heure.', 'This time isn\'t available: change it.');
+  return '';
+}
+
+function renderComposeForm(c) {
+  const f = c.form;
+  const opts = (sel) => TIME_OPTIONS.map(t => `<option value="${t}" ${t === sel ? 'selected' : ''}>${composeTime(t)}</option>`).join('');
+  const problem = composeFormProblem(f);
+  return `
+    <div class="modal-overlay" id="cmp-overlay">
+      <div class="modal compose-modal" role="dialog" aria-modal="true" aria-labelledby="cmp-popup-title" tabindex="-1">
+        <div class="modal-head vr-head">
+          <button class="vr-back" id="cmp-back" title="${tr('Retour', 'Back')}" aria-label="${tr('Retour', 'Back')}">${icon('arrowLeft')}</button>
+          <h2 class="vr-title" id="cmp-popup-title">${tr('Ajouter une visite', 'Add new listing')}</h2>
+          <span class="vr-head-spacer"></span>
+        </div>
+        <div class="modal-body cmp-form">
+          <p class="field-label">${tr('Propriété demandée', 'Requested property')}</p>
+          <div class="cmp-property"><img class="result-thumb" src="${thumbFor(f.mls, f.address)}" alt=""><strong>${esc(f.address)}</strong></div>
+          <div class="vr-broker">
+            <span class="vr-broker-avatar">${esc(initialsOf(f.courtier))}</span>
+            <div><p class="vr-broker-name">${esc(f.courtier)}</p><p class="vr-broker-agency">${esc(courtierEntry(f.courtier) ? courtierEntry(f.courtier).bureau : currentBrandName())}</p></div>
+          </div>
+          <div class="field"><p class="field-label">${tr('Disponibilités pour visites', 'Showing availability')}</p>${composeAvailabilityHtml(f)}</div>
+          <div class="field"><label class="field-label" for="cmp-client">${tr('Nom du client', 'Client name')} <span class="field-optional">${tr('(facultatif)', '(optional)')}</span></label>${composeFormClientHtml(f)}</div>
+          <div class="field"><label class="field-label" for="cmp-date">${tr('Date', 'Date')}</label><input type="date" class="input" id="cmp-date" value="${esc(f.date)}" min="${composeISO(new Date())}"></div>
+          <div class="field-row">
+            <div class="field"><label class="field-label" for="cmp-from">${tr('De', 'From')}</label><select class="input" id="cmp-from">${opts(f.from)}</select></div>
+            <div class="field"><label class="field-label" for="cmp-to">${tr('À', 'To')}</label><select class="input" id="cmp-to">${opts(f.to)}</select></div>
+          </div>
+          <div id="cmp-banner">${composeFormBannerHtml(f)}</div>
+          <div class="field"><label class="field-label" for="cmp-comment">${tr('Commentaires', 'Comments')}</label><textarea class="input" id="cmp-comment" rows="3" placeholder="${tr('Ajoutez un message', 'Enter your message')}">${esc(f.comment)}</textarea></div>
+          <div class="field"><label class="field-label" for="cmp-callback">${tr('Numéro de rappel', 'Callback')}</label><input type="tel" class="input" id="cmp-callback" value="${esc(f.callback)}"></div>
+          <p class="compose-later-why" id="cmp-form-why" role="status">${esc(problem)}</p>
+          <div class="compose-form-actions">
+            <button class="btn btn-primary" id="cmp-form-save" ${problem ? 'disabled' : ''}>${tr('Enregistrer', 'Save')}</button>
+            <button class="btn btn-outline" id="cmp-form-cancel">${tr('Annuler', 'Cancel')}</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function composeOpenForm(p, editIndex) {
+  const c = state.compose;
+  if (editIndex != null) {
+    const d = c.dests[editIndex];
+    c.form = { ...d, editIndex, clientQuery: '' };
+  } else {
+    // Le créneau proposé est la prochaine plage où la propriété accepte déjà
+    // des visites ; à défaut, le prochain quart d'heure.
+    const open = composeAvailableSlots(p.mls)[0];
+    const s = open ? composeSlotIn(open) : composeDefaultSlot();
+    c.form = { editIndex: null, mls: p.mls, address: p.address, courtier: courtierFor(p.mls), date: s.date, from: s.from, to: s.to, comment: '', callback: state.helpDraft.phone, client: null, clientQuery: '' };
+  }
+  c.popup = 'form';
+}
+
+function composeAddDest(p) {
+  const c = state.compose;
+  if (c.kind === 'showing') { composeOpenForm(p, null); render(); return; }
+  c.dests = [{ mls: p.mls, address: p.address, courtier: courtierFor(p.mls), client: null }];
+  c.popup = null;
+  render();
+}
+
+function composeClosePopup() { if (state.compose) { state.compose.popup = null; state.compose.form = null; render(); } }
+
+// Les boutons et la phrase d'aide suivent la saisie sans repeindre l'écran :
+// un rendu complet retirerait le focus du champ en cours de frappe.
+function composeSyncActions() {
+  const c = state.compose;
+  const problem = composeProblem(c);
+  ['cmp-send', 'cmp-later'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = !!problem; });
+  const why = document.getElementById('cmp-why');
+  if (why) why.textContent = problem;
+}
+
+function composeSnapshot(c) {
+  return { kind: c.kind, message: c.message, dests: c.dests.map(d => ({ ...d, client: d.client ? { ...d.client } : null })) };
+}
+
+function composeNowHHMM() { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+
+// Même client sur toutes les propriétés d'une demande de visites : c'est un tour.
+function composeIsTour(c) {
+  const first = c.dests[0] && c.dests[0].client;
+  return c.kind === 'showing' && c.dests.length >= 2 && !!first && c.dests.every(d => d.client && d.client.name === first.name);
+}
+
+// Le tour rejoint la liste « Tours de visites » avec la date et le client. Un
+// client qui n'est pas encore dans les acheteurs y est ajouté, pour que le tour
+// porte son nom.
+function composeCreateTour(c) {
+  const name = c.dests[0].client.name;
+  let buyer = state.buyers.find(b => normalizeText(`${b.prenom} ${b.nom}`) === normalizeText(name));
+  if (!buyer) {
+    const contact = state.contacts.find(k => normalizeText(`${k.prenom} ${k.nom}`) === normalizeText(name));
+    const [prenom, ...rest] = name.split(' ');
+    buyer = { id: uid(), prenom: contact ? contact.prenom : prenom, nom: contact ? contact.nom : rest.join(' '), email: contact ? contact.email : '', tel: contact ? contact.tel : '' };
+    state.buyers.push(buyer);
+  }
+  const sorted = c.dests.slice().sort((a, b) => `${a.date} ${a.from}`.localeCompare(`${b.date} ${b.from}`));
+  const now = Date.now();
+  const stops = sorted.map(d => makeStop(d.address, d.mls, {
+    status: composeTagOk(composeTag(d)) ? 'confirmed' : 'pending',
+    lockedStart: d.from, duration: timeToMinutes(d.to) - timeToMinutes(d.from), sentAt: now,
+  }));
+  const tour = { id: uid(), buyerId: buyer.id, date: sorted[0].date, time: sorted[0].from, sentAt: now, relancedAt: null, sharedAt: null, stops };
+  state.tours.push(tour);
+  return tour;
+}
+
+function composeSend() {
+  const c = state.compose;
+  if (composeProblem(c)) return;
+  const stamp = Date.now();
+  const rows = c.dests.map((d, i) => ({
+    id: `s${stamp}-${i}`, tab: 'envoyes', unread: false, courtier: d.courtier, photo: null,
+    client: d.client ? d.client.name : null, clientPhoto: d.client ? d.client.photo || null : null,
+    property: d.address, mls: d.mls, kind: c.kind, message: c.kind === 'showing' ? d.comment : c.message,
+    date: c.kind === 'showing' ? d.date : null, start: c.kind === 'showing' ? d.from : null, end: c.kind === 'showing' ? d.to : null,
+    status: c.kind === 'showing' && composeTagOk(composeTag(d)) ? 'confirmation' : 'demande', time: composeNowHHMM(), count: 1, daysAgo: 0,
+  }));
+  if (c.id) state.inbox = state.inbox.filter(x => x.id !== c.id);
+  state.inbox = [...rows, ...state.inbox];
+  const tour = composeIsTour(c) ? composeCreateTour(c) : null;
+  state.inboxTab = 'envoyes'; state.inboxSelected = [];
+  state.compose = null; state.screen = 'inbox';
+  render();
+  if (tour) {
+    const b = state.buyers.find(x => x.id === tour.buyerId);
+    showToast(tr(`Tour de visites créé pour ${b.prenom} ${b.nom}, ${formatDateLong(tour.date)}.`, `Showing tour created for ${b.prenom} ${b.nom}, ${formatDateLong(tour.date)}.`), 'success');
+    return;
+  }
+  showToast(rows.length > 1 ? tr(`${rows.length} messages envoyés aux courtiers.`, `${rows.length} messages sent to the agents.`) : tr('Message envoyé au courtier.', 'Message sent to the agent.'), 'success');
+}
+
+function composeSchedule() {
+  const c = state.compose;
+  const first = c.dests[0];
+  const id = c.id || `d${Date.now()}`;
+  const row = {
+    id, tab: 'programmes', unread: false, courtier: first.courtier, photo: null,
+    client: first.client ? first.client.name : null, clientPhoto: first.client ? first.client.photo || null : null,
+    property: first.address + (c.dests.length > 1 ? ` +${c.dests.length - 1}` : ''), mls: first.mls, kind: c.kind, message: c.message,
+    date: c.kind === 'showing' ? first.date : null, start: c.kind === 'showing' ? first.from : null, end: c.kind === 'showing' ? first.to : null,
+    status: 'demande', time: c.laterTime, count: 0, daysAgo: 0,
+    sched: { date: c.laterDate, time: c.laterTime }, draft: composeSnapshot(c),
+  };
+  state.inbox = c.id ? state.inbox.map(x => x.id === c.id ? row : x) : [row, ...state.inbox];
+  state.inboxTab = 'programmes'; state.inboxSelected = [];
+  state.compose = null; state.screen = 'inbox';
+  render();
+  const when = new Date(`${row.sched.date}T${row.sched.time}`).toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
+  showToast(tr(`Message programmé pour le ${when}, ${row.sched.time}.`, `Message scheduled for ${when}, ${row.sched.time}.`), 'success');
+}
+
+// Un brouillon se rouvre dans le même écran de composition, avec ce qu'on y avait mis.
+function composeOpenDraft(x) {
+  const c = newCompose(x.draft.kind);
+  c.id = x.id; c.message = x.draft.message; c.dests = composeSnapshot(x.draft).dests;
+  c.laterDate = x.sched.date; c.laterTime = x.sched.time;
+  state.compose = c; state.screen = 'compose';
+  render();
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && state.screen === 'compose' && state.compose && state.compose.popup) composeClosePopup();
+});
+
+function bindComposeEvents() {
+  const c = state.compose;
+  if (!c) return;
+  document.querySelectorAll('input[name="compose-kind"]').forEach(r => {
+    r.onchange = () => {
+      c.kind = r.value;
+      // Hors demande de visite : une seule propriété, sans date ni heure.
+      if (c.kind !== 'showing') c.dests = c.dests.slice(0, 1);
+      render();
+    };
+  });
+  document.querySelectorAll('[data-cmp-remove]').forEach(b => {
+    b.onclick = () => { c.dests.splice(Number(b.getAttribute('data-cmp-remove')), 1); render(); };
+  });
+  document.querySelectorAll('[data-cmp-edit]').forEach(b => {
+    b.onclick = () => { composeOpenForm(null, Number(b.getAttribute('data-cmp-edit'))); render(); };
+  });
+  const add = document.getElementById('cmp-add');
+  if (add) add.onclick = () => { c.popup = 'search'; c.tab = 'address'; c.search = ''; render(); setTimeout(() => { const s = document.getElementById('cmp-search'); if (s) s.focus(); }, 0); };
+  const msg = document.getElementById('cmp-message');
+  if (msg) msg.oninput = () => { c.message = msg.value; composeSyncActions(); };
+  const send = document.getElementById('cmp-send');
+  if (send) send.onclick = composeSend;
+  const later = document.getElementById('cmp-later');
+  if (later) later.onclick = () => { c.popup = 'later'; render(); };
+
+  const overlay = document.getElementById('cmp-overlay');
+  if (!overlay) return;
+  overlay.onclick = (e) => { if (e.target === overlay) composeClosePopup(); };
+  ['cmp-close', 'cmp-cancel', 'cmp-form-cancel'].forEach(id => { const b = document.getElementById(id); if (b) b.onclick = composeClosePopup; });
+
+  // Recherche
+  document.querySelectorAll('[data-cmp-tab]').forEach(b => {
+    b.onclick = () => { c.tab = b.getAttribute('data-cmp-tab'); c.search = ''; render(); setTimeout(() => { const s = document.getElementById('cmp-search'); if (s) s.focus(); }, 0); };
+  });
+  const search = document.getElementById('cmp-search');
+  if (search) search.oninput = () => {
+    c.search = search.value;
+    render();
+    setTimeout(() => { const s = document.getElementById('cmp-search'); if (s) { s.focus(); s.selectionStart = s.selectionEnd = s.value.length; } }, 0);
+  };
+  document.querySelectorAll('[data-cmp-pick]').forEach(b => {
+    b.onclick = () => { const p = MLS_POOL.find(x => x.mls === b.getAttribute('data-cmp-pick')); if (p) composeAddDest(p); };
+  });
+
+  // Envoyer plus tard
+  const ld = document.getElementById('cmp-later-date');
+  const lt = document.getElementById('cmp-later-time');
+  const syncLater = () => {
+    c.laterDate = ld.value; c.laterTime = lt.value;
+    const past = !ld.value || !lt.value || new Date(`${ld.value}T${lt.value}`) <= new Date();
+    document.getElementById('cmp-later-save').disabled = past;
+    document.getElementById('cmp-later-why').textContent = past ? tr('Choisissez une date et une heure à venir.', 'Choose a future date and time.') : '';
+  };
+  if (ld && lt) { ld.oninput = syncLater; lt.oninput = syncLater; }
+  const lsave = document.getElementById('cmp-later-save');
+  if (lsave) lsave.onclick = composeSchedule;
+
+  // Formulaire de visite
+  const f = c.form;
+  if (!f) return;
+  const refreshForm = () => {
+    document.getElementById('cmp-banner').innerHTML = composeFormBannerHtml(f);
+    const why = composeFormProblem(f);
+    document.getElementById('cmp-form-why').textContent = why;
+    document.getElementById('cmp-form-save').disabled = !!why;
+  };
+  const bindField = (id, key, evt = 'oninput') => { const el = document.getElementById(id); if (el) el[evt] = () => { f[key] = el.value; refreshForm(); }; };
+  bindField('cmp-date', 'date'); bindField('cmp-from', 'from', 'onchange'); bindField('cmp-to', 'to', 'onchange');
+  document.querySelectorAll('[data-cmp-slot]').forEach(b => {
+    b.onclick = () => {
+      const ev = propertyAvailability(f.mls).find(e => e.id === b.getAttribute('data-cmp-slot'));
+      if (!ev) return;
+      Object.assign(f, composeSlotIn(ev));
+      const body = document.querySelector('.cmp-form'); const top = body ? body.scrollTop : 0;
+      render();
+      const again = document.querySelector('.cmp-form'); if (again) again.scrollTop = top;
+    };
+  });
+  const comment = document.getElementById('cmp-comment');
+  if (comment) comment.oninput = () => { f.comment = comment.value; };
+  const cb = document.getElementById('cmp-callback');
+  if (cb) cb.oninput = () => { f.callback = cb.value; };
+  const back = document.getElementById('cmp-back');
+  if (back) back.onclick = () => { if (f.editIndex != null) { composeClosePopup(); } else { c.popup = 'search'; c.form = null; render(); } };
+
+  const client = document.getElementById('cmp-client');
+  if (client) client.oninput = () => {
+    f.clientQuery = client.value;
+    render();
+    setTimeout(() => { const s = document.getElementById('cmp-client'); if (s) { s.focus(); s.selectionStart = s.selectionEnd = s.value.length; } }, 0);
+  };
+  document.querySelectorAll('[data-cmp-client]').forEach(b => {
+    b.onclick = () => { const x = state.contacts.find(k => k.id === b.getAttribute('data-cmp-client')); if (x) { f.client = { name: `${x.prenom} ${x.nom}`, photo: x.photo || null }; f.clientQuery = ''; render(); } };
+  });
+  const free = document.querySelector('[data-cmp-client-free]');
+  if (free) free.onclick = () => { f.client = { name: f.clientQuery.trim(), photo: null }; f.clientQuery = ''; render(); };
+  const clear = document.getElementById('cmp-client-clear');
+  if (clear) clear.onclick = () => { f.client = null; render(); };
+
+  const save = document.getElementById('cmp-form-save');
+  if (save) save.onclick = () => {
+    if (composeFormProblem(f)) return;
+    const d = { mls: f.mls, address: f.address, courtier: f.courtier, date: f.date, from: f.from, to: f.to, client: f.client, comment: f.comment, callback: f.callback };
+    if (f.editIndex != null) c.dests[f.editIndex] = d; else c.dests.push(d);
+    c.popup = null; c.form = null;
+    render();
+  };
+}
+
+/* ----- Screen: détail d'un message ----- */
+
+const INBOX_HISTORY_LABELS = {
+  demande: ['Demande de visite', 'Showing request'],
+  confirmation: ['Confirmation', 'Confirmation'],
+  annulation: ['Annulation', 'Cancellation'],
+  repondre: ['Réponse attendue', 'Reply expected'],
+};
+const INBOX_DEFAULT_TEXT = {
+  demande: ['Une demande de visite pour cette propriété.', 'A showing request for this property.'],
+  confirmation: ['La visite est confirmée. Merci!', 'The showing is confirmed. Thank you!'],
+  annulation: ['La visite est annulée.', 'The showing is cancelled.'],
+  repondre: ['Un compte rendu de la visite de cette propriété serait apprécié. Merci!', 'A report on the showing of this property would be appreciated. Thank you!'],
+};
+
+// Le dernier échange en tête, puis la demande qui l'a provoqué, de l'autre côté.
+function inboxHistory(x) {
+  const sent = x.tab === 'envoyes';
+  const rows = [{ status: x.status, dir: sent ? 'sent' : 'recv' }];
+  if (x.status !== 'demande') rows.push({ status: 'demande', dir: sent ? 'recv' : 'sent' });
+  return rows;
+}
+
+function inboxMlsNumber(x) {
+  return x.mls || `0${String((hashStr(x.property) * 7919) % 1e12).padStart(12, '0')}`;
+}
+
+const DETAIL_ICONS = {
+  reply: '<path d="M9 8L4 12.5 9 17M4 12.5h10a6 6 0 016 6V19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+  calendarPlus: '<rect x="4" y="5.5" width="16" height="14" rx="2.5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M4 10h16M8 3.5v4M16 3.5v4M12 12.5v4.5M9.75 14.75h4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  archive: '<path d="M4 13h4.5l1 2.5h5l1-2.5H20M5.5 5h13L20 13v5a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 014 18v-5l1.5-8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M9.5 9.5L12 12l2.5-2.5M12 6.5V12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+};
+function detailIcon(name) {
+  const content = DETAIL_ICONS[name] || (ICONS[name] && ICONS[name].content) || ICONS[name];
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${content}</svg>`;
+}
+
+function renderMessageDetailScreen() {
+  const x = state.inbox.find(m => m.id === state.openMessageId);
+  if (!x) return `<div class="page-card"><div class="empty-state"><p>${tr('Ce message n\'existe plus.', 'This message no longer exists.')}</p></div></div>`;
+  const loc = state.lang === 'en' ? 'en-CA' : 'fr-CA';
+  const d = new Date(); d.setDate(d.getDate() - (x.daysAgo || 0));
+  const when = `${d.toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'short' })}, ${x.time}`;
+  const dir = x.tab === 'envoyes' ? tr('Envoyé', 'Sent') : tr('Reçu', 'Received');
+  const text = x.message || tr(...INBOX_DEFAULT_TEXT[x.status]);
+  const visit = x.date ? `<strong>${esc(inboxDateLabel(x).replace(/(\d{2}):(\d{2})/g, (m0, h, mi) => composeTime(`${h}:${mi}`)))}</strong>` : '';
+  const agency = courtierEntry(x.courtier) ? courtierEntry(x.courtier).bureau : 'Dynamic Realty';
+  const history = inboxHistory(x).map(h => `
+      <li class="msgdetail-hist">
+        ${inboxStatusIcon(h.status)}
+        <span class="msgdetail-hist-text">${x.date ? `<strong>${esc(inboxDateLabel(x))}</strong>` : ''}<span>${esc(tr(...INBOX_HISTORY_LABELS[h.status]))}</span></span>
+        <span class="msgdetail-hist-dir">${h.dir === 'sent' ? tr('Envoyé', 'Sent') : tr('Reçu', 'Received')}</span>
+      </li>`).join('');
+  const action = (id, glyph, label) => `<button type="button" class="msgdetail-action" data-detail-action="${id}"><span class="msgdetail-action-icon">${detailIcon(glyph)}</span><span>${label}</span></button>`;
+  return `
+    <div class="page-card msgdetail">
+      <p class="msgdetail-when">${dir} ${esc(when)}</p>
+      <section class="msgdetail-block msgdetail-courtier">
+        ${inboxAvatar(x.courtier, x.photo)}
+        <div><p class="msgdetail-name">${esc(x.courtier)}</p><p class="msgdetail-sub">${esc(agency)}</p></div>
+      </section>
+      <section class="msgdetail-block msgdetail-prop">
+        <img class="result-thumb" src="${thumbFor(x.mls, x.property)}" alt="">
+        <div><p class="msgdetail-name">${esc(x.property)}</p><p class="msgdetail-sub">#${esc(inboxMlsNumber(x))}</p></div>
+      </section>
+      <section class="msgdetail-block msgdetail-visit">
+        ${inboxStatusIcon(x.status)}
+        <div>${visit}<p class="msgdetail-text">${esc(text)}</p></div>
+      </section>
+      ${x.client ? `
+      <section class="msgdetail-block msgdetail-client">
+        <p class="msgdetail-label">${tr('Client', 'Client')}</p>
+        <span class="msgdetail-client-chip">${inboxAvatar(x.client, x.clientPhoto)}<span>${esc(x.client)}</span></span>
+      </section>` : ''}
+      <section class="msgdetail-history" aria-labelledby="msgdetail-hist-title">
+        <h2 class="msgdetail-label" id="msgdetail-hist-title">${tr('Historique', 'History')}</h2>
+        <ul>${history}</ul>
+      </section>
+      <nav class="msgdetail-actions" aria-label="${tr('Actions sur le message', 'Message actions')}">
+        ${action('reply', 'reply', tr('Répondre', 'Reply'))}
+        ${action('call', 'phone', tr('Appeler', 'Call'))}
+        ${action('calendar', 'calendarPlus', tr('+ Calendrier', '+ Calendar'))}
+        ${action('archive', 'archive', tr('Archiver', 'Archive'))}
+      </nav>
+    </div>`;
+}
+
+function bindMessageDetailEvents() {
+  const x = state.inbox.find(m => m.id === state.openMessageId);
+  document.querySelectorAll('[data-detail-action]').forEach(b => {
+    b.onclick = () => {
+      const kind = b.getAttribute('data-detail-action');
+      if (!x) return;
+      if (kind === 'archive') {
+        x.tab = 'archives';
+        state.screen = 'inbox';
+        render();
+        showToast(tr('Message archivé.', 'Message archived.'), 'success');
+        return;
+      }
+      if (kind === 'call') { const p = courtierPhoneFor(x.courtier); showToast(p ? tr(`Appel au ${p}`, `Calling ${p}`) : tr('Aucun numéro pour ce courtier.', 'No number for this agent.')); return; }
+      showToast(tr('Cette action n\'est pas encore disponible dans ce prototype.', 'This action isn\'t wired up in this prototype yet.'));
+    };
   });
 }
 
@@ -5635,6 +6298,8 @@ function bindEvents() {
     if (state.screen === 'contact' && state.contactPurpose !== 'create') { state.contactPurpose = 'create'; state.screen = 'builder'; render(); return; }
     // Sans lien avec un tour en cours : pas de leaveTour, retour direct à la liste.
     if (state.screen === 'about') { state.screen = 'help'; render(); return; }
+    if (state.screen === 'compose') { state.screen = state.compose && state.compose.id ? 'inbox' : 'newMessage'; if (state.screen === 'inbox') state.compose = null; render(); return; }
+    if (state.screen === 'messageDetail') { state.screen = 'inbox'; render(); return; }
     if (state.screen === 'newMessage') { state.screen = state.messageFrom && state.messageFrom !== 'newMessage' ? state.messageFrom : 'inbox'; render(); return; }
     if (state.screen === 'propertyAvailability') { state.screen = 'propertyDetail'; state.availMiniCalOpen = false; render(); return; }
     if (state.screen === 'propertyDetail') { state.screen = 'properties'; state.propertyDetailMls = null; render(); return; }
@@ -5676,6 +6341,8 @@ function bindEvents() {
   if (state.screen === 'help') bindHelpEvents();
   if (state.screen === 'about') bindAboutEvents();
   if (state.screen === 'newMessage') bindNewMessageEvents();
+  if (state.screen === 'compose') bindComposeEvents();
+  if (state.screen === 'messageDetail') bindMessageDetailEvents();
   if (state.screen === 'contactForm') bindContactFormEvents();
   bindModalEvents();
 }
