@@ -2585,3 +2585,15 @@ body[data-screen="messageDetail"] .msgdetail { flex: 1 0 auto; padding-bottom: 0
   .compose-actions #cmp-add svg { width: 14px; height: 14px; }
   .compose-form-actions .btn, .compose-popup-footer .btn { max-width: none; }
 }
+
+/* Mobile : la mention « Fièrement canadien » ne vit que sur la page du menu, et
+   « Nouveau message » y flotte en bas pour rester toujours à portée du pouce. */
+@media (max-width: 768px) {
+  body:not([data-screen="menu"]) .mobile-footer { display: none; }
+  .menu-new-btn {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 30;
+    width: min(377px, calc(100vw - 32px)); box-shadow: var(--shadow-md);
+  }
+  .menu-grid { padding-bottom: 16px; }
+  body[data-screen="menu"] .mobile-footer { padding-bottom: 92px; }
+}
