@@ -2535,3 +2535,29 @@ body[data-screen="messageDetail"] .msgdetail { flex: 1 0 auto; padding-bottom: 0
   body[data-screen="messageDetail"] .msgdetail { padding-bottom: 120px; }
   .msgdetail-action { min-width: 0; flex: 1; white-space: nowrap; }
 }
+
+/* ---------- Menu « Répondre » ---------- */
+.msgdetail-actions { z-index: 50; }
+.msgdetail-action-wrap { position: relative; display: flex; }
+.reply-backdrop { position: fixed; inset: 0; z-index: -1; background: transparent; }
+.reply-pop {
+  position: absolute; bottom: calc(100% + 14px); left: -8px; z-index: 1;
+  width: min(320px, calc(100vw - 32px)); padding: 16px 14px;
+  background: var(--blanc); border-radius: var(--radius-2xl);
+  box-shadow: 0 8px 28px rgba(33, 49, 99, 0.18);
+  animation: reply-rise 220ms ease-out both;
+}
+@keyframes reply-rise {
+  from { clip-path: inset(100% 0 0 0); transform: translateY(28px); opacity: 0.4; }
+  to { clip-path: inset(-20px -20px -20px -20px); transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .reply-pop { animation: none; } }
+.reply-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.reply-option {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 48px; padding: 0 14px;
+  background: var(--blanc); border: 1px solid var(--bordures); border-radius: var(--radius-lg);
+  font: inherit; font-size: 15px; font-weight: 700; color: var(--bleu-principal); text-align: left; cursor: pointer;
+}
+.reply-option:hover { background: var(--lumiere-principale); border-color: var(--bleu-action-30); }
+.reply-option:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.reply-option .msgtype-icon-wrap { width: 28px; height: 28px; }

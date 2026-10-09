@@ -1115,6 +1115,7 @@ const state = {
   inboxSelected: [],         // ids cochés
   compose: null,             // message en cours de composition (voir newCompose)
   openMessageId: null,       // message ouvert dans son détail
+  replyMenu: false,          // menu « Répondre » ouvert dans le détail
   directoryTab: 'tous',      // tous | acheteurs | vendeurs | prospects | courtiers | favoris
   directorySearch: '',
   directoryPage: 1,
@@ -3516,6 +3517,30 @@ function detailIcon(name) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${content}</svg>`;
 }
 
+// Les quatre réponses possibles à un message : même vocabulaire d'icônes que la messagerie.
+const REPLY_OPTIONS = [
+  { id: 'confirmation', labelFr: 'Confirmation / Modification', labelEn: 'Confirmation / Change', glyph: null },
+  { id: 'cancel', labelFr: 'Annulation de visite', labelEn: 'Visit cancellation', glyph: 'canceled' },
+  { id: 'report', labelFr: 'Compte rendu', labelEn: 'Visit report', glyph: 'report' },
+  { id: 'other', labelFr: 'Autre message', labelEn: 'Other message', glyph: 'other' },
+];
+function replyOptionIcon(o) {
+  if (o.glyph === 'report') return messageTypeIcon({ id: 'report' });
+  if (o.glyph === 'other') return messageTypeIcon({ id: 'other' });
+  return `<svg class="msgtype-icon" viewBox="-1 14.5 20.5 17" fill="none" aria-hidden="true"><path d="${INBOX_HOUSE}" stroke="#213163" stroke-linejoin="round"/>${o.glyph ? houseBadgeMark(o.glyph) : ''}</svg>`;
+}
+// Le menu sort de derrière la barre d'actions, juste au-dessus de « Répondre ».
+function renderReplyMenu() {
+  if (!state.replyMenu) return '';
+  return `
+    <div class="reply-backdrop" id="reply-overlay"></div>
+    <div class="reply-pop" role="menu" aria-label="${tr('Répondre', 'Reply')}">
+      <ul class="reply-list">
+        ${REPLY_OPTIONS.map(o => `<li><button type="button" role="menuitem" class="reply-option" data-reply="${o.id}"><span class="msgtype-icon-wrap">${replyOptionIcon(o)}</span><span>${esc(tr(o.labelFr, o.labelEn))}</span></button></li>`).join('')}
+      </ul>
+    </div>`;
+}
+
 function renderMessageDetailScreen() {
   const x = state.inbox.find(m => m.id === state.openMessageId);
   if (!x) return `<div class="page-card"><div class="empty-state"><p>${tr('Ce message n\'existe plus.', 'This message no longer exists.')}</p></div></div>`;
@@ -3558,7 +3583,7 @@ function renderMessageDetailScreen() {
         <ul>${history}</ul>
       </section>
       <nav class="msgdetail-actions" aria-label="${tr('Actions sur le message', 'Message actions')}">
-        ${action('reply', 'reply', tr('Répondre', 'Reply'))}
+        <div class="msgdetail-action-wrap">${action('reply', 'reply', tr('Répondre', 'Reply'))}${renderReplyMenu()}</div>
         ${action('call', 'phone', tr('Appeler', 'Call'))}
         ${action('calendar', 'calendarPlus', tr('+ Calendrier', '+ Calendar'))}
         ${action('archive', 'archive', tr('Archiver', 'Archive'))}
@@ -3566,8 +3591,35 @@ function renderMessageDetailScreen() {
     </div>`;
 }
 
+function closeReplyMenu() { state.replyMenu = false; render(); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.screen === 'messageDetail' && state.replyMenu) closeReplyMenu(); });
+
 function bindMessageDetailEvents() {
   const x = state.inbox.find(m => m.id === state.openMessageId);
+  const overlay = document.getElementById('reply-overlay');
+  if (overlay) {
+    overlay.onclick = (e) => { if (e.target === overlay) closeReplyMenu(); };
+    document.querySelectorAll('[data-reply]').forEach(b => {
+      b.onclick = () => {
+        const kind = b.getAttribute('data-reply');
+        state.replyMenu = false;
+        if (kind !== 'other' || !x) { render(); showToast(tr('Cette réponse n\'est pas encore disponible dans ce prototype.', 'This reply isn\'t wired up in this prototype yet.')); return; }
+        // Un message libre à l'expéditeur : le destinataire est déjà choisi.
+        const contact = x.recipientKind === 'contact' ? state.contacts.find(k => `${k.prenom} ${k.nom}` === x.courtier) : null;
+        const entry = courtierEntry(x.courtier);
+        const [prenom, ...rest] = x.courtier.split(' ');
+        const recipient = contact
+          ? { kind: 'contact', id: contact.id, prenom: contact.prenom, nom: contact.nom, name: x.courtier, photo: contact.photo || null, subtitle: contact.email || contact.tel || '' }
+          : { kind: 'courtier', id: x.courtier, prenom, nom: rest.join(' ') || x.courtier, name: x.courtier, photo: x.photo || null, subtitle: entry ? entry.bureau : 'Dynamic Realty' };
+        const c = newCompose('other');
+        c.dests = [{ recipient }];
+        state.compose = c;
+        state.messageFrom = 'messageDetail';
+        state.screen = 'compose';
+        render();
+      };
+    });
+  }
   document.querySelectorAll('[data-detail-action]').forEach(b => {
     b.onclick = () => {
       const kind = b.getAttribute('data-detail-action');
@@ -3579,6 +3631,7 @@ function bindMessageDetailEvents() {
         showToast(tr('Message archivé.', 'Message archived.'), 'success');
         return;
       }
+      if (kind === 'reply') { state.replyMenu = true; render(); return; }
       if (kind === 'call') { const p = courtierPhoneFor(x.courtier); showToast(p ? tr(`Appel au ${p}`, `Calling ${p}`) : tr('Aucun numéro pour ce courtier.', 'No number for this agent.')); return; }
       showToast(tr('Cette action n\'est pas encore disponible dans ce prototype.', 'This action isn\'t wired up in this prototype yet.'));
     };
