@@ -2512,9 +2512,26 @@ button.compose-dest-body:focus-visible { outline: var(--focus-ring); outline-off
 .msgdetail-hist { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--bordures); border-radius: var(--radius-lg); font-size: 13.5px; }
 .msgdetail-hist-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .msgdetail-hist-dir { font-size: 13px; color: var(--texte-secondaire); }
-.msgdetail-actions { display: flex; justify-content: space-around; gap: 8px; margin-top: 16px; padding: 14px 12px; background: var(--lumiere-principale); border-radius: var(--radius-xl); }
+.msgdetail-actions { display: flex; justify-content: space-around; gap: 8px; margin-top: auto; padding: 14px 12px; background: var(--lumiere-principale); border-radius: var(--radius-xl); position: sticky; bottom: 0; z-index: 5; box-shadow: 0 -8px 12px -8px rgba(33, 49, 99, 0.12); }
 .msgdetail-action { display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: 0; font: inherit; font-size: 12px; color: var(--bleu-principal); cursor: pointer; min-width: 64px; }
 .msgdetail-action:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-radius: var(--radius-md); }
 .msgdetail-action-icon { width: 44px; height: 44px; border-radius: var(--radius-lg); background: var(--bleu-principal); color: var(--blanc); display: flex; align-items: center; justify-content: center; }
 .msgdetail-action:hover .msgdetail-action-icon { background: var(--bleu-principal-dark); }
 .msgdetail-action-icon svg { width: 22px; height: 22px; }
+
+/* Le détail remplit la hauteur de la page : la barre d'actions reste collée
+   en bas, que le message soit court ou qu'il faille défiler. */
+body[data-screen="messageDetail"] .content { padding-bottom: 0; display: flex; flex-direction: column; }
+body[data-screen="messageDetail"] #main-content { display: flex; flex-direction: column; flex: 1; }
+body[data-screen="messageDetail"] .msgdetail-actions { border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
+body[data-screen="messageDetail"] .msgdetail { flex: 1 0 auto; padding-bottom: 0; }
+.msgdetail-history { margin-bottom: 16px; }
+@media (max-width: 768px) {
+  .msgdetail-actions {
+    position: fixed; left: 0; right: 0; bottom: 0; margin: 0; z-index: 40;
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+  body[data-screen="messageDetail"] .msgdetail { padding-bottom: 120px; }
+  .msgdetail-action { min-width: 0; flex: 1; white-space: nowrap; }
+}
