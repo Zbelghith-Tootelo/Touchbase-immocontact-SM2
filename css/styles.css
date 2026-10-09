@@ -287,7 +287,6 @@ body[data-screen="contactForm"] .topbar-back,
 body[data-screen="team"] .topbar-back,
 body[data-screen="teamAdd"] .topbar-back,
 body[data-screen="about"] .topbar-back,
-body[data-screen="newMessage"] .topbar-back,
 body[data-screen="compose"] .topbar-back,
 body[data-screen="messageDetail"] .topbar-back { display: inline-flex; }
 .topbar-back:hover { color: var(--bleu-secondaire); }
@@ -2519,14 +2518,3 @@ button.compose-dest-body:focus-visible { outline: var(--focus-ring); outline-off
 .msgdetail-action-icon { width: 44px; height: 44px; border-radius: var(--radius-lg); background: var(--bleu-principal); color: var(--blanc); display: flex; align-items: center; justify-content: center; }
 .msgdetail-action:hover .msgdetail-action-icon { background: var(--bleu-principal-dark); }
 .msgdetail-action-icon svg { width: 22px; height: 22px; }
-
-.cmp-avail { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.cmp-avail-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--bordures); border-radius: var(--radius-lg); background: var(--blanc); font: inherit; font-size: 13.5px; color: var(--texte-principal); text-align: left; }
-.cmp-avail-item em { font-style: normal; font-size: 12px; color: var(--texte-secondaire); }
-button.cmp-avail-item { cursor: pointer; }
-button.cmp-avail-item:hover { background: var(--lumiere-principale); }
-button.cmp-avail-item:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
-.cmp-avail-item.is-on { background: var(--bleu-action-10); border-color: var(--bleu-secondaire); }
-.cmp-avail-item.is-blocked { background: var(--neutre-surface); color: var(--texte-secondaire); text-decoration: line-through; }
-.cmp-avail-item.is-blocked em { text-decoration: none; }
-.cmp-avail-empty { margin: 0; }
