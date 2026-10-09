@@ -2967,7 +2967,7 @@ function renderComposeScreen() {
       </div>` : ''}
       <div class="compose-actions">
         <button class="btn btn-primary" id="cmp-send" ${problem ? 'disabled' : ''}>${tr('Envoyer', 'Send')}</button>
-        ${composeExistingTour(c) ? `<button class="btn btn-secondary" id="cmp-tour" ${problem ? 'disabled' : ''}>${tr('Enregistrer dans le tour de visites', 'Save to the showing tour')}</button>` : ''}
+        ${composeIsTour(c) ? `<button class="btn btn-secondary" id="cmp-tour" ${problem ? 'disabled' : ''}>${tr('Enregistrer dans le tour de visites', 'Save to the showing tour')}</button>` : ''}
         <button class="btn btn-outline" id="cmp-later" ${problem ? 'disabled' : ''}>${tr('Envoyer plus tard…', 'Send later…')}</button>
         ${canAdd ? `<button class="btn btn-outline" id="cmp-add">${icon('plus')} ${c.kind === 'other' ? tr('Ajouter un destinataire', 'Add recipient') : tr('Ajouter une propriété', 'Add property')}</button>` : ''}
       </div>
@@ -3234,6 +3234,21 @@ function composeCreateTour(c) {
   return tour;
 }
 
+// Ouvre un tour existant dans le constructeur, au nom de son client.
+function openTourById(id) {
+  const t = state.tours.find(x => x.id === id);
+  if (!t) return;
+  state.editingTourId = t.id;
+  const buyer = state.buyers.find(b => b.id === t.buyerId);
+  state.draft = {
+    buyer: buyer || null, date: t.date, time: t.time,
+    stops: JSON.parse(JSON.stringify(t.stops)),
+  };
+  state.dirty = false;
+  state.screen = 'builder';
+  render();
+}
+
 function composeAddToTour(c, tour) {
   const now = Date.now();
   c.dests.forEach(d => {
@@ -3251,7 +3266,6 @@ function composeSend(toExistingTour) {
   // Ajouter au tour garde la date du tour : chaque visite prend sa date, et il
   // faut que la propriété soit libre ce jour-là avant de la ranger dans le tour.
   const target = toExistingTour ? composeExistingTour(c) : null;
-  if (toExistingTour && !target) return;
   if (target) {
     const blocked = c.dests.find(d => composeTag({ ...d, date: target.date }).id === 'impossible');
     if (blocked) { showToast(tr(`${blocked.address} n'est pas disponible le ${formatDateLong(target.date)}.`, `${blocked.address} isn't available on ${formatDateLong(target.date)}.`)); return; }
@@ -3279,11 +3293,13 @@ function composeSend(toExistingTour) {
   render();
   if (target) {
     const b = state.buyers.find(x => x.id === target.buyerId);
+    openTourById(target.id);
     showToast(tr(`Ajouté au tour de visites de ${b.prenom} ${b.nom}, ${formatDateLong(target.date)}.`, `Added to ${b.prenom} ${b.nom}'s showing tour, ${formatDateLong(target.date)}.`), 'success');
     return;
   }
   if (tour) {
     const b = state.buyers.find(x => x.id === tour.buyerId);
+    if (toExistingTour) openTourById(tour.id);
     showToast(b
       ? tr(`Tour de visites créé pour ${b.prenom} ${b.nom}, ${formatDateLong(tour.date)}.`, `Showing tour created for ${b.prenom} ${b.nom}, ${formatDateLong(tour.date)}.`)
       : tr(`Tour de visites créé pour le ${formatDateLong(tour.date)} (${tour.stops.length} visites).`, `Showing tour created for ${formatDateLong(tour.date)} (${tour.stops.length} showings).`), 'success');
@@ -6447,18 +6463,7 @@ function bindListEvents() {
     search.oninput = () => { state.listSearch = search.value; render(); setTimeout(() => { const s = document.getElementById('list-search'); if (s) { s.focus(); s.selectionStart = s.selectionEnd = s.value.length; } }, 0); };
   }
   document.querySelectorAll('[data-open-tour]').forEach(el => {
-    el.onclick = () => {
-      const t = state.tours.find(x => x.id === el.getAttribute('data-open-tour'));
-      state.editingTourId = t.id;
-      const buyer = state.buyers.find(b => b.id === t.buyerId);
-      state.draft = {
-        buyer: buyer || null, date: t.date, time: t.time,
-        stops: JSON.parse(JSON.stringify(t.stops)),
-      };
-      state.dirty = false;
-      state.screen = 'builder';
-      render();
-    };
+    el.onclick = () => openTourById(el.getAttribute('data-open-tour'));
   });
   const btn = document.getElementById('btn-create-tour');
   if (btn) btn.onclick = () => {
