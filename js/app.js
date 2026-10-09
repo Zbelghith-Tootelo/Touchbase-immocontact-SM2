@@ -2279,6 +2279,11 @@ function inboxReceivedTitle(x) {
   return `${d.toLocaleDateString(state.lang === 'en' ? 'en-CA' : 'fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })}, ${x.time}`;
 }
 
+// Un message libre n'est ni une demande ni une visite : il porte une enveloppe, pas une maison.
+function inboxIconFor(x) {
+  if (x.kind !== 'other') return inboxStatusIcon(x.status);
+  return `<svg class="inbox-status-icon" viewBox="-1 -1 36.8333 31.8333" fill="none" role="img" aria-label="${tr('Message', 'Message')}"><title>${tr('Message', 'Message')}</title><path d="M0.750004 4.91669L12.2717 11.445C16.5193 13.8517 18.314 13.8517 22.5616 11.445L34.0833 4.91669" stroke="#213163" stroke-linejoin="round"/><path d="M0.776276 17.376C0.885235 22.4853 0.939714 25.0399 2.82493 26.9323C4.71014 28.8246 7.33389 28.8906 12.5814 29.0224C15.8155 29.1037 19.0178 29.1037 22.252 29.0224C27.4995 28.8906 30.1232 28.8246 32.0084 26.9323C33.8936 25.0399 33.9481 22.4853 34.0571 17.376C34.0921 15.7332 34.0921 14.1001 34.0571 12.4573C33.9481 7.3481 33.8936 4.79349 32.0084 2.9011C30.1232 1.00872 27.4995 0.942795 22.252 0.810948C19.0178 0.729688 15.8155 0.729684 12.5814 0.810937C7.33388 0.942773 4.71014 1.00869 2.82492 2.90108C0.939705 4.79347 0.885228 7.34808 0.776274 12.4573C0.741241 14.1001 0.741242 15.7332 0.776276 17.376Z" stroke="#213163" stroke-linejoin="round"/></svg>`;
+}
 function inboxStatusLabel(key) { const s = INBOX_STATUSES[key]; return tr(s.labelFr, s.labelEn); }
 
 function inboxDateLabel(x) {
@@ -2328,7 +2333,7 @@ function inboxRowHtml(x) {
     <div class="inbox-row ${cls}" data-inbox-row="${x.id}">
       ${check}
       <span class="inbox-cell inbox-cell-courtier">
-        ${inboxStatusIcon(x.status)}
+        ${inboxIconFor(x)}
         ${inboxAvatar(x.courtier, x.photo)}
         <button class="inbox-open" data-inbox-open="${x.id}"><span>${esc(x.courtier)}</span></button>
       </span>
@@ -2346,7 +2351,7 @@ function inboxRowHtml(x) {
           </span>
           <span class="inbox-card-time" title="${esc(inboxReceivedTitle(x))}"><span>${esc(inboxReceivedLabel(x))}</span>${x.count ? `<span class="inbox-count">${x.count}</span>` : ''}</span>
         </div>
-        <p class="inbox-card-prop">${inboxStatusIcon(x.status)}<span>${esc(x.property)}</span></p>
+        <p class="inbox-card-prop">${inboxIconFor(x)}<span>${esc(x.property)}</span></p>
         <p class="inbox-card-date">${esc(inboxDateLabel(x))}</p>
       </div>
     </div>`;
@@ -2867,8 +2872,25 @@ function composeDateLabel(d) {
 // Un client commun à toutes les propriétés fait un tour ; sinon, plusieurs
 // propriétés font une demande de visites multiples. Lecture seule : la règle
 // décrit ce qui part, elle ne se règle pas.
+// Le tour à venir du client choisi, s'il en a un et que toutes les propriétés
+// portent ce même client : c'est à lui que « Enregistrer dans le tour » ajoute.
+function composeExistingTour(c) {
+  // Une seule propriété reste une demande simple ; deux clients différents, une
+  // demande multiple : seul un même client sur 2 propriétés ou plus fait un tour.
+  if (c.kind !== 'showing' || c.dests.length < 2) return null;
+  const first = c.dests[0].client;
+  if (!first || !c.dests.every(d => d.client && d.client.name === first.name)) return null;
+  const buyer = state.buyers.find(b => normalizeText(`${b.prenom} ${b.nom}`) === normalizeText(first.name));
+  if (!buyer) return null;
+  return state.tours
+    .filter(t => t.buyerId === buyer.id && !tourIsCompleted(t))
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))[0] || null;
+}
+
 function composeKindNote(c) {
   if (c.kind !== 'showing' || !c.dests.length) return '';
+  const existing = composeExistingTour(c);
+  if (existing) return tr(`${c.dests[0].client.name} a déjà un tour de visites le ${formatDateLong(existing.date)} : ajoutez ces visites à ce tour.`, `${c.dests[0].client.name} already has a showing tour on ${formatDateLong(existing.date)}: add these showings to it.`);
   if (c.dests.length === 1) return tr('Une propriété : une demande de visite simple.', 'One property: a single showing request.');
   const first = c.dests[0].client;
   if (first && c.dests.every(d => d.client && d.client.name === first.name)) return tr(`Même client (${first.name}) sur toutes les propriétés : un tour de visites.`, `Same client (${first.name}) on every property: a showing tour.`);
@@ -2876,7 +2898,7 @@ function composeKindNote(c) {
 }
 
 function composeProblem(c) {
-  if (!c.dests.length) return c.kind === 'showing' ? tr('Ajoutez au moins une propriété pour envoyer la demande.', 'Add at least one property to send the request.') : tr('Choisissez la propriété concernée.', 'Choose the property this is about.');
+  if (!c.dests.length) return c.kind === 'showing' ? tr('Ajoutez au moins une propriété pour envoyer la demande.', 'Add at least one property to send the request.') : c.kind === 'other' ? tr('Choisissez un destinataire dans le répertoire.', 'Choose a recipient from the directory.') : tr('Choisissez la propriété concernée.', 'Choose the property this is about.');
   if (c.kind !== 'showing' && !c.message.trim()) return tr('Écrivez votre message pour pouvoir l\'envoyer.', 'Write your message to send it.');
   return '';
 }
@@ -2887,6 +2909,15 @@ function composeSlotTagHtml(d) {
 }
 
 function composeDestHtml(d, i, c) {
+  if (d.recipient) {
+    const r = d.recipient;
+    return `
+    <li class="compose-dest">
+      ${directoryAvatar({ prenom: r.prenom, nom: r.nom, photo: r.photo }, 'sm')}
+      <div class="compose-dest-body"><strong>${esc(r.name)}</strong><span class="compose-dest-meta"><span>${esc(r.subtitle)}</span></span></div>
+      <button type="button" class="compose-dest-remove" data-cmp-remove="${i}" aria-label="${tr('Retirer', 'Remove')} ${esc(r.name)}">${TEAM_ICONS.removeCircle}</button>
+    </li>`;
+  }
   const body = c.kind === 'showing'
     ? `<button type="button" class="compose-dest-body" data-cmp-edit="${i}" aria-label="${tr('Modifier la visite de', 'Edit the showing for')} ${esc(d.address)}">
          <strong>${esc(d.address)}</strong>
@@ -2928,8 +2959,9 @@ function renderComposeScreen() {
       </div>` : ''}
       <div class="compose-actions">
         <button class="btn btn-primary" id="cmp-send" ${problem ? 'disabled' : ''}>${tr('Envoyer', 'Send')}</button>
+        ${composeExistingTour(c) ? `<button class="btn btn-secondary" id="cmp-tour" ${problem ? 'disabled' : ''}>${tr('Enregistrer dans le tour de visites', 'Save to the showing tour')}</button>` : ''}
         <button class="btn btn-outline" id="cmp-later" ${problem ? 'disabled' : ''}>${tr('Envoyer plus tard…', 'Send later…')}</button>
-        ${canAdd ? `<button class="btn btn-outline" id="cmp-add">${icon('plus')} ${tr('Ajouter une destination', 'Add destination')}</button>` : ''}
+        ${canAdd ? `<button class="btn btn-outline" id="cmp-add">${icon('plus')} ${c.kind === 'other' ? tr('Ajouter un destinataire', 'Add recipient') : tr('Ajouter une propriété', 'Add property')}</button>` : ''}
       </div>
       <p class="helper-text compose-why" id="cmp-why" role="status">${esc(problem)}</p>
       ${renderComposePopup(c)}
@@ -2988,6 +3020,40 @@ function renderComposePopup(c) {
             ${icon('search')}
           </div>`}
           <div class="info-banner">${icon('info')} <span>${c.kind === 'showing' ? tr('Sélectionnez un résultat pour l\'ajouter à la demande de visite.', 'Select a result to add it to the showing request.') : tr('Sélectionnez la propriété concernée par votre message.', 'Select the property your message is about.')}</span></div>
+          <div class="compose-results">${list}</div>
+        </div>
+        <div class="modal-footer compose-popup-footer"><button class="btn btn-outline" id="cmp-cancel">${tr('Annuler', 'Cancel')}</button></div>
+      </div>
+    </div>`;
+  }
+  if (c.popup === 'recipient') {
+    const q = normalizeText(c.search).trim();
+    const tabs = [
+      { id: 'courtiers', label: tr('Courtiers', 'Agents') },
+      { id: 'contacts', label: tr('Clients', 'Clients') },
+    ];
+    const pool = c.tab === 'contacts'
+      ? state.contacts.map(k => ({ id: k.id, kind: 'contact', prenom: k.prenom, nom: k.nom, photo: k.photo || null, subtitle: k.email || k.tel || '' }))
+      : COURTIER_DIRECTORY.map(k => { const [prenom, ...rest] = k.nom.split(' '); return { id: k.nom, kind: 'courtier', prenom, nom: rest.join(' ') || k.nom, photo: null, subtitle: k.bureau }; });
+    const found = pool.filter(r => !q || normalizeText(`${r.prenom} ${r.nom} ${r.subtitle}`).includes(q));
+    const list = found.map(r => `
+      <button type="button" class="result-row" data-cmp-recipient="${esc(r.kind)}:${esc(r.id)}">
+        ${directoryAvatar(r, 'sm')}
+        <div class="result-address-group"><div class="result-address">${esc(`${r.prenom} ${r.nom}`)}</div><div class="result-subtitle">${esc(r.subtitle)}</div></div>
+        <span class="result-add-btn">${icon('plus')}</span>
+      </button>`).join('') || `<p class="dest-empty">${tr('Aucun résultat dans le répertoire.', 'No results in the directory.')}</p>`;
+    return `
+    <div class="modal-overlay" id="cmp-overlay">
+      <div class="modal compose-modal" role="dialog" aria-modal="true" aria-labelledby="cmp-popup-title" tabindex="-1">
+        <div class="modal-head"><h2 id="cmp-popup-title">${tr('Choisir dans le répertoire', 'Choose from the directory')}</h2><button class="modal-close" id="cmp-close" aria-label="${tr('Fermer', 'Close')}">${icon('x')}</button></div>
+        <div class="modal-body">
+          <div class="dest-tabs" role="tablist">
+            ${tabs.map(t => `<button type="button" role="tab" class="dest-tab ${c.tab === t.id ? 'active' : ''}" aria-selected="${c.tab === t.id}" data-cmp-tab="${t.id}">${t.label}</button>`).join('')}
+          </div>
+          <div class="search-bar" style="margin-bottom:14px;">
+            <input type="text" class="input" id="cmp-search" autocomplete="off" placeholder="${tr('Rechercher un nom…', 'Search a name…')}" value="${esc(c.search)}" aria-label="${tr('Rechercher dans le répertoire', 'Search the directory')}">
+            ${icon('search')}
+          </div>
           <div class="compose-results">${list}</div>
         </div>
         <div class="modal-footer compose-popup-footer"><button class="btn btn-outline" id="cmp-cancel">${tr('Annuler', 'Cancel')}</button></div>
@@ -3120,13 +3186,13 @@ function composeClosePopup() { if (state.compose) { state.compose.popup = null; 
 function composeSyncActions() {
   const c = state.compose;
   const problem = composeProblem(c);
-  ['cmp-send', 'cmp-later'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = !!problem; });
+  ['cmp-send', 'cmp-later', 'cmp-tour'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = !!problem; });
   const why = document.getElementById('cmp-why');
   if (why) why.textContent = problem;
 }
 
 function composeSnapshot(c) {
-  return { kind: c.kind, message: c.message, dests: c.dests.map(d => ({ ...d, client: d.client ? { ...d.client } : null })) };
+  return { kind: c.kind, message: c.message, dests: c.dests.map(d => ({ ...d, client: d.client ? { ...d.client } : null, recipient: d.recipient ? { ...d.recipient } : undefined })) };
 }
 
 function composeNowHHMM() { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -3160,11 +3226,36 @@ function composeCreateTour(c) {
   return tour;
 }
 
-function composeSend() {
+function composeAddToTour(c, tour) {
+  const now = Date.now();
+  c.dests.forEach(d => {
+    tour.stops.push(makeStop(d.address, d.mls, {
+      status: composeTagOk(composeTag(d)) ? 'confirmed' : 'pending',
+      lockedStart: d.from, duration: timeToMinutes(d.to) - timeToMinutes(d.from), sentAt: now,
+    }));
+  });
+  return tour;
+}
+
+function composeSend(toExistingTour) {
   const c = state.compose;
   if (composeProblem(c)) return;
+  // Ajouter au tour garde la date du tour : chaque visite prend sa date, et il
+  // faut que la propriété soit libre ce jour-là avant de la ranger dans le tour.
+  const target = toExistingTour ? composeExistingTour(c) : null;
+  if (toExistingTour && !target) return;
+  if (target) {
+    const blocked = c.dests.find(d => composeTag({ ...d, date: target.date }).id === 'impossible');
+    if (blocked) { showToast(tr(`${blocked.address} n'est pas disponible le ${formatDateLong(target.date)}.`, `${blocked.address} isn't available on ${formatDateLong(target.date)}.`)); return; }
+    c.dests = c.dests.map(d => ({ ...d, date: target.date }));
+  }
+  const hadTour = !target && !!composeExistingTour(c);
   const stamp = Date.now();
-  const rows = c.dests.map((d, i) => ({
+  const rows = c.kind === 'other' ? c.dests.map((d, i) => ({
+    id: `s${stamp}-${i}`, tab: 'envoyes', unread: false, courtier: d.recipient.name, photo: d.recipient.photo,
+    client: null, clientPhoto: null, property: '', kind: 'other', recipientKind: d.recipient.kind, message: c.message,
+    date: null, start: null, end: null, status: 'demande', time: composeNowHHMM(), count: 1, daysAgo: 0,
+  })) : c.dests.map((d, i) => ({
     id: `s${stamp}-${i}`, tab: 'envoyes', unread: false, courtier: d.courtier, photo: null,
     client: d.client ? d.client.name : null, clientPhoto: d.client ? d.client.photo || null : null,
     property: d.address, mls: d.mls, kind: c.kind, message: c.kind === 'showing' ? d.comment : c.message,
@@ -3173,10 +3264,16 @@ function composeSend() {
   }));
   if (c.id) state.inbox = state.inbox.filter(x => x.id !== c.id);
   state.inbox = [...rows, ...state.inbox];
-  const tour = composeIsTour(c) ? composeCreateTour(c) : null;
+  // Un client qui a déjà un tour n'en reçoit pas un deuxième : on y ajoute, ou on envoie seul.
+  const tour = target ? composeAddToTour(c, target) : (composeIsTour(c) && !hadTour ? composeCreateTour(c) : null);
   state.inboxTab = 'envoyes'; state.inboxSelected = [];
   state.compose = null; state.screen = 'inbox';
   render();
+  if (target) {
+    const b = state.buyers.find(x => x.id === target.buyerId);
+    showToast(tr(`Ajouté au tour de visites de ${b.prenom} ${b.nom}, ${formatDateLong(target.date)}.`, `Added to ${b.prenom} ${b.nom}'s showing tour, ${formatDateLong(target.date)}.`), 'success');
+    return;
+  }
   if (tour) {
     const b = state.buyers.find(x => x.id === tour.buyerId);
     showToast(tr(`Tour de visites créé pour ${b.prenom} ${b.nom}, ${formatDateLong(tour.date)}.`, `Showing tour created for ${b.prenom} ${b.nom}, ${formatDateLong(tour.date)}.`), 'success');
@@ -3189,6 +3286,20 @@ function composeSchedule() {
   const c = state.compose;
   const first = c.dests[0];
   const id = c.id || `d${Date.now()}`;
+  if (first.recipient) {
+    const row = {
+      id, tab: 'programmes', unread: false, courtier: first.recipient.name, photo: first.recipient.photo,
+      client: null, clientPhoto: null, property: '', kind: 'other', recipientKind: first.recipient.kind, message: c.message,
+      date: null, start: null, end: null, status: 'demande', time: c.laterTime, count: 0, daysAgo: 0,
+      sched: { date: c.laterDate, time: c.laterTime }, draft: composeSnapshot(c),
+    };
+    state.inbox = c.id ? state.inbox.map(x => x.id === c.id ? row : x) : [row, ...state.inbox];
+    state.inboxTab = 'programmes'; state.inboxSelected = [];
+    state.compose = null; state.screen = 'inbox';
+    render();
+    showToast(tr(`Message programmé pour le ${c.laterDate}, ${c.laterTime}.`, `Message scheduled for ${c.laterDate}, ${c.laterTime}.`), 'success');
+    return;
+  }
   const row = {
     id, tab: 'programmes', unread: false, courtier: first.courtier, photo: null,
     client: first.client ? first.client.name : null, clientPhoto: first.client ? first.client.photo || null : null,
@@ -3223,7 +3334,11 @@ function bindComposeEvents() {
   if (!c) return;
   document.querySelectorAll('input[name="compose-kind"]').forEach(r => {
     r.onchange = () => {
+      const was = c.kind;
       c.kind = r.value;
+      // Un message libre vise une personne du répertoire, les autres types une
+      // propriété : changer de famille vide la destination.
+      if ((was === 'other') !== (c.kind === 'other')) c.dests = [];
       // Hors demande de visite : une seule propriété, sans date ni heure.
       if (c.kind !== 'showing') c.dests = c.dests.slice(0, 1);
       render();
@@ -3236,11 +3351,18 @@ function bindComposeEvents() {
     b.onclick = () => { composeOpenForm(null, Number(b.getAttribute('data-cmp-edit'))); render(); };
   });
   const add = document.getElementById('cmp-add');
-  if (add) add.onclick = () => { c.popup = 'search'; c.tab = 'nom'; c.search = ''; render(); setTimeout(() => { const s = document.getElementById('cmp-search'); if (s) s.focus(); }, 0); };
+  if (add) add.onclick = () => {
+    c.popup = c.kind === 'other' ? 'recipient' : 'search';
+    c.tab = c.kind === 'other' ? 'courtiers' : 'nom'; c.search = '';
+    render();
+    setTimeout(() => { const s = document.getElementById('cmp-search'); if (s) s.focus(); }, 0);
+  };
   const msg = document.getElementById('cmp-message');
   if (msg) msg.oninput = () => { c.message = msg.value; composeSyncActions(); };
   const send = document.getElementById('cmp-send');
-  if (send) send.onclick = composeSend;
+  if (send) send.onclick = () => composeSend(false);
+  const toTour = document.getElementById('cmp-tour');
+  if (toTour) toTour.onclick = () => composeSend(true);
   const later = document.getElementById('cmp-later');
   if (later) later.onclick = () => { c.popup = 'later'; render(); };
 
@@ -3259,6 +3381,19 @@ function bindComposeEvents() {
     render();
     setTimeout(() => { const s = document.getElementById('cmp-search'); if (s) { s.focus(); s.selectionStart = s.selectionEnd = s.value.length; } }, 0);
   };
+  document.querySelectorAll('[data-cmp-recipient]').forEach(b => {
+    b.onclick = () => {
+      const [kind, ...idParts] = b.getAttribute('data-cmp-recipient').split(':');
+      const id = idParts.join(':');
+      let r;
+      if (kind === 'contact') { const k = state.contacts.find(x => x.id === id); if (k) r = { kind, id, prenom: k.prenom, nom: k.nom, name: `${k.prenom} ${k.nom}`, photo: k.photo || null, subtitle: k.email || k.tel || '' }; }
+      else { const k = courtierEntry(id); if (k) { const [prenom, ...rest] = k.nom.split(' '); r = { kind, id, prenom, nom: rest.join(' ') || k.nom, name: k.nom, photo: null, subtitle: k.bureau }; } }
+      if (!r) return;
+      c.dests = [{ recipient: r }];
+      c.popup = null;
+      render();
+    };
+  });
   document.querySelectorAll('[data-cmp-pick]').forEach(b => {
     b.onclick = () => { const p = MLS_POOL.find(x => x.mls === b.getAttribute('data-cmp-pick')); if (p) composeAddDest(p); };
   });
@@ -3337,7 +3472,7 @@ const INBOX_DEFAULT_TEXT = {
 function inboxHistory(x) {
   const sent = x.tab === 'envoyes';
   const rows = [{ status: x.status, dir: sent ? 'sent' : 'recv' }];
-  if (x.status !== 'demande') rows.push({ status: 'demande', dir: sent ? 'recv' : 'sent' });
+  if (x.kind !== 'other' && x.status !== 'demande') rows.push({ status: 'demande', dir: sent ? 'recv' : 'sent' });
   return rows;
 }
 
@@ -3364,11 +3499,11 @@ function renderMessageDetailScreen() {
   const dir = x.tab === 'envoyes' ? tr('Envoyé', 'Sent') : tr('Reçu', 'Received');
   const text = x.message || tr(...INBOX_DEFAULT_TEXT[x.status]);
   const visit = x.date ? `<strong>${esc(inboxDateLabel(x).replace(/(\d{2}):(\d{2})/g, (m0, h, mi) => composeTime(`${h}:${mi}`)))}</strong>` : '';
-  const agency = courtierEntry(x.courtier) ? courtierEntry(x.courtier).bureau : 'Dynamic Realty';
+  const agency = x.recipientKind === 'contact' ? tr('Client', 'Client') : courtierEntry(x.courtier) ? courtierEntry(x.courtier).bureau : 'Dynamic Realty';
   const history = inboxHistory(x).map(h => `
       <li class="msgdetail-hist">
-        ${inboxStatusIcon(h.status)}
-        <span class="msgdetail-hist-text">${x.date ? `<strong>${esc(inboxDateLabel(x))}</strong>` : ''}<span>${esc(tr(...INBOX_HISTORY_LABELS[h.status]))}</span></span>
+        ${x.kind === 'other' ? inboxIconFor(x) : inboxStatusIcon(h.status)}
+        <span class="msgdetail-hist-text">${x.date ? `<strong>${esc(inboxDateLabel(x))}</strong>` : ''}<span>${esc(x.kind === 'other' ? tr('Message', 'Message') : tr(...INBOX_HISTORY_LABELS[h.status]))}</span></span>
         <span class="msgdetail-hist-dir">${h.dir === 'sent' ? tr('Envoyé', 'Sent') : tr('Reçu', 'Received')}</span>
       </li>`).join('');
   const action = (id, glyph, label) => `<button type="button" class="msgdetail-action" data-detail-action="${id}"><span class="msgdetail-action-icon">${detailIcon(glyph)}</span><span>${label}</span></button>`;
@@ -3379,12 +3514,12 @@ function renderMessageDetailScreen() {
         ${inboxAvatar(x.courtier, x.photo)}
         <div><p class="msgdetail-name">${esc(x.courtier)}</p><p class="msgdetail-sub">${esc(agency)}</p></div>
       </section>
-      <section class="msgdetail-block msgdetail-prop">
+      ${x.property ? `<section class="msgdetail-block msgdetail-prop">
         <img class="result-thumb" src="${thumbFor(x.mls, x.property)}" alt="">
         <div><p class="msgdetail-name">${esc(x.property)}</p><p class="msgdetail-sub">#${esc(inboxMlsNumber(x))}</p></div>
-      </section>
+      </section>` : ''}
       <section class="msgdetail-block msgdetail-visit">
-        ${inboxStatusIcon(x.status)}
+        ${inboxIconFor(x)}
         <div>${visit}<p class="msgdetail-text">${esc(text)}</p></div>
       </section>
       ${x.client ? `
