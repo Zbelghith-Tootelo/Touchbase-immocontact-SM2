@@ -2874,12 +2874,20 @@ function composeDateLabel(d) {
 // décrit ce qui part, elle ne se règle pas.
 // Le tour à venir du client choisi, s'il en a un et que toutes les propriétés
 // portent ce même client : c'est à lui que « Enregistrer dans le tour » ajoute.
+// Le client du tour : celui choisi dans la liste. Une propriété sans client
+// reprend celui des autres ; deux noms différents n'en font plus un tour.
+function composeTourClient(c) {
+  const names = [...new Set(c.dests.filter(d => d.client).map(d => d.client.name))];
+  if (names.length !== 1) return null;
+  return c.dests.find(d => d.client).client;
+}
+
 function composeExistingTour(c) {
   // Une seule propriété reste une demande simple ; deux clients différents, une
   // demande multiple : seul un même client sur 2 propriétés ou plus fait un tour.
   if (c.kind !== 'showing' || c.dests.length < 2) return null;
-  const first = c.dests[0].client;
-  if (!first || !c.dests.every(d => d.client && d.client.name === first.name)) return null;
+  const first = composeTourClient(c);
+  if (!first) return null;
   const buyer = state.buyers.find(b => normalizeText(`${b.prenom} ${b.nom}`) === normalizeText(first.name));
   if (!buyer) return null;
   return state.tours
@@ -2890,10 +2898,10 @@ function composeExistingTour(c) {
 function composeKindNote(c) {
   if (c.kind !== 'showing' || !c.dests.length) return '';
   const existing = composeExistingTour(c);
-  if (existing) return tr(`${c.dests[0].client.name} a déjà un tour de visites le ${formatDateLong(existing.date)} : ajoutez ces visites à ce tour.`, `${c.dests[0].client.name} already has a showing tour on ${formatDateLong(existing.date)}: add these showings to it.`);
+  if (existing) return tr(`${composeTourClient(c).name} a déjà un tour de visites le ${formatDateLong(existing.date)} : ajoutez ces visites à ce tour.`, `${composeTourClient(c).name} already has a showing tour on ${formatDateLong(existing.date)}: add these showings to it.`);
   if (c.dests.length === 1) return tr('Une propriété : une demande de visite simple.', 'One property: a single showing request.');
-  const first = c.dests[0].client;
-  if (first && c.dests.every(d => d.client && d.client.name === first.name)) return tr(`Même client (${first.name}) sur toutes les propriétés : un tour de visites.`, `Same client (${first.name}) on every property: a showing tour.`);
+  const first = composeTourClient(c);
+  if (first) return tr(`Même client (${first.name}) sur toutes les propriétés : un tour de visites.`, `Same client (${first.name}) on every property: a showing tour.`);
   return tr('Plusieurs propriétés : une demande de visites multiples.', 'Several properties: a multiple-showing request.');
 }
 
@@ -3199,17 +3207,17 @@ function composeNowHHMM() { const d = new Date(); return `${pad2(d.getHours())}:
 
 // Même client sur toutes les propriétés d'une demande de visites : c'est un tour.
 function composeIsTour(c) {
-  const first = c.dests[0] && c.dests[0].client;
-  return c.kind === 'showing' && c.dests.length >= 2 && !!first && c.dests.every(d => d.client && d.client.name === first.name);
+  return c.kind === 'showing' && c.dests.length >= 2 && !!composeTourClient(c);
 }
 
 // Le tour rejoint la liste « Tours de visites » avec la date et le client. Un
 // client qui n'est pas encore dans les acheteurs y est ajouté, pour que le tour
 // porte son nom.
 function composeCreateTour(c) {
-  const name = c.dests[0].client.name;
-  let buyer = state.buyers.find(b => normalizeText(`${b.prenom} ${b.nom}`) === normalizeText(name));
-  if (!buyer) {
+  // Des visites multiples sans client commun forment un tour sans acheteur.
+  const name = composeIsTour(c) ? composeTourClient(c).name : null;
+  let buyer = name ? state.buyers.find(b => normalizeText(`${b.prenom} ${b.nom}`) === normalizeText(name)) : null;
+  if (name && !buyer) {
     const contact = state.contacts.find(k => normalizeText(`${k.prenom} ${k.nom}`) === normalizeText(name));
     const [prenom, ...rest] = name.split(' ');
     buyer = { id: uid(), prenom: contact ? contact.prenom : prenom, nom: contact ? contact.nom : rest.join(' '), email: contact ? contact.email : '', tel: contact ? contact.tel : '' };
@@ -3221,7 +3229,7 @@ function composeCreateTour(c) {
     status: composeTagOk(composeTag(d)) ? 'confirmed' : 'pending',
     lockedStart: d.from, duration: timeToMinutes(d.to) - timeToMinutes(d.from), sentAt: now,
   }));
-  const tour = { id: uid(), buyerId: buyer.id, date: sorted[0].date, time: sorted[0].from, sentAt: now, relancedAt: null, sharedAt: null, stops };
+  const tour = { id: uid(), buyerId: buyer ? buyer.id : null, date: sorted[0].date, time: sorted[0].from, sentAt: now, relancedAt: null, sharedAt: null, stops };
   state.tours.push(tour);
   return tour;
 }
@@ -3265,7 +3273,7 @@ function composeSend(toExistingTour) {
   if (c.id) state.inbox = state.inbox.filter(x => x.id !== c.id);
   state.inbox = [...rows, ...state.inbox];
   // Un client qui a déjà un tour n'en reçoit pas un deuxième : on y ajoute, ou on envoie seul.
-  const tour = target ? composeAddToTour(c, target) : (composeIsTour(c) && !hadTour ? composeCreateTour(c) : null);
+  const tour = target ? composeAddToTour(c, target) : (c.kind === 'showing' && c.dests.length >= 2 && !hadTour ? composeCreateTour(c) : null);
   state.inboxTab = 'envoyes'; state.inboxSelected = [];
   state.compose = null; state.screen = 'inbox';
   render();
@@ -3276,7 +3284,9 @@ function composeSend(toExistingTour) {
   }
   if (tour) {
     const b = state.buyers.find(x => x.id === tour.buyerId);
-    showToast(tr(`Tour de visites créé pour ${b.prenom} ${b.nom}, ${formatDateLong(tour.date)}.`, `Showing tour created for ${b.prenom} ${b.nom}, ${formatDateLong(tour.date)}.`), 'success');
+    showToast(b
+      ? tr(`Tour de visites créé pour ${b.prenom} ${b.nom}, ${formatDateLong(tour.date)}.`, `Showing tour created for ${b.prenom} ${b.nom}, ${formatDateLong(tour.date)}.`)
+      : tr(`Tour de visites créé pour le ${formatDateLong(tour.date)} (${tour.stops.length} visites).`, `Showing tour created for ${formatDateLong(tour.date)} (${tour.stops.length} showings).`), 'success');
     return;
   }
   showToast(rows.length > 1 ? tr(`${rows.length} messages envoyés aux courtiers.`, `${rows.length} messages sent to the agents.`) : tr('Message envoyé au courtier.', 'Message sent to the agent.'), 'success');
