@@ -1767,6 +1767,7 @@ function renderMenuScreen() {
   const activeId = navActiveId();
   return `
     <div class="menu-grid">
+      <button type="button" class="menu-new-btn" id="menu-new-message">${icon('plus')} ${tr('Nouveau message', 'New message')}</button>
       ${NAV_ITEMS.map(item => {
         const active = item.id === activeId;
         const label = navItemLabel(item);
@@ -6449,6 +6450,8 @@ function bindEvents() {
 
   const newMessageBtn = document.getElementById('btn-sidebar-new-message');
   if (newMessageBtn) newMessageBtn.onclick = openNewMessage;
+  const menuNewBtn = document.getElementById('menu-new-message');
+  if (menuNewBtn) menuNewBtn.onclick = openNewMessage;
 
   const menuBtn = document.getElementById('mobile-menu-btn');
   if (menuBtn) menuBtn.onclick = () => leaveTour(() => { state.screen = 'menu'; state.draft = null; });

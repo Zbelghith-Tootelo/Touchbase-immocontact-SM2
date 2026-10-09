@@ -2031,7 +2031,16 @@ body[data-screen="messageDetail"] .topbar-back { display: inline-flex; }
   position: absolute; top: -8px; right: -8px; margin: 0;
   width: 25px; height: 25px; font-size: 14px; font-weight: 600; z-index: 2;
 }
-.menu-card:last-child:nth-child(3n + 1) { grid-column: 2; }
+.menu-card:last-child:nth-child(3n + 2) { grid-column: 2; }
+/* Le bouton d'action occupe toute la largeur de la grille, comme le « Nouveau message » du menu latéral. */
+.menu-new-btn {
+  grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 48px; border: 0; border-radius: var(--radius-lg); cursor: pointer;
+  background: var(--bleu-principal); color: var(--blanc); font: inherit; font-size: 16px; font-weight: 600;
+}
+.menu-new-btn:hover { background: var(--bleu-principal-dark); }
+.menu-new-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.menu-new-btn svg { width: 16px; height: 16px; }
 .menu-ribbon {
   position: absolute; top: 12px; right: -32px;
   background: var(--bleu-secondaire); color: var(--blanc);
@@ -2561,3 +2570,18 @@ body[data-screen="messageDetail"] .msgdetail { flex: 1 0 auto; padding-bottom: 0
 .reply-option:hover { background: var(--lumiere-principale); border-color: var(--bleu-action-30); }
 .reply-option:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .reply-option .msgtype-icon-wrap { width: 28px; height: 28px; }
+
+/* Composition en mobile : les boutons prennent toute la largeur, et l'ajout de
+   propriété flotte en bas à droite, comme « Nouveau message » dans la messagerie. */
+@media (max-width: 768px) {
+  .compose-actions { max-width: none; }
+  .compose-page { padding-bottom: 88px; }
+  .compose-actions #cmp-add {
+    position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 20;
+    width: auto; min-height: 48px; padding: 12px 20px; border-radius: 999px; gap: 4px;
+    background: var(--bleu-principal); color: var(--blanc); border-color: var(--bleu-principal); box-shadow: var(--shadow-md);
+  }
+  .compose-actions #cmp-add:hover { background: var(--bleu-principal-dark); }
+  .compose-actions #cmp-add svg { width: 14px; height: 14px; }
+  .compose-form-actions .btn, .compose-popup-footer .btn { max-width: none; }
+}
