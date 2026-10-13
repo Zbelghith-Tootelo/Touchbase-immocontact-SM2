@@ -1726,14 +1726,11 @@ function setTopbarTitle(title) {
 }
 
 /* ----- Listes d'heures colorées : gabarit et clavier partagés -----
-   La couleur ne porte jamais seule la disponibilité (WCAG 1.4.1) : chaque heure
-   a un pictogramme visible et un nom accessible complet (« 10h30, Visite
-   libre »). Le clavier suit le motif listbox : flèches, Début/Fin, Entrée,
+   Chaque heure a un nom accessible complet (« 10h30, Visite libre »), lu par les
+   lecteurs d'écran, et le bandeau écrit la disponibilité. Le clavier suit le motif listbox : flèches, Début/Fin, Entrée,
    Échap (ferme la liste seulement, jamais le formulaire qui la porte). */
-const TONE_GLYPH = { ok: '✓', info: '✓', warn: '?', danger: '✕' };
 function timeBadgeHtml(tone, text) {
-  const g = TONE_GLYPH[tone];
-  return `<span class="time-badge tone-${tone}">${g ? `<span class="time-glyph" aria-hidden="true">${g}</span>` : ''}${text}</span>`;
+  return `<span class="time-badge tone-${tone}">${text}</span>`;
 }
 function timeOptionHtml({ id, attrs, selected, tone, text, label }) {
   return `<li role="option" id="${id}" class="time-opt" ${attrs} aria-selected="${selected}" aria-label="${esc(`${text}, ${label}`)}" title="${esc(label)}">${timeBadgeHtml(tone, text)}</li>`;
