@@ -1720,8 +1720,59 @@ function initSidebarTips() {
 
 function setTopbarTitle(title) {
   document.getElementById('topbar-title').textContent = title;
+  document.title = `${currentBrandName()} — ${title}`;
   const mobileTitle = document.getElementById('mobile-nav-title');
   if (mobileTitle) mobileTitle.textContent = title;
+}
+
+/* ----- Listes d'heures colorées : gabarit et clavier partagés -----
+   La couleur ne porte jamais seule la disponibilité (WCAG 1.4.1) : chaque heure
+   a un pictogramme visible et un nom accessible complet (« 10h30, Visite
+   libre »). Le clavier suit le motif listbox : flèches, Début/Fin, Entrée,
+   Échap (ferme la liste seulement, jamais le formulaire qui la porte). */
+const TONE_GLYPH = { ok: '✓', info: '✓', warn: '?', danger: '✕' };
+function timeBadgeHtml(tone, text) {
+  const g = TONE_GLYPH[tone];
+  return `<span class="time-badge tone-${tone}">${g ? `<span class="time-glyph" aria-hidden="true">${g}</span>` : ''}${text}</span>`;
+}
+function timeOptionHtml({ id, attrs, selected, tone, text, label }) {
+  return `<li role="option" id="${id}" class="time-opt" ${attrs} aria-selected="${selected}" aria-label="${esc(`${text}, ${label}`)}" title="${esc(label)}">${timeBadgeHtml(tone, text)}</li>`;
+}
+function timeDisabledOptionHtml(id, text) {
+  return `<li role="option" id="${id}" class="time-opt is-disabled" aria-disabled="true" aria-selected="false"><span class="time-badge">${text}</span></li>`;
+}
+function wireTimePicker({ btnId, listId, open, setOpen, pick }) {
+  const btn = document.getElementById(btnId);
+  if (btn) btn.onkeydown = e => {
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !open) { e.preventDefault(); setOpen(true); }
+  };
+  const list = document.getElementById(listId);
+  if (!list) return;
+  const opts = [...list.querySelectorAll('[role="option"]:not([aria-disabled="true"])')];
+  if (!opts.length) return;
+  let i = Math.max(0, opts.findIndex(o => o.getAttribute('aria-selected') === 'true'));
+  const mark = (center) => {
+    list.querySelectorAll('.is-active').forEach(o => o.classList.remove('is-active'));
+    const o = opts[i];
+    o.classList.add('is-active');
+    list.setAttribute('aria-activedescendant', o.id);
+    o.scrollIntoView({ block: center ? 'center' : 'nearest' });
+  };
+  list.focus({ preventScroll: true });
+  mark(true);
+  list.onkeydown = e => {
+    const k = e.key;
+    if (k === 'ArrowDown') i = Math.min(opts.length - 1, i + 1);
+    else if (k === 'ArrowUp') i = Math.max(0, i - 1);
+    else if (k === 'Home') i = 0;
+    else if (k === 'End') i = opts.length - 1;
+    else if (k === 'Enter' || k === ' ') { e.preventDefault(); pick(opts[i]); return; }
+    else if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); return; }
+    else if (k === 'Tab') { e.preventDefault(); setOpen(false); return; }
+    else return;
+    e.preventDefault();
+    mark(false);
+  };
 }
 
 /* ----- Touchbase Live : assistant IA -----
@@ -1827,6 +1878,15 @@ function renderLive() {
   btn.setAttribute('aria-label', tr('Touchbase Live, assistant IA', 'Touchbase Live, AI assistant'));
   btn.title = tr('Touchbase Live — assistant IA', 'Touchbase Live — AI assistant');
   dock.hidden = !open;
+  // Étiquette traduite des icônes Live mobiles (écrites en dur dans le HTML).
+  document.querySelectorAll('.mobile-live').forEach(b => {
+    b.setAttribute('aria-label', tr('Touchbase Live, assistant IA', 'Touchbase Live, AI assistant'));
+    b.title = tr('Touchbase Live — assistant IA', 'Touchbase Live — AI assistant');
+  });
+  // En plein écran (mobile) le panneau est un dialogue modal : le reste de la
+  // page devient inerte, la tabulation ne peut plus en sortir.
+  const modal = open && liveIsMobile();
+  document.querySelectorAll('.sidebar, .main-col').forEach(el => { el.inert = modal; });
   if (!open) { dock.innerHTML = ''; return; }
 
   const hadFocus = document.activeElement && document.activeElement.id === 'live-input';
@@ -1847,7 +1907,7 @@ function renderLive() {
         ${liveState.typing ? `<p class="live-msg is-ai is-typing" aria-label="${tr('Touchbase Live écrit', 'Touchbase Live is typing')}"><span></span><span></span><span></span></p>` : ''}
       </div>`;
   dock.innerHTML = `
-    <section class="live-panel${liveState.entering ? ' is-entering' : ''}" role="complementary" aria-labelledby="live-title" id="live-panel">
+    <section class="live-panel${liveState.entering ? ' is-entering' : ''}" role="${modal ? 'dialog' : 'complementary'}"${modal ? ' aria-modal="true"' : ''} aria-labelledby="live-title" id="live-panel">
       <div class="live-grip" id="live-grip" aria-hidden="true"><span></span></div>
       <div class="live-head" id="live-head">
         <button type="button" class="live-new" id="live-new" ${empty ? 'disabled' : ''}>${icon('plus')}<span>${tr('Nouveau chat', 'New chat')}</span></button>
@@ -1886,7 +1946,11 @@ function renderLive() {
   dock.querySelectorAll('[data-live-chip]').forEach(b => {
     b.onclick = () => liveSend(b.textContent, b.getAttribute('data-live-chip'));
   });
-  dock.querySelectorAll('[data-live-go]').forEach(b => { b.onclick = () => liveGo(b.getAttribute('data-live-go')); });
+  // Sur mobile le panneau couvre tout l'écran : il se ferme avant la
+  // navigation, sinon l'écran proposé resterait caché derrière lui.
+  dock.querySelectorAll('[data-live-go]').forEach(b => {
+    b.onclick = () => { const to = b.getAttribute('data-live-go'); if (liveIsMobile()) liveSetOpen(false); liveGo(to); };
+  });
   const thread = document.getElementById('live-thread');
   if (thread) thread.scrollTop = thread.scrollHeight;
   if (hadFocus) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
@@ -3332,14 +3396,15 @@ function composePickerHtml(f, which) {
   const tone = cur ? cur.tone : 'muted';
   const items = TIME_OPTIONS.map(t => {
     const tag = composeTimeTag(f, which, t);
-    if (!tag) return `<li role="option" class="time-opt is-disabled" aria-disabled="true" aria-selected="false"><span class="time-badge">${composeTime(t)}</span></li>`;
-    return `<li role="option" class="time-opt" data-cmp-time="${which}:${t}" aria-selected="${t === f[which]}" title="${esc(availabilityTagLabel(tag))}"><span class="time-badge tone-${tag.tone}">${composeTime(t)}</span></li>`;
+    const id = `cmp-${which}-opt-${t.replace(':', '')}`;
+    if (!tag) return timeDisabledOptionHtml(id, composeTime(t));
+    return timeOptionHtml({ id, attrs: `data-cmp-time="${which}:${t}"`, selected: t === f[which], tone: tag.tone, text: composeTime(t), label: availabilityTagLabel(tag) });
   }).join('');
   return `
-    <button type="button" class="input select time-picker-btn tone-${tone}" id="cmp-${which}" aria-haspopup="listbox" aria-expanded="${!!f[which + 'Open']}"${cur ? ` title="${esc(availabilityTagLabel(cur))}"` : ''}>
-      <span class="time-badge tone-${tone}">${composeTime(f[which])}</span>
+    <button type="button" class="input select time-picker-btn tone-${tone}" id="cmp-${which}" aria-haspopup="listbox" aria-expanded="${!!f[which + 'Open']}" aria-controls="cmp-${which}-list" aria-labelledby="cmp-${which}-label cmp-${which}">
+      ${timeBadgeHtml(tone, composeTime(f[which]))}${cur ? `<span class="sr-only">, ${esc(availabilityTagLabel(cur))}</span>` : ''}
     </button>
-    ${f[which + 'Open'] ? `<ul class="time-list" role="listbox" aria-label="${which === 'to' ? tr('Heure de fin', 'End time') : tr('Heure de début', 'Start time')}">${items}</ul>` : ''}`;
+    ${f[which + 'Open'] ? `<ul class="time-list" id="cmp-${which}-list" role="listbox" tabindex="-1" aria-label="${which === 'to' ? tr('Heure de fin', 'End time') : tr('Heure de début', 'Start time')}">${items}</ul>` : ''}`;
 }
 
 function renderComposeForm(c) {
@@ -3657,21 +3722,20 @@ function bindComposeEvents() {
   if (!f) return;
   const bindPickers = () => {
     ['from', 'to'].forEach(which => {
-      const btn = document.getElementById(`cmp-${which}`);
-      if (btn) btn.onclick = () => {
-        const wasOpen = !!f[which + 'Open'];
-        f.fromOpen = false; f.toOpen = false;
-        f[which + 'Open'] = !wasOpen;
+      const setOpen = open => {
+        f.fromOpen = false; f.toOpen = false; f[which + 'Open'] = open;
         refreshPickers();
-        const sel = document.querySelector(`#cmp-${which}-wrap [aria-selected="true"]`);
-        if (sel) sel.scrollIntoView({ block: 'center' });
+        if (!open) { const b = document.getElementById(`cmp-${which}`); if (b) b.focus(); }
       };
-    });
-    document.querySelectorAll('[data-cmp-time]').forEach(el => {
-      el.onclick = () => {
-        const [which, t] = el.getAttribute('data-cmp-time').split(/:(.+)/);
-        f[which] = t; f.fromOpen = false; f.toOpen = false; refreshForm();
+      const pick = li => {
+        const [w, t] = li.getAttribute('data-cmp-time').split(/:(.+)/);
+        f[w] = t; f.fromOpen = false; f.toOpen = false; refreshForm();
+        const b = document.getElementById(`cmp-${w}`); if (b) b.focus();
       };
+      const btn = document.getElementById(`cmp-${which}`);
+      if (btn) btn.onclick = () => setOpen(!f[which + 'Open']);
+      document.querySelectorAll(`#cmp-${which}-wrap [data-cmp-time]`).forEach(el => { el.onclick = () => pick(el); });
+      wireTimePicker({ btnId: `cmp-${which}`, listId: `cmp-${which}-list`, open: !!f[which + 'Open'], setOpen, pick });
     });
   };
   const refreshPickers = () => {
@@ -5841,12 +5905,12 @@ function renderVisitRequestModal() {
   const fromOptions = TIME_OPTIONS.map(t => {
     const min = timeToMinutes(t);
     const tag = vrFromTone(min);
-    return `<li role="option" class="time-opt" data-from="${min}" aria-selected="${min === m.from}" title="${esc(availabilityTagLabel(tag))}"><span class="time-badge tone-${tag.tone}">${timeLabel(t)}</span></li>`;
+    return timeOptionHtml({ id: `vr-from-opt-${min}`, attrs: `data-from="${min}"`, selected: min === m.from, tone: tag.tone, text: timeLabel(t), label: availabilityTagLabel(tag) });
   }).join('');
   // Heure de fin : mêmes couleurs, calculées pour la visite qui finirait là.
   const toOptions = [...new Set([15, 30, m.duration])].sort((a, b) => a - b).map(d => {
     const tag = availabilityTagFor({ mls: m.mls, external: m.external, duration: d }, m.from, vrDate);
-    return `<li role="option" class="time-opt" data-vr-dur="${d}" aria-selected="${d === m.duration}" title="${esc(availabilityTagLabel(tag))}"><span class="time-badge tone-${tag.tone}">${timeLabel(minutesToLabel(m.from + d).replace('h', ':'))}</span></li>`;
+    return timeOptionHtml({ id: `vr-dur-opt-${d}`, attrs: `data-vr-dur="${d}"`, selected: d === m.duration, tone: tag.tone, text: timeLabel(minutesToLabel(m.from + d).replace('h', ':')), label: availabilityTagLabel(tag) });
   }).join('');
   // Ce que le calendrier de disponibilité de la fiche décide pour ce créneau
   // précis, avant même d'enregistrer la demande : sans ça, rien ne dit au
@@ -5954,19 +6018,19 @@ function renderVisitRequestModal() {
             <div class="field">
               <label class="field-label" for="vr-from">${tr('De :', 'From:')}</label>
               <div class="time-picker">
-                <button type="button" class="input select time-picker-btn tone-${vrTag.tone}" id="vr-from" aria-haspopup="listbox" aria-expanded="${!!m.fromOpen}">
-                  <span class="time-badge tone-${vrTag.tone}">${timeLabel(minutesToLabel(m.from).replace('h', ':'))}</span>
+                <button type="button" class="input select time-picker-btn tone-${vrTag.tone}" id="vr-from" aria-haspopup="listbox" aria-expanded="${!!m.fromOpen}" aria-controls="vr-from-list">
+                  ${timeBadgeHtml(vrTag.tone, timeLabel(minutesToLabel(m.from).replace('h', ':')))}<span class="sr-only">, ${esc(availabilityTagLabel(vrTag))}</span>
                 </button>
-                ${m.fromOpen ? `<ul class="time-list" id="vr-from-list" role="listbox" aria-label="${tr('Heure de début', 'Start time')}">${fromOptions}</ul>` : ''}
+                ${m.fromOpen ? `<ul class="time-list" id="vr-from-list" role="listbox" tabindex="-1" aria-label="${tr('Heure de début', 'Start time')}">${fromOptions}</ul>` : ''}
               </div>
             </div>
             <div class="field">
               <label class="field-label" for="vr-duration">${tr('À :', 'To:')}</label>
               <div class="time-picker">
-                <button type="button" class="input select time-picker-btn tone-${vrTag.tone}" id="vr-duration" aria-haspopup="listbox" aria-expanded="${!!m.durOpen}">
-                  <span class="time-badge tone-${vrTag.tone}">${timeLabel(minutesToLabel(m.from + m.duration).replace('h', ':'))}</span>
+                <button type="button" class="input select time-picker-btn tone-${vrTag.tone}" id="vr-duration" aria-haspopup="listbox" aria-expanded="${!!m.durOpen}" aria-controls="vr-dur-list">
+                  ${timeBadgeHtml(vrTag.tone, timeLabel(minutesToLabel(m.from + m.duration).replace('h', ':')))}<span class="sr-only">, ${esc(availabilityTagLabel(vrTag))}</span>
                 </button>
-                ${m.durOpen ? `<ul class="time-list" role="listbox" aria-label="${tr('Heure de fin', 'End time')}">${toOptions}</ul>` : ''}
+                ${m.durOpen ? `<ul class="time-list" id="vr-dur-list" role="listbox" tabindex="-1" aria-label="${tr('Heure de fin', 'End time')}">${toOptions}</ul>` : ''}
               </div>
             </div>
           </div>
@@ -7938,22 +8002,22 @@ function bindVisitRequestModalEvents() {
 
   // Liste maison plutôt que <select> : un <option> natif ne peut pas porter
   // la couleur de disponibilité de chaque heure.
+  const vrRefocus = id => { const b = document.getElementById(id); if (b) b.focus(); };
+  const vrToggle = (key, other, btnId) => open => { m[key] = open; m[other] = false; render(); if (!open) vrRefocus(btnId); };
   const fromBtn = document.getElementById('vr-from');
-  if (fromBtn) fromBtn.onclick = () => {
-    m.fromOpen = !m.fromOpen; m.durOpen = false;
-    render();
-    const sel = document.querySelector('#vr-from-list [aria-selected="true"]');
-    if (sel) sel.scrollIntoView({ block: 'center' });
-  };
-  document.querySelectorAll('#vr-from-list [data-from]').forEach(el => {
-    el.onclick = () => { m.from = +el.getAttribute('data-from'); m.fromOpen = false; render(); };
-  });
-
+  if (fromBtn) fromBtn.onclick = () => vrToggle('fromOpen', 'durOpen', 'vr-from')(!m.fromOpen);
   const durBtn = document.getElementById('vr-duration');
-  if (durBtn) durBtn.onclick = () => { m.durOpen = !m.durOpen; m.fromOpen = false; render(); };
-  document.querySelectorAll('[data-vr-dur]').forEach(el => {
-    el.onclick = () => { m.duration = +el.getAttribute('data-vr-dur'); m.durOpen = false; render(); };
+  if (durBtn) durBtn.onclick = () => vrToggle('durOpen', 'fromOpen', 'vr-duration')(!m.durOpen);
+  document.querySelectorAll('#vr-from-list [data-from]').forEach(el => {
+    el.onclick = () => { m.from = +el.getAttribute('data-from'); m.fromOpen = false; render(); vrRefocus('vr-from'); };
   });
+  document.querySelectorAll('#vr-dur-list [data-vr-dur]').forEach(el => {
+    el.onclick = () => { m.duration = +el.getAttribute('data-vr-dur'); m.durOpen = false; render(); vrRefocus('vr-duration'); };
+  });
+  wireTimePicker({ btnId: 'vr-from', listId: 'vr-from-list', open: !!m.fromOpen, setOpen: vrToggle('fromOpen', 'durOpen', 'vr-from'),
+    pick: li => { m.from = +li.getAttribute('data-from'); m.fromOpen = false; render(); vrRefocus('vr-from'); } });
+  wireTimePicker({ btnId: 'vr-duration', listId: 'vr-dur-list', open: !!m.durOpen, setOpen: vrToggle('durOpen', 'fromOpen', 'vr-duration'),
+    pick: li => { m.duration = +li.getAttribute('data-vr-dur'); m.durOpen = false; render(); vrRefocus('vr-duration'); } });
 
   const comment = document.getElementById('vr-comment');
   if (comment) comment.oninput = () => {
