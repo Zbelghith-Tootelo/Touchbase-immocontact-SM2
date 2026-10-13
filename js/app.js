@@ -5583,7 +5583,6 @@ function renderNewPropertyModal() {
 function renderVisitRequestModal() {
   const m = state.modal;
   const courtier = m.external ? m.courtier : courtierFor(m.mls);
-  const fromOptions = TIME_OPTIONS.map(t => `<option value="${timeToMinutes(t)}" ${timeToMinutes(t) === m.from ? 'selected' : ''}>${state.lang === 'en' ? t : t.replace(':', 'h')}</option>`).join('');
 
   // Le champ Date de ce formulaire ne déplace le tour que s'il n'a qu'une
   // propriété (même règle qu'à l'enregistrement) : sinon la date qui compte
@@ -5592,6 +5591,17 @@ function renderVisitRequestModal() {
   const vrPropCount = state.draft.stops.filter(s => s.type === 'property').length + (m.editStopId ? 0 : 1);
   const vrDateApplies = m.date !== state.draft.date && vrPropCount === 1;
   const vrTag = availabilityTagFor({ mls: m.mls, external: m.external, duration: m.duration }, m.from, vrDateApplies ? m.date : state.draft.date);
+  // Chaque heure du sélecteur « De : » porte la couleur de la disponibilité
+  // qu'aurait la visite si elle commençait là : le courtier voit d'un coup
+  // d'œil où ça passe sans détour, avant d'ouvrir le bandeau ci-dessous.
+  const vrDate = vrDateApplies ? m.date : state.draft.date;
+  const timeLabel = t => state.lang === 'en' ? t : t.replace(':', 'h');
+  const vrFromTone = min => availabilityTagFor({ mls: m.mls, external: m.external, duration: m.duration }, min, vrDate);
+  const fromOptions = TIME_OPTIONS.map(t => {
+    const min = timeToMinutes(t);
+    const tag = vrFromTone(min);
+    return `<li role="option" class="time-opt" data-from="${min}" aria-selected="${min === m.from}" title="${esc(availabilityTagLabel(tag))}"><span class="time-badge tone-${tag.tone}">${timeLabel(t)}</span></li>`;
+  }).join('');
   // Ce que le calendrier de disponibilité de la fiche décide pour ce créneau
   // précis, avant même d'enregistrer la demande : sans ça, rien ne dit au
   // courtier acheteur qu'une visite libre ou pré-approuvée se confirmera
@@ -5672,7 +5682,7 @@ function renderVisitRequestModal() {
 
   return `
     <div class="modal-overlay" id="modal-overlay">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
+      <div class="modal vr-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
         <div class="modal-head vr-head">
           <button class="vr-back" id="vr-back" title="${tr('Retour', 'Back')}" aria-label="${tr('Retour', 'Back')}">${icon('arrowLeft')}</button>
           <h2 class="vr-title" id="modal-title">${tr('Demande de visite', 'Visit request')}</h2>
@@ -5680,6 +5690,7 @@ function renderVisitRequestModal() {
         </div>
         <div class="modal-body">
           ${brokerHtml}
+          <p class="vr-section">${tr('Propriété demandée', 'Requested property')}</p>
           <div class="vr-property">
             ${m.external
               ? `<span class="result-pin">${icon('mapPinOutline')}</span>`
@@ -5696,7 +5707,12 @@ function renderVisitRequestModal() {
           <div class="field-row">
             <div class="field">
               <label class="field-label" for="vr-from">${tr('De :', 'From:')}</label>
-              <select class="input select" id="vr-from">${fromOptions}</select>
+              <div class="time-picker">
+                <button type="button" class="input select time-picker-btn tone-${vrTag.tone}" id="vr-from" aria-haspopup="listbox" aria-expanded="${!!m.fromOpen}">
+                  <span class="time-badge tone-${vrTag.tone}">${timeLabel(minutesToLabel(m.from).replace('h', ':'))}</span>
+                </button>
+                ${m.fromOpen ? `<ul class="time-list" id="vr-from-list" role="listbox" aria-label="${tr('Heure de début', 'Start time')}">${fromOptions}</ul>` : ''}
+              </div>
             </div>
             <div class="field">
               <label class="field-label" for="vr-duration">${tr('À :', 'To:')}</label>
@@ -5708,7 +5724,7 @@ function renderVisitRequestModal() {
           </div>
           <p class="vr-note">${tr('La durée de visite est limitée à 30 minutes', 'Visit length is limited to 30 minutes')}</p>
 
-          <div class="vr-availability tone-${vrTag.tone}">${icon(vrTag.id === 'impossible' ? 'warning' : vrTag.id === 'none' ? 'warning' : 'check')}<span>${vrAvailabilityMsg}</span></div>
+          <div class="vr-availability tone-${vrTag.tone}" role="status"><span class="vr-av-icon">${icon(vrTag.id === 'impossible' ? 'warning' : vrTag.id === 'none' ? 'warning' : 'check')}</span><span>${vrAvailabilityMsg}</span></div>
 
           <div class="field" style="margin-bottom:4px;">
             <!-- Le texte d'invite ne tenait pas lieu d'étiquette : il disparaît
@@ -5723,9 +5739,9 @@ function renderVisitRequestModal() {
             <input type="tel" class="input" id="vr-callback" value="${esc(m.callback)}" placeholder="(514) 000-0000">
           </div>
         </div>
-        <div class="modal-footer"${editing ? ' style="display:flex;flex-direction:column;gap:10px;"' : ''}>
-          <button class="btn btn-primary${editing ? ' btn-block' : ''}" id="vr-save" ${editing ? '' : 'style="min-width:220px;"'}${vrWhy.a}>${saveLabel}</button>${vrWhy.n}
-          ${editing ? `<button class="btn btn-outline btn-block" id="modal-cancel">${tr('Annuler', 'Cancel')}</button>` : ''}
+        <div class="modal-footer vr-footer">
+          <button class="btn btn-primary btn-block" id="vr-save"${vrWhy.a}>${saveLabel}</button>${vrWhy.n}
+          <button class="btn btn-outline btn-block" id="modal-cancel">${tr('Annuler', 'Cancel')}</button>
           ${m.external && !courtierEntry(courtier)
             ? `<p class="helper-text" style="margin:10px 0 0;">${tr('Choisissez le courtier inscripteur : c\'est lui qui recevra la demande de visite.', 'Choose the listing agent: they\'re the one who will receive the visit request.')}</p>`
             : ''}
@@ -7672,8 +7688,18 @@ function bindVisitRequestModalEvents() {
   const dateInput = document.getElementById('vr-date');
   if (dateInput) dateInput.onchange = () => { m.date = dateInput.value; render(); };
 
-  const fromSelect = document.getElementById('vr-from');
-  if (fromSelect) fromSelect.onchange = () => { m.from = +fromSelect.value; render(); };
+  // Liste maison plutôt que <select> : un <option> natif ne peut pas porter
+  // la couleur de disponibilité de chaque heure.
+  const fromBtn = document.getElementById('vr-from');
+  if (fromBtn) fromBtn.onclick = () => {
+    m.fromOpen = !m.fromOpen;
+    render();
+    const sel = document.querySelector('#vr-from-list [aria-selected="true"]');
+    if (sel) sel.scrollIntoView({ block: 'center' });
+  };
+  document.querySelectorAll('#vr-from-list [data-from]').forEach(el => {
+    el.onclick = () => { m.from = +el.getAttribute('data-from'); m.fromOpen = false; render(); };
+  });
 
   const durSelect = document.getElementById('vr-duration');
   if (durSelect) durSelect.onchange = () => { m.duration = +durSelect.value; render(); };

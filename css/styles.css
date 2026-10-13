@@ -1226,6 +1226,29 @@ body[data-screen="messageDetail"] .topbar-back { display: inline-flex; }
 .vr-availability.tone-danger { background: var(--rouge-10); color: var(--rouge-dark); }
 .vr-availability.tone-warn { background: var(--attention-bg); color: #8a5a05; }
 
+/* Heures du sélecteur « De : » : la couleur reprend le ton de la disponibilité
+   (vert libre, bleu pré-approuvée, jaune à confirmer, rouge impossible), et le
+   bandeau ci-dessus l'écrit en toutes lettres. */
+.time-picker { position: relative; }
+.time-picker-btn { text-align: left; display: flex; align-items: center; }
+.time-list {
+  position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0;
+  max-height: 240px; overflow-y: auto; margin: 0; padding: 0; list-style: none;
+  background: var(--blanc); border: 1px solid var(--bordures);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+}
+.time-opt { padding: 6px 12px; cursor: pointer; }
+.time-opt:hover { background: var(--lumiere-principale); }
+.time-opt[aria-selected="true"] { background: var(--bleu-action-10); }
+.time-badge {
+  display: inline-block; padding: 1px 8px; border-radius: 4px;
+  font-size: 13px; font-weight: 600; border: 1px solid transparent;
+}
+.time-badge.tone-danger { background: #D4111A; color: #fff; border-color: #A80E15; }
+.time-badge.tone-warn { background: #F5F87F; color: var(--texte-principal); border-color: #D9DC5A; }
+.time-badge.tone-ok { background: var(--succes); color: #fff; border-color: #1E8A37; }
+.time-badge.tone-info { background: var(--bleu-secondaire); color: #fff; border-color: var(--bleu-action-dark); }
+
 .vr-comment { height: auto; min-height: 84px; padding: 12px 14px; resize: vertical; font-family: inherit; }
 .vr-charcount { font-size: 12.5px; color: var(--texte-secondaire); text-align: right; margin: 6px 0 0; }
 
@@ -2597,3 +2620,93 @@ body[data-screen="messageDetail"] .msgdetail { flex: 1 0 auto; padding-bottom: 0
   .menu-grid { padding-bottom: 16px; }
   body[data-screen="menu"] .mobile-footer { padding-bottom: 92px; }
 }
+
+
+/* ---------- Demande de visite : habillage ----------
+   Champs arrondis à bordure bleutée, heure de début teintée de la
+   disponibilité, bandeau à filet d'accent, boutons empilés pleine largeur.
+   Tout est borné à .vr-modal pour ne pas toucher aux autres formulaires. */
+.vr-modal { --vr-line: #C5D0E2; --vr-radius: 12px; max-width: 560px; }
+.vr-modal .modal-head { padding: 22px 28px 4px; }
+.vr-modal .vr-title { font-size: 24px; font-weight: 800; color: #111; letter-spacing: -0.01em; }
+.vr-modal .modal-body { padding: 14px 28px 8px; }
+.vr-modal .modal-footer { padding: 8px 28px 28px; }
+
+.vr-modal .vr-section { margin: 0 0 10px; font-size: 17px; font-weight: 700; color: var(--bleu-principal); }
+.vr-modal .vr-property { gap: 16px; padding-bottom: 14px; }
+.vr-modal .result-thumb { width: 50px; height: 50px; min-width: 50px; flex: none; border-radius: 10px; object-fit: cover; }
+.vr-modal .vr-property-address { font-size: 17px; font-weight: 800; color: var(--bleu-principal); line-height: 1.25; }
+.vr-modal .vr-broker { gap: 16px; padding: 4px 0 18px; margin-bottom: 20px; }
+.vr-modal .vr-broker-avatar { width: 50px; height: 50px; border-radius: 10px; font-size: 16px; }
+.vr-modal .vr-broker-name { font-size: 17px; font-weight: 800; color: var(--bleu-principal); }
+.vr-modal .vr-broker-agency { font-size: 15px; color: var(--bleu-principal); }
+
+.vr-modal .field { margin-bottom: 18px; }
+.vr-modal .field-label { font-size: 14px; font-weight: 500; color: var(--texte-principal); margin-bottom: 8px; }
+.vr-modal .input {
+  height: 48px; border: 1.5px solid var(--vr-line); border-radius: var(--vr-radius);
+  padding: 0 16px; font-size: 16px;
+}
+.vr-modal .input:focus { border: 2px solid var(--bleu-secondaire); padding: 0 15px; }
+.vr-modal .vr-date { background: var(--blanc); border-color: var(--vr-line); }
+.vr-modal .vr-comment { height: auto; min-height: 96px; padding: 14px 16px; }
+.vr-modal .select { background-position: right 16px center; background-size: 14px 9px; }
+.vr-modal .field-row { gap: 20px; }
+.vr-modal .field-row select.input { text-align: center; text-align-last: center; padding-right: 40px; }
+.vr-modal .vr-note { margin: -8px 0 14px; color: var(--texte-secondaire); }
+
+/* « De : » prend la teinte de l'heure choisie ; le badge garde la couleur forte. */
+.vr-modal .time-picker-btn { justify-content: center; padding-right: 40px; }
+.vr-modal .time-picker-btn.tone-warn { background-color: #FFFCE0; border-color: #E4DC9A; }
+.vr-modal .time-picker-btn.tone-ok { background-color: var(--succes-bg); border-color: #9AD1A5; }
+.vr-modal .time-picker-btn.tone-info { background-color: var(--bleu-action-10); border-color: #A9CBEC; }
+.vr-modal .time-picker-btn.tone-danger { background-color: var(--rouge-10); border-color: #E9A3AD; }
+.vr-modal .time-badge { font-size: 15px; padding: 2px 12px; border-radius: 6px; }
+.vr-modal .time-list { border: 1.5px solid var(--vr-line); border-radius: var(--vr-radius); padding: 6px; max-height: 260px; }
+.vr-modal .time-opt { border-radius: 8px; padding: 6px 10px; text-align: center; }
+.vr-modal .time-opt .time-badge { display: block; }
+
+/* Bandeau : filet d'accent à gauche + icône colorée, comme la maquette. */
+.vr-modal .vr-availability {
+  gap: 12px; padding: 16px 18px; border-radius: var(--vr-radius);
+  border-left: 5px solid currentColor; font-weight: 500; font-size: 15px; line-height: 1.4;
+  margin-bottom: 22px; color: var(--texte-principal);
+}
+.vr-modal .vr-av-icon {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: currentColor;
+}
+.vr-modal .vr-av-icon svg { width: 15px; height: 15px; color: #fff; }
+.vr-modal .vr-availability.tone-warn { background: #FFFBE0; border-left-color: #F59E0B; }
+.vr-modal .vr-availability.tone-warn .vr-av-icon { color: #F59E0B; }
+.vr-modal .vr-availability.tone-ok { background: var(--succes-bg); border-left-color: var(--succes); }
+.vr-modal .vr-availability.tone-ok .vr-av-icon { color: var(--succes); }
+.vr-modal .vr-availability.tone-info { background: var(--bleu-action-10); border-left-color: var(--bleu-secondaire); }
+.vr-modal .vr-availability.tone-info .vr-av-icon { color: var(--bleu-secondaire); }
+.vr-modal .vr-availability.tone-danger { background: var(--rouge-10); border-left-color: var(--rouge-principal); }
+.vr-modal .vr-availability.tone-danger .vr-av-icon { color: var(--rouge-principal); }
+
+.vr-modal .vr-footer { display: flex; flex-direction: column; gap: 12px; }
+.vr-modal .vr-footer .btn { height: 52px; border-radius: var(--vr-radius); font-size: 17px; font-weight: 700; }
+.vr-modal .vr-footer .btn-outline { border-width: 1.5px; }
+@media (max-width: 560px) {
+  .vr-modal .modal-head, .vr-modal .modal-body, .vr-modal .modal-footer { padding-left: 18px; padding-right: 18px; }
+  .vr-modal .field-row { gap: 12px; }
+}
+
+/* Heures de la demande de visite : teintes claires, sans cadre ni aplat
+   foncé. La couleur reste un fond léger ; le texte garde son contraste. */
+.vr-modal .time-badge { border: 0; background: transparent; color: var(--texte-principal); font-weight: 500; padding: 2px 12px; }
+.vr-modal .time-opt .time-badge.tone-warn { background: #FFFCE0; }
+.vr-modal .time-opt .time-badge.tone-ok { background: var(--succes-bg); }
+.vr-modal .time-opt .time-badge.tone-info { background: var(--bleu-action-10); }
+.vr-modal .time-opt .time-badge.tone-danger { background: var(--rouge-10); }
+.vr-modal .time-picker-btn .time-badge { background: transparent; }
+.vr-modal .time-picker-btn.tone-warn { border-color: var(--vr-line); }
+.vr-modal .time-picker-btn.tone-ok { border-color: var(--vr-line); }
+.vr-modal .time-picker-btn.tone-info { border-color: var(--vr-line); }
+.vr-modal .time-picker-btn.tone-danger { border-color: var(--vr-line); }
+.vr-modal .time-list { padding: 4px; }
+.vr-modal .time-opt { padding: 2px 4px; }
+.vr-modal .time-opt:hover .time-badge { filter: brightness(0.97); }
