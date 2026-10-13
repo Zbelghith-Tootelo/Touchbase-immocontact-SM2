@@ -2971,7 +2971,7 @@ function renderComposeScreen() {
         <button class="btn btn-primary" id="cmp-send" ${problem ? 'disabled' : ''}>${tr('Envoyer', 'Send')}</button>
         ${composeIsTour(c) ? `<button class="btn btn-secondary" id="cmp-tour" ${problem ? 'disabled' : ''}>${tr('Enregistrer dans le tour de visites', 'Save to the showing tour')}</button>` : ''}
         <button class="btn btn-outline" id="cmp-later" ${problem ? 'disabled' : ''}>${tr('Envoyer plus tard…', 'Send later…')}</button>
-        ${canAdd ? `<button class="btn btn-outline" id="cmp-add">${icon('plus')} ${c.kind === 'other' ? tr('Ajouter un destinataire', 'Add recipient') : tr('Ajouter une propriété', 'Add property')}</button>` : ''}
+        ${canAdd ? `<button class="btn btn-outline" id="cmp-add">${icon('plus')} ${c.kind === 'other' ? tr('Ajouter un destinataire', 'Add recipient') : tr('Sélectionner une propriété', 'Select a property')}</button>` : ''}
       </div>
       <p class="helper-text compose-why" id="cmp-why" role="status">${esc(problem)}</p>
       ${renderComposePopup(c)}
@@ -3128,6 +3128,27 @@ function composeFormProblem(f) {
   return '';
 }
 
+// Heure de début du formulaire : chaque heure porte la couleur de la
+// disponibilité qu'aurait la visite si elle commençait là, pour la date et la
+// durée en cours. Une liste maison plutôt qu'un <select>, dont les <option>
+// ne se colorent pas.
+function composeFromTag(f, min) {
+  const dur = Math.max(15, timeToMinutes(f.to) - timeToMinutes(f.from)) || 30;
+  return availabilityTagFor({ mls: f.mls, duration: dur }, min, f.date);
+}
+function composeFromPickerHtml(f) {
+  const cur = composeFromTag(f, timeToMinutes(f.from));
+  const items = TIME_OPTIONS.map(t => {
+    const tag = composeFromTag(f, timeToMinutes(t));
+    return `<li role="option" class="time-opt" data-cmp-from="${t}" aria-selected="${t === f.from}" title="${esc(availabilityTagLabel(tag))}"><span class="time-badge tone-${tag.tone}">${composeTime(t)}</span></li>`;
+  }).join('');
+  return `
+    <button type="button" class="input select time-picker-btn tone-${cur.tone}" id="cmp-from" aria-haspopup="listbox" aria-expanded="${!!f.fromOpen}" title="${esc(availabilityTagLabel(cur))}">
+      <span class="time-badge tone-${cur.tone}">${composeTime(f.from)}</span>
+    </button>
+    ${f.fromOpen ? `<ul class="time-list" role="listbox" aria-label="${tr('Heure de début', 'Start time')}">${items}</ul>` : ''}`;
+}
+
 function renderComposeForm(c) {
   const f = c.form;
   const opts = (sel) => TIME_OPTIONS.map(t => `<option value="${t}" ${t === sel ? 'selected' : ''}>${composeTime(t)}</option>`).join('');
@@ -3150,7 +3171,7 @@ function renderComposeForm(c) {
           <div class="field"><label class="field-label" for="cmp-client">${tr('Nom du client', 'Client name')} <span class="field-optional">${tr('(facultatif)', '(optional)')}</span></label>${composeFormClientHtml(f)}</div>
           <div class="field"><label class="field-label" for="cmp-date">${tr('Date', 'Date')}</label><input type="date" class="input" id="cmp-date" value="${esc(f.date)}" min="${composeISO(new Date())}"></div>
           <div class="field-row">
-            <div class="field"><label class="field-label" for="cmp-from">${tr('De', 'From')}</label><select class="input" id="cmp-from">${opts(f.from)}</select></div>
+            <div class="field"><label class="field-label" id="cmp-from-label">${tr('De', 'From')}</label><div class="time-picker" id="cmp-from-wrap">${composeFromPickerHtml(f)}</div></div>
             <div class="field"><label class="field-label" for="cmp-to">${tr('À', 'To')}</label><select class="input" id="cmp-to">${opts(f.to)}</select></div>
           </div>
           <div id="cmp-banner">${composeFormBannerHtml(f)}</div>
@@ -3442,14 +3463,32 @@ function bindComposeEvents() {
   // Formulaire de visite
   const f = c.form;
   if (!f) return;
+  const bindFromPicker = () => {
+    const btn = document.getElementById('cmp-from');
+    if (btn) btn.onclick = () => {
+      f.fromOpen = !f.fromOpen;
+      refreshFromPicker();
+      const sel = document.querySelector('#cmp-from-wrap [aria-selected="true"]');
+      if (sel) sel.scrollIntoView({ block: 'center' });
+    };
+    document.querySelectorAll('#cmp-from-wrap [data-cmp-from]').forEach(el => {
+      el.onclick = () => { f.from = el.getAttribute('data-cmp-from'); f.fromOpen = false; refreshForm(); };
+    });
+  };
+  const refreshFromPicker = () => {
+    const wrap = document.getElementById('cmp-from-wrap');
+    if (wrap) { wrap.innerHTML = composeFromPickerHtml(f); bindFromPicker(); }
+  };
   const refreshForm = () => {
+    refreshFromPicker();
     document.getElementById('cmp-banner').innerHTML = composeFormBannerHtml(f);
     const why = composeFormProblem(f);
     document.getElementById('cmp-form-why').textContent = why;
     document.getElementById('cmp-form-save').disabled = !!why;
   };
   const bindField = (id, key, evt = 'oninput') => { const el = document.getElementById(id); if (el) el[evt] = () => { f[key] = el.value; refreshForm(); }; };
-  bindField('cmp-date', 'date'); bindField('cmp-from', 'from', 'onchange'); bindField('cmp-to', 'to', 'onchange');
+  bindField('cmp-date', 'date'); bindField('cmp-to', 'to', 'onchange');
+  bindFromPicker();
   const comment = document.getElementById('cmp-comment');
   if (comment) comment.oninput = () => { f.comment = comment.value; };
   const cb = document.getElementById('cmp-callback');

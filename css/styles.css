@@ -2710,3 +2710,28 @@ body[data-screen="messageDetail"] .msgdetail { flex: 1 0 auto; padding-bottom: 0
 .vr-modal .time-list { padding: 4px; }
 .vr-modal .time-opt { padding: 2px 4px; }
 .vr-modal .time-opt:hover .time-badge { filter: brightness(0.97); }
+
+
+/* Heure de début du formulaire « Ajouter une visite » : mêmes teintes claires
+   que la demande de visite, sans cadre ni aplat foncé. */
+.compose-modal .time-picker { position: relative; }
+.compose-modal .time-picker-btn { text-align: center; display: flex; align-items: center; justify-content: center; padding-right: 40px; }
+.compose-modal .time-picker-btn.tone-warn { background-color: #FFFCE0; }
+.compose-modal .time-picker-btn.tone-ok { background-color: var(--succes-bg); }
+.compose-modal .time-picker-btn.tone-info { background-color: var(--bleu-action-10); }
+.compose-modal .time-picker-btn.tone-danger { background-color: var(--rouge-10); }
+.compose-modal .time-list {
+  position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0;
+  max-height: 260px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
+  background: var(--blanc); border: 1.5px solid #C5D0E2; border-radius: 12px; box-shadow: var(--shadow-md);
+}
+.compose-modal .time-opt { padding: 2px 4px; cursor: pointer; }
+.compose-modal .time-badge { display: block; text-align: center; padding: 2px 12px; border-radius: 6px; font-size: 15px; font-weight: 500; color: var(--texte-principal); background: transparent; border: 0; }
+.compose-modal .time-picker-btn .time-badge { display: inline-block; }
+.compose-modal .time-opt .time-badge.tone-warn { background: #FFFCE0; }
+.compose-modal .time-opt .time-badge.tone-ok { background: var(--succes-bg); }
+.compose-modal .time-opt .time-badge.tone-info { background: var(--bleu-action-10); }
+.compose-modal .time-opt .time-badge.tone-danger { background: var(--rouge-10); }
+.compose-modal .time-opt:hover .time-badge { filter: brightness(0.97); }
+.compose-modal .time-opt[aria-selected="true"] .time-badge { outline: 1.5px solid #C5D0E2; }
+
