@@ -1724,6 +1724,171 @@ function setTopbarTitle(title) {
   if (mobileTitle) mobileTitle.textContent = title;
 }
 
+/* ----- Touchbase Live : assistant IA -----
+   Le bouton du haut ouvre un panneau ancré à droite. Il n'appartient pas à
+   l'écran en cours (#main-content est réécrit à chaque rendu) : il vit dans
+   #live-dock, hors de ce cycle, pour que la conversation survive à la
+   navigation — le courtier peut suivre une suggestion et garder le fil.
+   Les réponses sont simulées : le prototype n'appelle aucun service d'IA. */
+const LIVE_ICON = '<img src="assets/favicon-touchbase.svg" alt="" width="%W%" height="%H%">';
+const liveState = { timer: null, entering: false, open: false, prevCollapsed: false, messages: [], input: '', typing: false };
+
+function liveSuggestions() {
+  return [
+    { id: 'summary', label: tr('Résumer mes messages', 'Summarize my messages') },
+    { id: 'reply', label: tr('Rédiger une réponse', 'Draft a reply') },
+    { id: 'find', label: tr('Trouver une propriété', 'Find a listing') },
+    { id: 'visit', label: tr('Préparer une visite', 'Prepare a showing') },
+  ];
+}
+// Chaque réponse propose l'écran où l'action se fait : l'assistant guide, il
+// ne remplace pas les écrans.
+function liveAnswer(key) {
+  const go = {
+    inbox: { screen: 'inbox', label: tr('Ouvrir la messagerie', 'Open messages') },
+    properties: { screen: 'properties', label: tr('Ouvrir Mes propriétés', 'Open My listings') },
+    list: { screen: 'list', label: tr('Ouvrir Tour de visites', 'Open Buyer\'s tours') },
+  };
+  const answers = {
+    summary: { text: tr('Vos messages non lus et ceux en attente de réponse se trouvent dans la messagerie. Filtrez par « Nouveau » ou « En attente » pour commencer par les plus urgents.', 'Your unread messages and those awaiting a reply are in Messages. Filter by “New” or “Pending” to start with the most urgent.'), action: go.inbox },
+    reply: { text: tr('Ouvrez le message auquel répondre : vous y trouverez la réponse à une demande de visite (accepter, proposer une autre heure ou refuser).', 'Open the message you want to answer: you\'ll find the reply options for a showing request (accept, suggest another time or decline).'), action: go.inbox },
+    find: { text: tr('Entrez une adresse ou un numéro MLS dans Mes propriétés pour retrouver une fiche et consulter ses disponibilités.', 'Enter an address or MLS number in My listings to find a listing and check its availability.'), action: go.properties },
+    visit: { text: tr('Pour préparer une visite : choisissez l\'acheteur, ajoutez les propriétés, puis vérifiez les heures. Les couleurs indiquent la disponibilité de chaque propriété.', 'To prepare a showing: choose the buyer, add the listings, then check the times. The colours show each listing\'s availability.'), action: go.list },
+    help: { text: tr('Je peux résumer vos messages, rédiger une réponse, retrouver une propriété ou préparer une visite. Choisissez une suggestion ou écrivez votre question.', 'I can summarize your messages, draft a reply, find a listing or prepare a showing. Pick a suggestion or type your question.') },
+    other: { text: tr('Je n\'ai pas bien compris. Je peux vous aider avec les messages, les propriétés et les tours de visites : choisissez une suggestion pour commencer.', 'I didn\'t quite get that. I can help with messages, listings and showing tours: pick a suggestion to start.') },
+  };
+  return answers[key] || answers.other;
+}
+function liveGuessKey(text) {
+  const t = normalizeText(text);
+  if (/(resum|message|boite|inbox|summar)/.test(t)) return 'summary';
+  if (/(repon|redig|reply|draft|ecrire)/.test(t)) return 'reply';
+  if (/(propriet|adresse|mls|listing|find)/.test(t)) return 'find';
+  if (/(visite|tour|showing|prepar)/.test(t)) return 'visit';
+  return 'other';
+}
+function liveSend(text, key) {
+  const q = (text || '').trim();
+  if (!q || liveState.typing) return;
+  liveState.messages.push({ role: 'user', text: q });
+  liveState.input = '';
+  liveState.typing = true;
+  renderLive();
+  const answerKey = key || liveGuessKey(q);
+  liveState.timer = setTimeout(() => {
+    liveState.messages.push({ role: 'ai', ...liveAnswer(answerKey) });
+    liveState.typing = false;
+    renderLive();
+  }, 600);
+}
+// Repart d'une conversation vierge. Une réponse encore en route est annulée :
+// elle arriverait sinon dans le nouveau fil, sans question qui l'appelle.
+function liveNewChat() {
+  clearTimeout(liveState.timer);
+  liveState.messages = [];
+  liveState.input = '';
+  liveState.typing = false;
+  renderLive();
+  const ta = document.getElementById('live-input');
+  if (ta) ta.focus();
+}
+function liveSetOpen(open) {
+  if (open === liveState.open) return;
+  liveState.open = open;
+  liveState.entering = open;
+  // Le menu se réduit pendant que l'assistant est ouvert, pour laisser sa
+  // largeur au contenu ; il reprend son état d'avant à la fermeture.
+  if (open) { liveState.prevCollapsed = state.sidebarCollapsed; state.sidebarCollapsed = true; }
+  else { state.sidebarCollapsed = liveState.prevCollapsed; }
+  render();
+  if (open) { const ta = document.getElementById('live-input'); if (ta) ta.focus(); }
+  else { const b = document.getElementById('btn-live'); if (b) b.focus(); }
+}
+function liveGo(screen) {
+  leaveTour(() => { state.screen = screen; state.draft = null; if (screen === 'inbox') state.compose = null; });
+}
+
+function renderLive() {
+  const dock = document.getElementById('live-dock');
+  const btn = document.getElementById('btn-live');
+  if (!dock || !btn) return;
+  const open = liveState.open;
+  document.body.classList.toggle('live-open', open);
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  btn.setAttribute('aria-label', tr('Touchbase Live, assistant IA', 'Touchbase Live, AI assistant'));
+  btn.title = tr('Touchbase Live — assistant IA', 'Touchbase Live — AI assistant');
+  dock.hidden = !open;
+  if (!open) { dock.innerHTML = ''; return; }
+
+  const hadFocus = document.activeElement && document.activeElement.id === 'live-input';
+  const empty = liveState.messages.length === 0;
+  const body = empty ? `
+      <div class="live-empty">
+        <span class="live-mark">${LIVE_ICON.replace('%W%', 42).replace('%H%', 50)}</span>
+        <h2 class="live-title" id="live-title">${tr('Comment puis-je vous aider ?', 'How can I help you?')}</h2>
+        <p class="live-sub">${tr('Posez une question ou choisissez une suggestion pour commencer.', 'Ask a question or pick a suggestion to get started.')}</p>
+      </div>
+      <div class="live-chips" role="group" aria-label="${tr('Suggestions', 'Suggestions')}">
+        ${liveSuggestions().map(c => `<button type="button" class="live-chip" data-live-chip="${c.id}">${esc(c.label)}</button>`).join('')}
+      </div>` : `
+      <div class="live-thread" id="live-thread" role="log" aria-live="polite">
+        ${liveState.messages.map(m => m.role === 'user'
+          ? `<p class="live-msg is-user">${esc(m.text)}</p>`
+          : `<div class="live-msg is-ai"><p>${esc(m.text)}</p>${m.action ? `<button type="button" class="live-action" data-live-go="${m.action.screen}">${esc(m.action.label)} ${icon('chevronRight')}</button>` : ''}</div>`).join('')}
+        ${liveState.typing ? `<p class="live-msg is-ai is-typing" aria-label="${tr('Touchbase Live écrit', 'Touchbase Live is typing')}"><span></span><span></span><span></span></p>` : ''}
+      </div>`;
+  dock.innerHTML = `
+    <section class="live-panel${liveState.entering ? ' is-entering' : ''}" role="complementary" aria-labelledby="live-title" id="live-panel">
+      <div class="live-head">
+        <button type="button" class="live-new" id="live-new" ${empty ? 'disabled' : ''}>${icon('plus')}<span>${tr('Nouveau chat', 'New chat')}</span></button>
+        <button type="button" class="live-icon-btn" id="live-help" aria-label="${tr('Ce que je peux faire', 'What I can do')}" title="${tr('Ce que je peux faire', 'What I can do')}"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M9.6 9.4a2.4 2.4 0 1 1 3.4 2.2c-.7.4-1 .8-1 1.5M12 16.6v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+        <button type="button" class="live-icon-btn is-filled" id="live-close" aria-label="${tr('Fermer l\'assistant', 'Close the assistant')}" title="${tr('Fermer', 'Close')}">${icon('x')}</button>
+      </div>
+      ${empty ? '' : `<h2 class="live-title live-title--sr" id="live-title">${tr('Touchbase Live', 'Touchbase Live')}</h2>`}
+      <div class="live-body${empty ? ' is-empty' : ''}">${body}</div>
+      <form class="live-composer" id="live-form">
+        <textarea id="live-input" rows="2" placeholder="${tr('Ex. : comment répondre à une demande de visite ?', 'E.g. how do I answer a showing request?')}" aria-label="${tr('Votre question', 'Your question')}">${esc(liveState.input)}</textarea>
+        <div class="live-composer-row">
+          <button type="button" class="live-tool" id="live-attach" aria-label="${tr('Joindre un fichier', 'Attach a file')}" title="${tr('Joindre un fichier', 'Attach a file')}">${icon('plus')}</button>
+          <span class="live-composer-end">
+            <button type="button" class="live-tool" id="live-mic" aria-label="${tr('Dicter', 'Dictate')}" title="${tr('Dicter', 'Dictate')}"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+            <button type="submit" class="live-send" id="live-send" aria-label="${tr('Envoyer', 'Send')}" ${liveState.input.trim() && !liveState.typing ? '' : 'disabled'}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </span>
+        </div>
+      </form>
+      <p class="live-disclaimer">${tr('L\'IA peut se tromper. Vérifiez les informations importantes.', 'AI can make mistakes. Check important information.')}</p>
+    </section>`;
+
+  liveState.entering = false;
+  const input = document.getElementById('live-input');
+  const sendBtn = document.getElementById('live-send');
+  input.oninput = () => { liveState.input = input.value; sendBtn.disabled = !input.value.trim() || liveState.typing; };
+  input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); liveSend(input.value); } };
+  document.getElementById('live-form').onsubmit = e => { e.preventDefault(); liveSend(input.value); };
+  document.getElementById('live-new').onclick = liveNewChat;
+  document.getElementById('live-close').onclick = () => liveSetOpen(false);
+  document.getElementById('live-help').onclick = () => {
+    liveState.messages.push({ role: 'ai', ...liveAnswer('help') });
+    renderLive();
+  };
+  document.getElementById('live-attach').onclick = () => showToast(tr('Les pièces jointes ne sont pas encore disponibles dans ce prototype.', 'Attachments aren\'t available in this prototype yet.'));
+  document.getElementById('live-mic').onclick = () => showToast(tr('La dictée n\'est pas encore disponible dans ce prototype.', 'Dictation isn\'t available in this prototype yet.'));
+  dock.querySelectorAll('[data-live-chip]').forEach(b => {
+    b.onclick = () => liveSend(b.textContent, b.getAttribute('data-live-chip'));
+  });
+  dock.querySelectorAll('[data-live-go]').forEach(b => { b.onclick = () => liveGo(b.getAttribute('data-live-go')); });
+  const thread = document.getElementById('live-thread');
+  if (thread) thread.scrollTop = thread.scrollHeight;
+  if (hadFocus) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+}
+function initLive() {
+  const btn = document.getElementById('btn-live');
+  if (btn) btn.onclick = () => liveSetOpen(!liveState.open);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && liveState.open && !state.modal && document.getElementById('live-dock').contains(document.activeElement)) liveSetOpen(false);
+  });
+}
+
 function render() {
   const main = document.getElementById('main-content');
   renderBrand();
@@ -1759,6 +1924,7 @@ function render() {
   // Après bindEvents : l'emplacement doit exister dans le DOM fraîchement rendu.
   syncTourMap();
   syncModalFocus();
+  renderLive();
 }
 
 /* ----- Screen: mobile menu grid ----- */
@@ -3128,30 +3294,37 @@ function composeFormProblem(f) {
   return '';
 }
 
-// Heure de début du formulaire : chaque heure porte la couleur de la
-// disponibilité qu'aurait la visite si elle commençait là, pour la date et la
-// durée en cours. Une liste maison plutôt qu'un <select>, dont les <option>
-// ne se colorent pas.
-function composeFromTag(f, min) {
-  const dur = Math.max(15, timeToMinutes(f.to) - timeToMinutes(f.from)) || 30;
-  return availabilityTagFor({ mls: f.mls, duration: dur }, min, f.date);
+// Heures de début et de fin du formulaire : chaque heure porte la couleur de la
+// disponibilité qu'aurait la visite. Pour le début, c'est la visite commençant
+// là avec la durée en cours ; pour la fin, c'est la visite commençant à l'heure
+// de début et finissant là (une fin trop tardive sort de la plage libre). Une
+// liste maison plutôt qu'un <select>, dont les <option> ne se colorent pas.
+function composeTimeTag(f, which, t) {
+  const fromMin = timeToMinutes(f.from);
+  if (which === 'to') {
+    const d = timeToMinutes(t) - fromMin;
+    return d > 0 ? availabilityTagFor({ mls: f.mls, duration: d }, fromMin, f.date) : null;
+  }
+  const dur = Math.max(15, timeToMinutes(f.to) - fromMin) || 30;
+  return availabilityTagFor({ mls: f.mls, duration: dur }, timeToMinutes(t), f.date);
 }
-function composeFromPickerHtml(f) {
-  const cur = composeFromTag(f, timeToMinutes(f.from));
+function composePickerHtml(f, which) {
+  const cur = composeTimeTag(f, which, f[which]);
+  const tone = cur ? cur.tone : 'muted';
   const items = TIME_OPTIONS.map(t => {
-    const tag = composeFromTag(f, timeToMinutes(t));
-    return `<li role="option" class="time-opt" data-cmp-from="${t}" aria-selected="${t === f.from}" title="${esc(availabilityTagLabel(tag))}"><span class="time-badge tone-${tag.tone}">${composeTime(t)}</span></li>`;
+    const tag = composeTimeTag(f, which, t);
+    if (!tag) return `<li role="option" class="time-opt is-disabled" aria-disabled="true" aria-selected="false"><span class="time-badge">${composeTime(t)}</span></li>`;
+    return `<li role="option" class="time-opt" data-cmp-time="${which}:${t}" aria-selected="${t === f[which]}" title="${esc(availabilityTagLabel(tag))}"><span class="time-badge tone-${tag.tone}">${composeTime(t)}</span></li>`;
   }).join('');
   return `
-    <button type="button" class="input select time-picker-btn tone-${cur.tone}" id="cmp-from" aria-haspopup="listbox" aria-expanded="${!!f.fromOpen}" title="${esc(availabilityTagLabel(cur))}">
-      <span class="time-badge tone-${cur.tone}">${composeTime(f.from)}</span>
+    <button type="button" class="input select time-picker-btn tone-${tone}" id="cmp-${which}" aria-haspopup="listbox" aria-expanded="${!!f[which + 'Open']}"${cur ? ` title="${esc(availabilityTagLabel(cur))}"` : ''}>
+      <span class="time-badge tone-${tone}">${composeTime(f[which])}</span>
     </button>
-    ${f.fromOpen ? `<ul class="time-list" role="listbox" aria-label="${tr('Heure de début', 'Start time')}">${items}</ul>` : ''}`;
+    ${f[which + 'Open'] ? `<ul class="time-list" role="listbox" aria-label="${which === 'to' ? tr('Heure de fin', 'End time') : tr('Heure de début', 'Start time')}">${items}</ul>` : ''}`;
 }
 
 function renderComposeForm(c) {
   const f = c.form;
-  const opts = (sel) => TIME_OPTIONS.map(t => `<option value="${t}" ${t === sel ? 'selected' : ''}>${composeTime(t)}</option>`).join('');
   const problem = composeFormProblem(f);
   return `
     <div class="modal-overlay" id="cmp-overlay">
@@ -3171,8 +3344,8 @@ function renderComposeForm(c) {
           <div class="field"><label class="field-label" for="cmp-client">${tr('Nom du client', 'Client name')} <span class="field-optional">${tr('(facultatif)', '(optional)')}</span></label>${composeFormClientHtml(f)}</div>
           <div class="field"><label class="field-label" for="cmp-date">${tr('Date', 'Date')}</label><input type="date" class="input" id="cmp-date" value="${esc(f.date)}" min="${composeISO(new Date())}"></div>
           <div class="field-row">
-            <div class="field"><label class="field-label" id="cmp-from-label">${tr('De', 'From')}</label><div class="time-picker" id="cmp-from-wrap">${composeFromPickerHtml(f)}</div></div>
-            <div class="field"><label class="field-label" for="cmp-to">${tr('À', 'To')}</label><select class="input" id="cmp-to">${opts(f.to)}</select></div>
+            <div class="field"><label class="field-label" id="cmp-from-label">${tr('De', 'From')}</label><div class="time-picker" id="cmp-from-wrap">${composePickerHtml(f, 'from')}</div></div>
+            <div class="field"><label class="field-label" id="cmp-to-label">${tr('À', 'To')}</label><div class="time-picker" id="cmp-to-wrap">${composePickerHtml(f, 'to')}</div></div>
           </div>
           <div id="cmp-banner">${composeFormBannerHtml(f)}</div>
           <div class="field"><label class="field-label" for="cmp-comment">${tr('Commentaires', 'Comments')}</label><textarea class="input" id="cmp-comment" rows="3" placeholder="${tr('Ajoutez un message', 'Enter your message')}">${esc(f.comment)}</textarea></div>
@@ -3463,32 +3636,42 @@ function bindComposeEvents() {
   // Formulaire de visite
   const f = c.form;
   if (!f) return;
-  const bindFromPicker = () => {
-    const btn = document.getElementById('cmp-from');
-    if (btn) btn.onclick = () => {
-      f.fromOpen = !f.fromOpen;
-      refreshFromPicker();
-      const sel = document.querySelector('#cmp-from-wrap [aria-selected="true"]');
-      if (sel) sel.scrollIntoView({ block: 'center' });
-    };
-    document.querySelectorAll('#cmp-from-wrap [data-cmp-from]').forEach(el => {
-      el.onclick = () => { f.from = el.getAttribute('data-cmp-from'); f.fromOpen = false; refreshForm(); };
+  const bindPickers = () => {
+    ['from', 'to'].forEach(which => {
+      const btn = document.getElementById(`cmp-${which}`);
+      if (btn) btn.onclick = () => {
+        const wasOpen = !!f[which + 'Open'];
+        f.fromOpen = false; f.toOpen = false;
+        f[which + 'Open'] = !wasOpen;
+        refreshPickers();
+        const sel = document.querySelector(`#cmp-${which}-wrap [aria-selected="true"]`);
+        if (sel) sel.scrollIntoView({ block: 'center' });
+      };
+    });
+    document.querySelectorAll('[data-cmp-time]').forEach(el => {
+      el.onclick = () => {
+        const [which, t] = el.getAttribute('data-cmp-time').split(/:(.+)/);
+        f[which] = t; f.fromOpen = false; f.toOpen = false; refreshForm();
+      };
     });
   };
-  const refreshFromPicker = () => {
-    const wrap = document.getElementById('cmp-from-wrap');
-    if (wrap) { wrap.innerHTML = composeFromPickerHtml(f); bindFromPicker(); }
+  const refreshPickers = () => {
+    ['from', 'to'].forEach(which => {
+      const wrap = document.getElementById(`cmp-${which}-wrap`);
+      if (wrap) wrap.innerHTML = composePickerHtml(f, which);
+    });
+    bindPickers();
   };
   const refreshForm = () => {
-    refreshFromPicker();
+    refreshPickers();
     document.getElementById('cmp-banner').innerHTML = composeFormBannerHtml(f);
     const why = composeFormProblem(f);
     document.getElementById('cmp-form-why').textContent = why;
     document.getElementById('cmp-form-save').disabled = !!why;
   };
   const bindField = (id, key, evt = 'oninput') => { const el = document.getElementById(id); if (el) el[evt] = () => { f[key] = el.value; refreshForm(); }; };
-  bindField('cmp-date', 'date'); bindField('cmp-to', 'to', 'onchange');
-  bindFromPicker();
+  bindField('cmp-date', 'date');
+  bindPickers();
   const comment = document.getElementById('cmp-comment');
   if (comment) comment.oninput = () => { f.comment = comment.value; };
   const cb = document.getElementById('cmp-callback');
@@ -5641,6 +5824,11 @@ function renderVisitRequestModal() {
     const tag = vrFromTone(min);
     return `<li role="option" class="time-opt" data-from="${min}" aria-selected="${min === m.from}" title="${esc(availabilityTagLabel(tag))}"><span class="time-badge tone-${tag.tone}">${timeLabel(t)}</span></li>`;
   }).join('');
+  // Heure de fin : mêmes couleurs, calculées pour la visite qui finirait là.
+  const toOptions = [...new Set([15, 30, m.duration])].sort((a, b) => a - b).map(d => {
+    const tag = availabilityTagFor({ mls: m.mls, external: m.external, duration: d }, m.from, vrDate);
+    return `<li role="option" class="time-opt" data-vr-dur="${d}" aria-selected="${d === m.duration}" title="${esc(availabilityTagLabel(tag))}"><span class="time-badge tone-${tag.tone}">${timeLabel(minutesToLabel(m.from + d).replace('h', ':'))}</span></li>`;
+  }).join('');
   // Ce que le calendrier de disponibilité de la fiche décide pour ce créneau
   // précis, avant même d'enregistrer la demande : sans ça, rien ne dit au
   // courtier acheteur qu'une visite libre ou pré-approuvée se confirmera
@@ -5755,10 +5943,12 @@ function renderVisitRequestModal() {
             </div>
             <div class="field">
               <label class="field-label" for="vr-duration">${tr('À :', 'To:')}</label>
-              <select class="input select" id="vr-duration">
-                ${[...new Set([15, 30, m.duration])].sort((a, b) => a - b).map(d => `
-                  <option value="${d}" ${m.duration === d ? 'selected' : ''}>${minutesToLabel(m.from + d)}</option>`).join('')}
-              </select>
+              <div class="time-picker">
+                <button type="button" class="input select time-picker-btn tone-${vrTag.tone}" id="vr-duration" aria-haspopup="listbox" aria-expanded="${!!m.durOpen}">
+                  <span class="time-badge tone-${vrTag.tone}">${timeLabel(minutesToLabel(m.from + m.duration).replace('h', ':'))}</span>
+                </button>
+                ${m.durOpen ? `<ul class="time-list" role="listbox" aria-label="${tr('Heure de fin', 'End time')}">${toOptions}</ul>` : ''}
+              </div>
             </div>
           </div>
           <p class="vr-note">${tr('La durée de visite est limitée à 30 minutes', 'Visit length is limited to 30 minutes')}</p>
@@ -7731,7 +7921,7 @@ function bindVisitRequestModalEvents() {
   // la couleur de disponibilité de chaque heure.
   const fromBtn = document.getElementById('vr-from');
   if (fromBtn) fromBtn.onclick = () => {
-    m.fromOpen = !m.fromOpen;
+    m.fromOpen = !m.fromOpen; m.durOpen = false;
     render();
     const sel = document.querySelector('#vr-from-list [aria-selected="true"]');
     if (sel) sel.scrollIntoView({ block: 'center' });
@@ -7740,8 +7930,11 @@ function bindVisitRequestModalEvents() {
     el.onclick = () => { m.from = +el.getAttribute('data-from'); m.fromOpen = false; render(); };
   });
 
-  const durSelect = document.getElementById('vr-duration');
-  if (durSelect) durSelect.onchange = () => { m.duration = +durSelect.value; render(); };
+  const durBtn = document.getElementById('vr-duration');
+  if (durBtn) durBtn.onclick = () => { m.durOpen = !m.durOpen; m.fromOpen = false; render(); };
+  document.querySelectorAll('[data-vr-dur]').forEach(el => {
+    el.onclick = () => { m.duration = +el.getAttribute('data-vr-dur'); m.durOpen = false; render(); };
+  });
 
   const comment = document.getElementById('vr-comment');
   if (comment) comment.oninput = () => {
@@ -8016,4 +8209,5 @@ function bindDestinationModalEvents() {
 /* ---------------- Init ---------------- */
 
 initSidebarTips();
+initLive();
 render();
