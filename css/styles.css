@@ -2046,7 +2046,6 @@ body[data-screen="messageDetail"] .topbar-back { display: inline-flex; }
   transition: box-shadow 0.15s ease;
 }
 .menu-card:hover { box-shadow: var(--shadow-base); }
-.menu-card-clip { position: absolute; inset: 0; overflow: hidden; border-radius: 10px; pointer-events: none; }
 .menu-card-icon { width: 40px; height: 40px; color: var(--bleu-principal); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .menu-card-icon img { max-width: 40px; max-height: 40px; display: block; }
 .menu-card-label { font-size: 14px; font-weight: 500; color: var(--bleu-principal); line-height: 1.15; padding: 0 6px; }
@@ -2064,13 +2063,6 @@ body[data-screen="messageDetail"] .topbar-back { display: inline-flex; }
 .menu-new-btn:hover { background: var(--bleu-principal-dark); }
 .menu-new-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .menu-new-btn svg { width: 16px; height: 16px; }
-.menu-ribbon {
-  position: absolute; top: 12px; right: -32px;
-  background: var(--bleu-secondaire); color: var(--blanc);
-  font-size: 9px; font-weight: 600; letter-spacing: 0.02em;
-  padding: 4px 32px; transform: rotate(45deg);
-  box-shadow: 3px 2px 14.4px rgba(26,39,64,0.1);
-}
 
 /* ---------- Responsive (mobile mockups: Figma 4366:7566 → 4366:8855) ---------- */
 
@@ -2093,14 +2085,17 @@ body[data-screen="messageDetail"] .topbar-back { display: inline-flex; }
     padding: 28px 20px 20px;
     margin-bottom: 24px;
   }
-  body[data-screen="menu"] .mobile-header--menu { display: flex; }
+  /* Logo et boutons sur le même axe : la zone tactile de 44 px de Live est plus haute que le logo. */
+  body[data-screen="menu"] .mobile-header--menu { display: flex; align-items: center; }
   body:not([data-screen="menu"]) .mobile-header--nav { display: flex; align-items: center; padding-top: 34px; }
 
   .mobile-logo { padding: 0; }
+  .mobile-logo { display: flex; align-items: center; }
   .mobile-logo img { display: block; height: 31px; width: auto; }
-  .mobile-header-actions { display: flex; align-items: center; gap: 12px; }
+  .mobile-header-actions { display: flex; align-items: center; gap: 4px; }
+  .mobile-header-actions .lang-toggle { margin-right: 8px; }
   .lang-toggle--mobile { margin: 0; align-self: center; }
-  .mobile-power { background: none; border: none; padding: 4px; cursor: pointer; color: var(--bleu-principal); }
+  .mobile-power { background: none; border: none; padding: 0; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--bleu-principal); }
   .mobile-power svg { width: 28px; height: 28px; }
 
   .mobile-nav-back, .mobile-nav-grid {
@@ -2594,31 +2589,31 @@ body[data-screen="messageDetail"] .msgdetail { flex: 1 0 auto; padding-bottom: 0
 .reply-option:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .reply-option .msgtype-icon-wrap { width: 28px; height: 28px; }
 
-/* Composition en mobile : les boutons prennent toute la largeur, et l'ajout de
-   propriété flotte en bas à droite, comme « Nouveau message » dans la messagerie. */
+/* Composition en mobile : les boutons prennent toute la largeur de l'écran, et
+   « Sélectionner une propriété » reste dans la colonne d'actions, comme sur le web. */
 @media (max-width: 768px) {
   .compose-actions { max-width: none; }
-  .compose-page { padding-bottom: 88px; }
-  .compose-actions #cmp-add {
-    position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 20;
-    width: auto; min-height: 48px; padding: 12px 20px; border-radius: 999px; gap: 4px;
-    background: var(--bleu-principal); color: var(--blanc); border-color: var(--bleu-principal); box-shadow: var(--shadow-md);
-  }
-  .compose-actions #cmp-add:hover { background: var(--bleu-principal-dark); }
-  .compose-actions #cmp-add svg { width: 14px; height: 14px; }
   .compose-form-actions .btn, .compose-popup-footer .btn { max-width: none; }
 }
 
-/* Mobile : la mention « Fièrement canadien » ne vit que sur la page du menu, et
-   « Nouveau message » y flotte en bas pour rester toujours à portée du pouce. */
+/* Mobile : la mention « Fièrement canadien » ne vit que sur la page du menu. Elle
+   reste collée en bas, et « Nouveau message » flotte juste au-dessus, centré,
+   avec la même pastille que le bouton flottant de la messagerie. */
 @media (max-width: 768px) {
   body:not([data-screen="menu"]) .mobile-footer { display: none; }
-  .menu-new-btn {
-    position: fixed; left: 50%; transform: translateX(-50%); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 30;
-    width: min(377px, calc(100vw - 32px)); box-shadow: var(--shadow-md);
+  body[data-screen="menu"] { --menu-footer-h: 84px; }
+  body[data-screen="menu"] .mobile-footer {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
+    min-height: var(--menu-footer-h); justify-content: flex-end;
+    padding: 8px 16px max(12px, env(safe-area-inset-bottom)); background: var(--blanc);
   }
-  .menu-grid { padding-bottom: 16px; }
-  body[data-screen="menu"] .mobile-footer { padding-bottom: 92px; }
+  .menu-new-btn {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
+    bottom: calc(var(--menu-footer-h) + 12px + env(safe-area-inset-bottom));
+    grid-column: auto; width: auto; min-height: 48px; padding: 12px 20px; gap: 4px;
+    border-radius: 999px; box-shadow: var(--shadow-md); white-space: nowrap;
+  }
+  .menu-grid { padding-bottom: calc(var(--menu-footer-h) + 48px + 40px); }
 }
 
 
@@ -2844,3 +2839,29 @@ body.live-open .topbar { padding-right: 24px; }
   .live-panel { position: static; height: 100%; border: 0; border-radius: 0; }
   body.live-open .main-col { border-radius: 0 0 20px 20px; }
 }
+
+/* Touchbase Live sur mobile : icône dans les deux en-têtes (zone tactile de
+   44 px) et panneau en feuille plein écran, avec poignée. */
+.live-grip { display: none; }
+.mobile-live { display: none; }
+@media (max-width: 768px) {
+  .mobile-live {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px;
+    background: transparent; cursor: pointer;
+  }
+  .mobile-live img { display: block; width: 20px; height: 24px; }
+  .mobile-live:active { background: #E4ECF8; }
+  .mobile-live:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+  .live-dock { height: 100vh; height: 100dvh; background: var(--blanc); }
+  .live-panel { padding: max(10px, env(safe-area-inset-top)) 16px max(10px, env(safe-area-inset-bottom)); }
+  .live-panel.is-entering { animation: live-up 0.22s ease-out; }
+  .live-grip { display: flex; justify-content: center; padding: 2px 0 6px; }
+  .live-grip span { width: 40px; height: 4px; border-radius: 2px; background: #D3DAE6; }
+  .live-icon-btn { width: 44px; height: 44px; }
+  .live-new { height: 44px; }
+  .live-tool, .live-send { width: 40px; height: 40px; }
+  .live-composer textarea { font-size: 16px; } /* évite le zoom automatique d'iOS */
+}
+@keyframes live-up { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .live-panel.is-entering { animation: none; } }

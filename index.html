@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <!-- Bump ?v= on both tags below whenever css/js changes, so browsers don't serve a stale cached copy after deploy. -->
-<link rel="stylesheet" href="css/styles.css?v=212">
+<link rel="stylesheet" href="css/styles.css?v=217">
 </head>
 <body>
 
@@ -52,6 +52,7 @@
           <button type="button" data-lang="fr" id="lang-btn-fr-mobile">FR</button>
           <button type="button" data-lang="en" id="lang-btn-en-mobile">EN</button>
         </div>
+        <button class="mobile-live" type="button" aria-label="Touchbase Live, assistant IA" title="Touchbase Live"><img src="assets/favicon-touchbase.svg" alt="" width="20" height="24"></button>
         <button class="mobile-power" data-nav="logout" title="Déconnexion" aria-label="Déconnexion" id="mobile-power-btn" data-i18n-title="logout" data-i18n-aria-label="logout">
           <img src="assets/menu/power.svg" alt="" width="32" height="31">
         </button>
@@ -64,6 +65,7 @@
         <svg viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <span class="mobile-nav-title" id="mobile-nav-title">Tour de visites</span>
+      <button class="mobile-live" type="button" aria-label="Touchbase Live, assistant IA" title="Touchbase Live"><img src="assets/favicon-touchbase.svg" alt="" width="20" height="24"></button>
       <button class="mobile-nav-grid" id="mobile-menu-btn" title="Menu" aria-label="Ouvrir le menu" data-i18n-title="menu" data-i18n-aria-label="openMenu">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <rect x="3" y="3" width="5" height="5" rx="1"/><rect x="9.5" y="3" width="5" height="5" rx="1"/><rect x="16" y="3" width="5" height="5" rx="1"/>
@@ -116,6 +118,6 @@
 <div id="toast-root"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="js/app.js?v=212"></script>
+<script src="js/app.js?v=217"></script>
 </body>
 </html>

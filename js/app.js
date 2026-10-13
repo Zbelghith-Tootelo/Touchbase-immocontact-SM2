@@ -1731,7 +1731,7 @@ function setTopbarTitle(title) {
    navigation — le courtier peut suivre une suggestion et garder le fil.
    Les réponses sont simulées : le prototype n'appelle aucun service d'IA. */
 const LIVE_ICON = '<img src="assets/favicon-touchbase.svg" alt="" width="%W%" height="%H%">';
-const liveState = { timer: null, entering: false, open: false, prevCollapsed: false, messages: [], input: '', typing: false };
+const liveState = { trigger: null, timer: null, entering: false, open: false, prevCollapsed: false, messages: [], input: '', typing: false };
 
 function liveSuggestions() {
   return [
@@ -1792,8 +1792,17 @@ function liveNewChat() {
   const ta = document.getElementById('live-input');
   if (ta) ta.focus();
 }
-function liveSetOpen(open) {
+// Sur mobile le panneau occupe tout l'écran : le geste ou le bouton « retour »
+// du téléphone doit le fermer, pas quitter la page. L'ouverture ajoute donc une
+// entrée à l'historique, que la fermeture retire.
+const liveIsMobile = () => window.matchMedia('(max-width: 768px)').matches;
+function liveSetOpen(open, trigger) {
   if (open === liveState.open) return;
+  if (open) liveState.trigger = trigger || document.getElementById('btn-live');
+  if (liveIsMobile()) {
+    if (open) { try { history.pushState({ live: 1 }, ''); } catch (e) { /* ignore */ } }
+    else if (history.state && history.state.live) { liveState.open = false; try { history.back(); } catch (e) { /* ignore */ } }
+  }
   liveState.open = open;
   liveState.entering = open;
   // Le menu se réduit pendant que l'assistant est ouvert, pour laisser sa
@@ -1802,7 +1811,7 @@ function liveSetOpen(open) {
   else { state.sidebarCollapsed = liveState.prevCollapsed; }
   render();
   if (open) { const ta = document.getElementById('live-input'); if (ta) ta.focus(); }
-  else { const b = document.getElementById('btn-live'); if (b) b.focus(); }
+  else { const b = liveState.trigger && liveState.trigger.offsetParent ? liveState.trigger : document.getElementById('btn-live'); if (b && b.offsetParent) b.focus(); }
 }
 function liveGo(screen) {
   leaveTour(() => { state.screen = screen; state.draft = null; if (screen === 'inbox') state.compose = null; });
@@ -1839,7 +1848,8 @@ function renderLive() {
       </div>`;
   dock.innerHTML = `
     <section class="live-panel${liveState.entering ? ' is-entering' : ''}" role="complementary" aria-labelledby="live-title" id="live-panel">
-      <div class="live-head">
+      <div class="live-grip" id="live-grip" aria-hidden="true"><span></span></div>
+      <div class="live-head" id="live-head">
         <button type="button" class="live-new" id="live-new" ${empty ? 'disabled' : ''}>${icon('plus')}<span>${tr('Nouveau chat', 'New chat')}</span></button>
         <button type="button" class="live-icon-btn" id="live-help" aria-label="${tr('Ce que je peux faire', 'What I can do')}" title="${tr('Ce que je peux faire', 'What I can do')}"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M9.6 9.4a2.4 2.4 0 1 1 3.4 2.2c-.7.4-1 .8-1 1.5M12 16.6v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
         <button type="button" class="live-icon-btn is-filled" id="live-close" aria-label="${tr('Fermer l\'assistant', 'Close the assistant')}" title="${tr('Fermer', 'Close')}">${icon('x')}</button>
@@ -1883,7 +1893,17 @@ function renderLive() {
 }
 function initLive() {
   const btn = document.getElementById('btn-live');
-  if (btn) btn.onclick = () => liveSetOpen(!liveState.open);
+  if (btn) btn.onclick = () => liveSetOpen(!liveState.open, btn);
+  document.querySelectorAll('.mobile-live').forEach(b => { b.onclick = () => liveSetOpen(true, b); });
+  window.addEventListener('popstate', () => { if (liveState.open) liveSetOpen(false); });
+  // Glisser l'en-tête vers le bas ferme la feuille, comme toute feuille mobile.
+  const dock = document.getElementById('live-dock');
+  let startY = null;
+  dock.addEventListener('touchstart', e => { startY = e.target.closest('#live-grip, #live-head') ? e.touches[0].clientY : null; }, { passive: true });
+  dock.addEventListener('touchend', e => {
+    if (startY !== null && e.changedTouches[0].clientY - startY > 80) liveSetOpen(false);
+    startY = null;
+  }, { passive: true });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && liveState.open && !state.modal && document.getElementById('live-dock').contains(document.activeElement)) liveSetOpen(false);
   });
@@ -1942,7 +1962,6 @@ function renderMenuScreen() {
         <a href="#" class="menu-card ${active ? 'is-current' : ''}" data-nav="${item.id}"
           ${active ? 'aria-current="page"' : (WIRED_NAV.has(item.id) ? '' : `title="${tr('Section absente de ce prototype', 'Not wired up in this prototype')}"`)}
           aria-label="${esc(label)}${item.badge ? `, ${item.badge} ${tr('en attente', 'pending')}` : ''}${hors}">
-          ${item.id === 'tours' ? `<span class="menu-card-clip"><span class="menu-ribbon">${tr('Nouveau', 'New')}</span></span>` : ''}
           ${item.badge ? `<span class="nav-badge menu-card-badge" aria-hidden="true">${item.badge}</span>` : ''}
           <span class="menu-card-icon"><img src="${item.img}" alt=""></span>
           <span class="menu-card-label">${esc(label)}</span>
