@@ -1511,7 +1511,7 @@ function tourStartIsFixed(draft) {
 // prototype, absents de cette maquette, suivent ce même registre.
 const NAV_ITEMS = [
   { id: 'inbox', labelFr: 'Messagerie', labelEn: 'Messages', img: 'assets/menu/inbox.svg', get badge() { return inboxUnreadCount(); } },
-  { id: 'tours', labelFr: 'Tour de visites', labelEn: 'Buyer\'s tours', img: 'assets/menu/tour.svg' },
+  { id: 'tours', labelFr: 'Tour', labelEn: 'Tour', img: 'assets/menu/tour.svg' },
   { id: 'properties', labelFr: 'Mes propriétés', labelEn: 'My listings', img: 'assets/menu/properties.svg' },
   { id: 'directory', labelFr: 'Répertoire', labelEn: 'Directory', img: 'assets/menu/directory.svg' },
   { id: 'reports', labelFr: 'Rapports', labelEn: 'Reports', img: 'assets/menu/reports.svg' },
@@ -1627,7 +1627,7 @@ function renderBrand() {
     img.setAttribute('title', p.brand);
     img.setAttribute('data-tip', p.brand);
   });
-  document.title = `${p.brand} — ${tr('Tour de visites', 'Buyer\'s tours')}`;
+  document.title = `${p.brand} — ${tr('Tour', 'Tour')}`;
 }
 
 // Chrome statique de index.html (sidebar, en-têtes mobiles, pied de page) :
@@ -1795,7 +1795,7 @@ function liveAnswer(key) {
   const go = {
     inbox: { screen: 'inbox', label: tr('Ouvrir la messagerie', 'Open messages') },
     properties: { screen: 'properties', label: tr('Ouvrir Mes propriétés', 'Open My listings') },
-    list: { screen: 'list', label: tr('Ouvrir Tour de visites', 'Open Buyer\'s tours') },
+    list: { screen: 'list', label: tr('Ouvrir Tour', 'Open Tour') },
   };
   const answers = {
     summary: { text: tr('Vos messages non lus et ceux en attente de réponse se trouvent dans la messagerie. Filtrez par « Nouveau » ou « En attente » pour commencer par les plus urgents.', 'Your unread messages and those awaiting a reply are in Messages. Filter by “New” or “Pending” to start with the most urgent.'), action: go.inbox },
@@ -1978,7 +1978,7 @@ function render() {
   // Un créneau partagé dépend de l'ordre de la liste : on le revalide ici, seul
   // point par lequel passe toute modification du tour.
   normalizeParallel(state.draft);
-  if (state.screen === 'list') { setTopbarTitle(tr('Tour de visites', 'Buyer\'s tours')); main.innerHTML = renderListScreen(); }
+  if (state.screen === 'list') { setTopbarTitle(tr('Tour', 'Tour')); main.innerHTML = renderListScreen(); }
   // L'écran nomme son objet — l'acheteur — et non l'envoi : on peut en repartir
   // sans avoir rien envoyé.
   else if (state.screen === 'contact') { setTopbarTitle(state.contactPurpose === 'create' ? tr('Créer un tour de visites', 'Create a buyer\'s tour') : tr('Choisir l\'acheteur', 'Choose the buyer')); main.innerHTML = renderContactScreen(); }
