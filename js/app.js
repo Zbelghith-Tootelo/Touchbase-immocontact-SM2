@@ -1099,6 +1099,14 @@ const state = {
   contacts: CONTACTS.slice(),
   team: seedTeam(),          // membres de « Mon équipe » (voir seedTeam)
   teamFilter: 'all',         // all | active | pending
+  teamPhase: 1,              // 1 | 2 — bascule en bas de « Mon équipe »
+  p2Filter: 'all',           // phase 2 : all | active | pending | unsent
+  p2Query: '',               // phase 2 : recherche par nom ou agence
+  p2New: null,               // phase 2 : invitations pas encore envoyées
+  p2Members: null,           // phase 2 : équipe avec ses statuts par catégorie
+  p2Selected: [],            // phase 2 : ids cochés (invitations et membres)
+  p2EditId: null,            // phase 2 : membre dont on règle les envois
+  p2Draft: null,             // phase 2 : réglages en cours, copiés dans le membre à l'enregistrement
   teamSelected: [],          // ids cochés dans la liste
   teamCart: [],              // courtiers choisis dans « Ajouter une personne »
   teamQuery: '',
@@ -1538,7 +1546,7 @@ function navActiveId() {
   if (state.screen === 'inbox') return 'inbox';
   if (state.screen === 'help' || state.screen === 'about') return 'help';
   if (state.screen === 'compose' || state.screen === 'messageDetail') return 'inbox';
-  if (state.screen === 'settings' || state.screen === 'team' || state.screen === 'teamAdd') return 'settings';
+  if (state.screen === 'settings' || state.screen === 'team' || state.screen === 'teamAdd' || state.screen === 'teamEdit') return 'settings';
   return 'tours';
 }
 
@@ -1989,6 +1997,7 @@ function render() {
   else if (state.screen === 'propertyDetail') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderPropertyDetailScreen(); }
   else if (state.screen === 'propertyAvailability') { setTopbarTitle(propertyDetailTitle()); main.innerHTML = renderAvailabilityScreen(); }
   else if (state.screen === 'team') { setTopbarTitle(tr('Mon équipe', 'My team')); main.innerHTML = renderTeamScreen(); }
+  else if (state.screen === 'teamEdit') { const em = p2Editing(); setTopbarTitle(`${tr('Mon équipe', 'My team')} | ${em ? em.name : ''}`); main.innerHTML = renderTeamEditScreen(); }
   else if (state.screen === 'teamAdd') { setTopbarTitle(tr('Ajouter une personne', 'Add a person')); main.innerHTML = renderTeamAddScreen(); }
   else if (state.screen === 'settings') { setTopbarTitle(tr('Paramètres', 'Settings')); main.innerHTML = renderSettingsScreen(); }
   else if (state.screen === 'directory') { setTopbarTitle(tr('Répertoire', 'Directory')); main.innerHTML = renderDirectoryScreen(); }
@@ -4098,7 +4107,7 @@ const TEAM_SEARCH_LIMIT = 5;
 // l'équipe actuelle. `agency` est ce que la recherche compare avec le nom.
 const TEAM_CANDIDATES = [
   { id: 't1', name: 'Emma Laurent', agency: 'Dynamic Realty', photo: 'assets/team/emma-laurent-v2.jpg' },
-  { id: 't2', name: 'Emma Anderson', agency: 'Dynamic Realty', photo: '' },
+  { id: 't2', name: 'Emma Anderson', agency: 'Dynamic Realty', photo: 'assets/team/emma-anderson.jpg' },
   { id: 't3', name: 'Emma Thompson', agency: 'Dynamic Realty', photo: 'assets/team/emma-thompson-v2.jpg' },
   { id: 't4', name: 'Sophie Martin', agency: 'Remax Québec', photo: '' },
   { id: 't5', name: 'Marc Leblanc', agency: 'Century 21', photo: '' },
@@ -4161,6 +4170,17 @@ function teamVisibleMembers() {
 }
 
 function renderTeamScreen() {
+  return state.teamPhase === 2 ? renderTeamPhase2() : renderTeamPhase1();
+}
+
+function teamPhaseSwitchHtml() {
+  return `
+      <div class="phase-switch" role="group" aria-label="Phase">
+        ${[1, 2].map(n => `<button class="${state.teamPhase === n ? 'active' : ''}" data-team-phase="${n}" aria-pressed="${state.teamPhase === n}">Phase ${n}</button>`).join('')}
+      </div>`;
+}
+
+function renderTeamPhase1() {
   // « Tout sélectionner » porte sur ce qui est affiché : cocher des lignes que
   // le filtre cache, puis agir dessus, serait agir à l'aveugle (Nielsen #1).
   const selectable = teamVisibleMembers().filter(m => !m.isMe).map(m => m.id);
@@ -4213,10 +4233,15 @@ function renderTeamScreen() {
       ${bar}
       <div class="team-list" aria-live="polite">${rows}${empty}</div>
       <button class="btn btn-primary team-add-btn" id="team-add-open">${icon('plus')} ${tr('Ajouter un membre', 'Add team member')}</button>
+      ${teamPhaseSwitchHtml()}
     </div>`;
 }
 
 function bindTeamEvents() {
+  document.querySelectorAll('[data-team-phase]').forEach(btn => {
+    btn.onclick = () => { state.teamPhase = Number(btn.getAttribute('data-team-phase')); render(); const b = document.querySelector(`[data-team-phase="${state.teamPhase}"]`); if (b) b.focus(); };
+  });
+  if (state.teamPhase === 2) { bindTeamPhase2Events(); return; }
   const selectable = teamVisibleMembers().filter(m => !m.isMe).map(m => m.id);
   const keepFocus = (selector) => { const el = document.querySelector(selector); if (el) el.focus(); };
 
@@ -4264,6 +4289,323 @@ function bindTeamEvents() {
 
   const open = document.getElementById('team-add-open');
   if (open) open.onclick = () => { state.screen = 'teamAdd'; state.teamQuery = ''; state.teamCart = []; state.teamOpen = false; state.teamActive = 0; render(); };
+}
+
+/* ----- Phase 2 : équipe avec statuts par catégorie -----
+   Même page, autre maquette : la recherche et la liste « Nouveaux membres »
+   vivent sur l'écran, et chaque membre actif montre où il en est dans six
+   catégories. Les données sont celles de la maquette, séparées de la phase 1. */
+
+const P2_DIR = 'assets/team/p2/';
+// Un membre actif porte six pastilles ; chacune est l'une de ces valeurs.
+const P2_CELL = {
+  check: { icon: 'user-check', fr: 'Accepté', en: 'Accepted' },
+  clock: { icon: 'clock', fr: 'En attente', en: 'Waiting' },
+  moon: { icon: 'moon', fr: 'En pause', en: 'Paused' },
+  cancel: { icon: 'cancel', fr: 'Refusé', en: 'Declined' },
+};
+
+function p2Init() {
+  if (state.p2New) return;
+  const me = state.team.find(m => m.isMe);
+  state.p2New = [{ id: 'm23', name: 'Noah Brown', agency: 'Dynamic Realty Agence immobilière', photo: 'assets/team/noah-brown.jpg' }];
+  state.p2Members = [
+    { id: 'me', name: me ? me.name : 'Thais Bungalow', photo: me ? me.photo : P2_DIR + 'thais.png', status: 'active', isMe: true, cells: ['check', 'check', 'check', 'check', 'check', 'check'] },
+    { id: 't3', name: 'Emma Thompson', photo: 'assets/team/emma-thompson-v2.jpg', status: 'active', cells: ['check', 'check', 'check', 'check', 'check', 'check'] },
+    { id: 'm20', name: 'Oliver Thompson', photo: 'assets/team/oliver-thompson.jpg', status: 'active', cells: ['check', 'clock', 'moon', 'cancel', 'cancel', 'cancel'] },
+    { id: 'm21', name: 'Olivia Davis', photo: 'assets/team/olivia-davis.jpg', status: 'delayed' },
+    { id: 'm24', name: 'Liam Johnson', photo: 'assets/team/liam-johnson.jpg', status: 'pending-in' },
+  ];
+}
+
+function p2Matches(m, q) { return !q || normalizeText(`${m.name} ${m.agency || ''}`).includes(q); }
+
+function p2Status(m) {
+  if (m.status === 'active') return { cls: 'active', label: tr('Membre actif', 'Active member') };
+  if (m.status === 'delayed') return { cls: 'late', label: tr('Approbation en retard', 'Approval delayed') };
+  return { cls: 'pending', label: tr('En attente d\'approbation', 'Pending approval') };
+}
+
+function p2Person(m, sub, subCls) {
+  return `${teamAvatar(m)}
+        <div class="team-row-text">
+          <p class="team-row-name ${m.status === 'delayed' || m.status === 'pending-in' ? 'team-row-name--plain' : ''}">${esc(m.name)}${m.isMe ? ` (${tr('moi', 'me')})` : ''}</p>
+          <p class="${subCls}">${esc(sub)}</p>
+        </div>`;
+}
+
+function p2Check(on) { return `<span class="team-check ${on ? 'on' : ''}" aria-hidden="true">${on ? TEAM_ICONS.check : ''}</span>`; }
+function p2RowCheck(m, sel) {
+  if (m.isMe) return '<span class="team-check-spacer"></span>';
+  const on = sel.has(m.id);
+  return `<button class="team-row-check" data-p2-toggle="${m.id}" aria-pressed="${on}" aria-label="${tr('Sélectionner', 'Select')} ${esc(m.name)}">${p2Check(on)}</button>`;
+}
+
+function renderTeamPhase2() {
+  p2Init();
+  const q = normalizeText(state.p2Query).trim();
+  const f = state.p2Filter;
+  const pill = (id, fr, en) => `<button class="team-pill ${f === id ? 'active' : ''}" data-p2-filter="${id}" aria-pressed="${f === id}">${tr(fr, en)}</button>`;
+
+  const inTeam = new Set([...state.p2New, ...state.p2Members].map(m => m.id));
+  const suggestions = q.length >= TEAM_MIN_LETTERS
+    ? TEAM_CANDIDATES.filter(c => !inTeam.has(c.id) && normalizeText(`${c.name} ${c.agency}`).includes(q)).slice(0, TEAM_SEARCH_LIMIT)
+    : [];
+  const suggestionsHtml = suggestions.length ? `
+    <ul class="p2-suggest" role="listbox" aria-label="${tr('Résultats', 'Results')}">
+      ${suggestions.map(c => `<li><button class="p2-suggest-item" data-p2-add="${c.id}">${c.photo ? teamAvatar(c, 32) : ''}<span class="p2-suggest-text"><strong>${esc(c.name)}</strong> ${esc(c.agency)}</span>${icon('plus')}</button></li>`).join('')}
+    </ul>` : '';
+
+  const newRows = (f === 'all' || f === 'unsent') ? state.p2New.filter(m => p2Matches(m, q)) : [];
+  const members = state.p2Members.filter(m => p2Matches(m, q) && (f === 'all' || (f === 'active' && m.status === 'active') || (f === 'pending' && m.status !== 'active')));
+
+  // « Tout sélectionner » porte sur ce qui est affiché : agir sur des lignes que
+  // le filtre cache serait agir à l'aveugle.
+  const selectable = [...newRows, ...members].filter(m => !m.isMe).map(m => m.id);
+  const sel = new Set(state.p2Selected.filter(id => selectable.includes(id)));
+  const allSelected = selectable.length > 0 && selectable.every(id => sel.has(id));
+  const approvable = state.p2Members.filter(m => sel.has(m.id) && m.status === 'pending-in');
+  const approveLabel = allSelected
+    ? tr(`Tout approuver (${approvable.length})`, `Approve all (${approvable.length})`)
+    : tr(`Approuver la sélection (${approvable.length})`, `Approve selected (${approvable.length})`);
+
+  const newHtml = newRows.map(m => `
+      <div class="team-row ${sel.has(m.id) ? 'selected' : ''}">
+        ${p2RowCheck(m, sel)}
+        ${p2Person(m, m.agency, 'team-row-agency')}
+        <div class="team-row-actions">
+          <button class="team-icon-btn team-icon-btn--remove" data-p2-discard="${m.id}" title="${tr('Retirer', 'Remove')}" aria-label="${tr('Retirer', 'Remove')} ${esc(m.name)}"><img src="${P2_DIR}remove-circle.svg" alt=""></button>
+          <button class="team-icon-btn team-icon-btn--send" data-p2-send="${m.id}" title="${tr('Envoyer l\'invitation', 'Send invitation')}" aria-label="${tr('Envoyer l\'invitation à', 'Send invitation to')} ${esc(m.name)}"><img src="${P2_DIR}send.svg" alt=""></button>
+        </div>
+      </div>`).join('');
+
+  const cell = (v) => { const c = P2_CELL[v]; return `<img class="p2-cell" src="${P2_DIR}${c.icon}.svg" alt="${tr(c.fr, c.en)}" title="${tr(c.fr, c.en)}">`; };
+  const memberHtml = members.map(m => {
+    const st = p2Status(m);
+    const cats = m.isMe
+      ? `<div class="p2-cats" role="img" aria-label="${tr('Catégories', 'Categories')}">${[1, 2, 3, 4, 5, 6].map(n => `<span class="p2-cat"><img src="${P2_DIR}cat${n}.svg" alt=""></span>`).join('')}</div>`
+      : m.cells ? `<div class="p2-cells">${m.cells.map(cell).join('')}</div>` : '';
+    let actions = '';
+    if (m.status === 'active') actions = `<button class="team-icon-btn team-icon-btn--edit" data-p2-edit="${m.id}" title="${tr('Modifier', 'Edit')}" aria-label="${tr('Modifier', 'Edit')} ${esc(m.name)}"><img src="${P2_DIR}edit.svg" alt=""></button>`;
+    else if (m.status === 'delayed') actions = `
+        <button class="team-icon-btn team-icon-btn--remove" data-p2-drop="${m.id}" title="${tr('Retirer de l\'équipe', 'Remove from team')}" aria-label="${tr('Retirer', 'Remove')} ${esc(m.name)}"><img src="${P2_DIR}trash.svg" alt=""></button>
+        <button class="team-icon-btn" data-p2-retry="${m.id}" title="${tr('Relancer', 'Send again')}" aria-label="${tr('Relancer', 'Send again to')} ${esc(m.name)}"><img src="${P2_DIR}reload.svg" alt=""></button>`;
+    else actions = `<button class="team-icon-btn team-icon-btn--approve" data-p2-approve="${m.id}" title="${tr('Approuver', 'Approve')}" aria-label="${tr('Approuver', 'Approve')} ${esc(m.name)}"><img src="${P2_DIR}check.svg" alt=""></button>`;
+    return `
+      <div class="team-row ${sel.has(m.id) ? 'selected' : ''}">
+        ${p2RowCheck(m, sel)}
+        ${p2Person(m, st.label, `team-row-status ${st.cls}`)}
+        ${cats}
+        <div class="team-row-actions">${actions}</div>
+      </div>`;
+  }).join('');
+
+  const empty = (!newHtml && !memberHtml) ? `<div class="empty-state"><p>${tr('Aucun membre ne correspond.', 'No member matches.')}</p></div>` : '';
+
+  return `
+    <div class="team-page team-page--p2">
+      <div class="p2-search">
+        <h2 class="p2-title">${tr('Ajouter un membre :', 'Add a team member:')}</h2>
+        <label class="p2-label" for="p2-query">${tr('Chercher par nom ou agence', 'Search by name or agency')}</label>
+        <div class="p2-field">
+          <input type="text" class="input" id="p2-query" autocomplete="off" value="${esc(state.p2Query)}">
+          <img src="${P2_DIR}search.svg" alt="" class="p2-field-icon">
+        </div>
+        ${suggestionsHtml}
+      </div>
+      <div class="team-bar">
+        <button class="team-pill team-pill--select ${allSelected ? 'active' : ''}" id="p2-select-all" aria-pressed="${allSelected}" ${selectable.length ? '' : 'disabled'}>${p2Check(allSelected)}<span>${tr('Tout sélectionner', 'Select all')}</span></button>
+        ${approvable.length ? `<button class="team-pill team-pill--approve" id="p2-bulk-approve">${TEAM_ICONS.check}${approveLabel}</button>` : ''}
+        ${sel.size ? `<button class="team-pill team-pill--delete" id="p2-bulk-delete">${TEAM_ICONS.trash}${tr('Retirer la sélection', 'Remove selected')} (${sel.size})</button>` : ''}
+        ${pill('active', 'Membres actifs', 'Active members')}
+        ${pill('pending', 'En attente d\'approbation', 'Pending approval')}
+        ${pill('unsent', 'Invitation non envoyée', 'Invitation not sent')}
+      </div>
+      ${newHtml ? `<h2 class="p2-title">${tr('Nouveaux membres :', 'New members:')}</h2><div class="team-list">${newHtml}</div>` : ''}
+      ${memberHtml ? `<h2 class="p2-title">${tr('Membres de mon équipe :', 'My team members:')}</h2><div class="team-list">${memberHtml}</div>` : ''}
+      ${empty}
+      ${teamPhaseSwitchHtml()}
+    </div>`;
+}
+
+function bindTeamPhase2Events() {
+  const byId = (list, id) => list.find(m => m.id === id);
+  const attr = (el, name) => el.getAttribute(name);
+
+  const input = document.getElementById('p2-query');
+  if (input) input.oninput = () => {
+    state.p2Query = input.value; render();
+    const i = document.getElementById('p2-query'); if (i) { i.focus(); i.selectionStart = i.selectionEnd = i.value.length; }
+  };
+  document.querySelectorAll('[data-p2-filter]').forEach(b => {
+    b.onclick = () => { const f = attr(b, 'data-p2-filter'); state.p2Filter = state.p2Filter === f ? 'all' : f; state.p2Selected = []; render(); };
+  });
+  const keepFocus = (selector) => { const el = document.querySelector(selector); if (el) el.focus(); };
+  const selectAll = document.getElementById('p2-select-all');
+  if (selectAll) selectAll.onclick = () => {
+    const ids = [...document.querySelectorAll('[data-p2-toggle]')].map(b => attr(b, 'data-p2-toggle'));
+    const all = ids.length > 0 && ids.every(id => state.p2Selected.includes(id));
+    state.p2Selected = all ? [] : ids;
+    render(); keepFocus('#p2-select-all');
+  };
+  document.querySelectorAll('[data-p2-toggle]').forEach(b => {
+    b.onclick = () => {
+      const id = attr(b, 'data-p2-toggle');
+      state.p2Selected = state.p2Selected.includes(id) ? state.p2Selected.filter(x => x !== id) : [...state.p2Selected, id];
+      render(); keepFocus(`[data-p2-toggle="${id}"]`);
+    };
+  });
+  const bulkApprove = document.getElementById('p2-bulk-approve');
+  if (bulkApprove) bulkApprove.onclick = () => {
+    let n = 0;
+    state.p2Members.forEach(m => { if (state.p2Selected.includes(m.id) && m.status === 'pending-in') { m.status = 'active'; m.cells = ['check', 'clock', 'clock', 'clock', 'clock', 'clock']; n++; } });
+    state.p2Selected = state.p2Selected.filter(id => { const m = byId(state.p2Members, id); return !m || m.status !== 'active'; });
+    render();
+    if (n) showToast(n > 1 ? tr(`${n} personnes sont maintenant membres actifs.`, `${n} people are now active members.`) : tr('Membre approuvé : il est maintenant actif.', 'Member approved: now active.'), 'success');
+  };
+  const bulkDelete = document.getElementById('p2-bulk-delete');
+  if (bulkDelete) bulkDelete.onclick = () => { state.modal = { type: 'confirmRemoveTeam', phase2: true, ids: state.p2Selected.slice() }; render(); };
+  document.querySelectorAll('[data-p2-add]').forEach(b => {
+    b.onclick = () => {
+      const c = byId(TEAM_CANDIDATES, attr(b, 'data-p2-add'));
+      if (c) state.p2New.push({ id: c.id, name: c.name, agency: c.agency, photo: c.photo });
+      state.p2Query = ''; render();
+    };
+  });
+  document.querySelectorAll('[data-p2-discard]').forEach(b => {
+    b.onclick = () => { state.p2New = state.p2New.filter(m => m.id !== attr(b, 'data-p2-discard')); state.p2Selected = state.p2Selected.filter(id => id !== attr(b, 'data-p2-discard')); render(); };
+  });
+  document.querySelectorAll('[data-p2-send]').forEach(b => {
+    b.onclick = () => {
+      const m = byId(state.p2New, attr(b, 'data-p2-send'));
+      if (!m) return;
+      state.p2New = state.p2New.filter(x => x !== m);
+      state.p2Members.push({ id: m.id, name: m.name, photo: m.photo, status: 'pending-out' });
+      render();
+      showToast(tr(`Invitation envoyée à ${m.name}.`, `Invitation sent to ${m.name}.`), 'success');
+    };
+  });
+  document.querySelectorAll('[data-p2-approve]').forEach(b => {
+    b.onclick = () => {
+      const m = byId(state.p2Members, attr(b, 'data-p2-approve'));
+      if (!m) return;
+      m.status = 'active'; m.cells = ['check', 'clock', 'clock', 'clock', 'clock', 'clock'];
+      render();
+      showToast(tr('Membre approuvé : il est maintenant actif.', 'Member approved: now active.'), 'success');
+    };
+  });
+  document.querySelectorAll('[data-p2-drop]').forEach(b => {
+    b.onclick = () => { state.p2Members = state.p2Members.filter(m => m.id !== attr(b, 'data-p2-drop')); render(); };
+  });
+  document.querySelectorAll('[data-p2-retry]').forEach(b => {
+    b.onclick = () => {
+      const m = byId(state.p2Members, attr(b, 'data-p2-retry'));
+      if (!m) return;
+      m.status = 'pending-out'; render();
+      showToast(tr(`Invitation relancée à ${m.name}.`, `Invitation sent again to ${m.name}.`), 'success');
+    };
+  });
+  document.querySelectorAll('[data-p2-edit]').forEach(b => {
+    b.onclick = () => {
+      const m = byId(state.p2Members, attr(b, 'data-p2-edit'));
+      if (!m) return;
+      state.p2EditId = m.id; state.p2Draft = m.cells.slice(); state.screen = 'teamEdit'; render();
+    };
+  });
+}
+
+/* ----- Phase 2 : régler les envois d'un membre -----
+   Six catégories de notification, chacune avec une fréquence. Les pastilles de
+   la liste (`cells`) sont ce réglage : enregistrer ici change donc la ligne. */
+
+const P2_CATEGORIES = [
+  { fr: 'Demande de visite', en: 'Showing request' },
+  { fr: 'Confirmation de visite', en: 'Showing confirmation' },
+  { fr: 'Annulation de visite', en: 'Showing cancellation' },
+  { fr: 'Retour de visite', en: 'Showing feedback' },
+  { fr: 'Info sur la propriété', en: 'Info on property' },
+  { fr: 'Autre message', en: 'Other message' },
+];
+// Même clés que P2_CELL : la fréquence choisie est la pastille affichée.
+const P2_FREQ = [
+  { id: 'check', fr: 'Toujours', en: 'Always' },
+  { id: 'clock', fr: 'Aux heures de bureau', en: 'On office hours' },
+  { id: 'moon', fr: 'Hors des heures de bureau', en: 'Out of office hours' },
+  { id: 'cancel', fr: 'Jamais', en: 'Never' },
+];
+
+function p2Editing() { return state.p2Members && state.p2Members.find(m => m.id === state.p2EditId); }
+
+function renderTeamEditScreen() {
+  const m = p2Editing();
+  if (!m || !state.p2Draft) return '';
+  const draft = state.p2Draft;
+  const st = p2Status(m);
+
+  const chips = P2_FREQ.map(f => {
+    const on = draft.every(v => v === f.id);
+    return `<label class="p2-chip ${on ? 'active' : ''}">
+        <input type="radio" class="p2-radio" name="p2-all" value="${f.id}" data-p2-all ${on ? 'checked' : ''}>
+        <span>${tr(f.fr, f.en)}</span><img src="${P2_DIR}${P2_CELL[f.id].icon}.svg" alt="">
+      </label>`;
+  }).join('');
+
+  const rows = P2_CATEGORIES.map((c, i) => `
+      <fieldset class="p2-cat-row">
+        <legend class="sr-only">${tr(c.fr, c.en)}</legend>
+        <div class="p2-cat-id"><span class="p2-cat"><img src="${P2_DIR}cat${i + 1}.svg" alt=""></span><span class="p2-cat-name">${tr(c.fr, c.en)}</span></div>
+        <div class="p2-freqs">
+          ${P2_FREQ.map(f => `<label class="p2-freq"><input type="radio" class="p2-radio" name="p2-cat-${i}" value="${f.id}" data-p2-cat="${i}" ${draft[i] === f.id ? 'checked' : ''}><span>${tr(f.fr, f.en)}</span></label>`).join('')}
+        </div>
+      </fieldset>`).join('');
+
+  return `
+    <div class="team-page team-page--p2 p2-edit">
+      <div class="team-row">
+        ${teamAvatar(m)}
+        <div class="team-row-text">
+          <p class="team-row-name">${esc(m.name)}${m.isMe ? ` (${tr('moi', 'me')})` : ''}</p>
+          <p class="team-row-status ${st.cls}">${st.label}</p>
+        </div>
+      </div>
+      <div class="p2-heading">
+        <h2 class="p2-title">${tr('Envoi des annonces', 'Listing dispatch')}</h2>
+        <p class="p2-sub">${tr('Choisissez quand ce membre reçoit les notifications de vos annonces.', 'Choose when this team member receives notifications for your listings.')}</p>
+      </div>
+      <div class="p2-grid-head">
+        <div class="p2-labels"><span>${tr('Type de notification', 'Type of notification')}</span><span>${tr('Fréquence d\'envoi', 'Frequency of delivery')}</span></div>
+        <div class="p2-all"><span class="p2-all-label">${tr('Tout sélectionner', 'Select all')}</span><div class="p2-chips">${chips}</div></div>
+      </div>
+      <div class="p2-cats-list">${rows}</div>
+      <div class="p2-actions">
+        <button class="btn btn-primary" id="p2-save">${tr('Enregistrer', 'Save changes')}</button>
+        ${m.isMe ? '' : `<button class="btn p2-delete" id="p2-delete">${tr('Retirer le membre', 'Delete member')}</button>`}
+      </div>
+      <p class="p2-note">${tr('Les changements ne s\'appliquent qu\'à ce membre.', 'Changes apply to this team member only.')}</p>
+    </div>`;
+}
+
+function bindTeamEditEvents() {
+  const m = p2Editing();
+  document.querySelectorAll('[data-p2-all]').forEach(r => {
+    r.onchange = () => { state.p2Draft = state.p2Draft.map(() => r.value); render(); const n = document.querySelector(`[data-p2-all][value="${r.value}"]`); if (n) n.focus(); };
+  });
+  document.querySelectorAll('[data-p2-cat]').forEach(r => {
+    r.onchange = () => { state.p2Draft[Number(r.getAttribute('data-p2-cat'))] = r.value; render(); const n = document.querySelector(`[data-p2-cat="${r.getAttribute('data-p2-cat')}"][value="${r.value}"]`); if (n) n.focus(); };
+  });
+  const leave = () => { state.screen = 'team'; state.p2EditId = null; state.p2Draft = null; };
+  const save = document.getElementById('p2-save');
+  if (save) save.onclick = () => {
+    if (!m) return;
+    m.cells = state.p2Draft.slice(); leave(); render();
+    showToast(tr(`Réglages enregistrés pour ${m.name}.`, `Settings saved for ${m.name}.`), 'success');
+  };
+  const del = document.getElementById('p2-delete');
+  if (del) del.onclick = () => {
+    if (!m) return;
+    state.p2Members = state.p2Members.filter(x => x !== m); leave(); render();
+    showToast(tr(`${m.name} a été retiré de l'équipe.`, `${m.name} was removed from the team.`), 'success');
+  };
 }
 
 /* ----- Ajouter une personne ----- */
@@ -5591,9 +5933,9 @@ function renderModal() {
     return;
   }
   if (state.modal.type === 'confirmRemoveTeam') {
-    const members = state.team.filter(m => state.modal.ids.includes(m.id));
+    const members = (state.modal.phase2 ? [...state.p2New, ...state.p2Members] : state.team).filter(m => state.modal.ids.includes(m.id));
     const who = members.length === 1 ? esc(members[0].name) : tr(`${members.length} membres`, `${members.length} members`);
-    const body = tr(`${who} sera retiré${members.length > 1 ? 's' : ''} de votre équipe. Une demande en attente sera annulée.`, `${who} will be removed from your team. Any pending request will be cancelled.`);
+    const body = tr(`${who} ${members.length > 1 ? 'seront retirés' : 'sera retiré'} de votre équipe. Une demande en attente sera annulée.`, `${who} will be removed from your team. Any pending request will be cancelled.`);
     root.innerHTML = renderConfirmModal(tr('Retirer de l\'équipe', 'Remove from team'), body, 'btn-confirm-remove-team', tr('Retirer', 'Remove'));
     return;
   }
@@ -6792,6 +7134,7 @@ function bindEvents() {
     if (state.screen === 'messageDetail') { state.screen = 'inbox'; render(); return; }
     if (state.screen === 'propertyAvailability') { state.screen = 'propertyDetail'; state.availMiniCalOpen = false; render(); return; }
     if (state.screen === 'propertyDetail') { state.screen = 'properties'; state.propertyDetailMls = null; render(); return; }
+    if (state.screen === 'teamEdit') { state.screen = 'team'; state.p2EditId = null; state.p2Draft = null; render(); return; }
     if (state.screen === 'teamAdd') { state.screen = 'team'; state.teamCart = []; render(); return; }
     if (state.screen === 'team') { state.screen = 'settings'; state.teamSelected = []; render(); return; }
     if (state.screen === 'contactForm') { state.screen = 'directory'; state.contactFormDraft = null; render(); return; }
@@ -6825,6 +7168,7 @@ function bindEvents() {
   if (state.screen === 'settings') bindSettingsEvents();
   if (state.screen === 'team') bindTeamEvents();
   if (state.screen === 'teamAdd') bindTeamAddEvents();
+  if (state.screen === 'teamEdit') bindTeamEditEvents();
   if (state.screen === 'directory') bindDirectoryEvents();
   if (state.screen === 'inbox') bindInboxEvents();
   if (state.screen === 'help') bindHelpEvents();
@@ -7823,8 +8167,14 @@ function bindModalEvents() {
     if (btn) btn.onclick = () => {
       const ids = new Set(state.modal.ids);
       const n = ids.size;
-      state.team = state.team.filter(m => !ids.has(m.id) || m.isMe);
-      state.teamSelected = state.teamSelected.filter(id => !ids.has(id));
+      if (state.modal.phase2) {
+        state.p2New = state.p2New.filter(m => !ids.has(m.id));
+        state.p2Members = state.p2Members.filter(m => !ids.has(m.id) || m.isMe);
+        state.p2Selected = state.p2Selected.filter(id => !ids.has(id));
+      } else {
+        state.team = state.team.filter(m => !ids.has(m.id) || m.isMe);
+        state.teamSelected = state.teamSelected.filter(id => !ids.has(id));
+      }
       state.modal = null;
       render();
       showToast(n > 1 ? tr(`${n} membres retirés.`, `${n} members removed.`) : tr('Membre retiré.', 'Member removed.'));
